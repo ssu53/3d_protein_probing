@@ -1,0 +1,20 @@
+name: 3d_protein_probing
+
+channels:
+  - conda-forge
+  - pytorch
+
+dependencies:
+  - python>=3.10
+  - ipdb  # for debugging
+  - ipython  # for debugging
+  - matplotlib
+  - numpy
+  - pandas
+  - pip
+  - pytorch  # for chemprop
+  - scikit-learn
+  - scipy
+  - tqdm
+  - pip:
+    - typed-argument-parser
