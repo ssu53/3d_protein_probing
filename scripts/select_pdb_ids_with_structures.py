@@ -24,7 +24,11 @@ def select_pbd_ids_with_structures(args: Args) -> None:
     print(f'Loaded {len(pdb_ids):,} PDB IDs')
 
     # Select PDB IDs for which we have structures
-    pdb_ids = [pdb_id for pdb_id in tqdm(pdb_ids) if (args.pdb_dir / pdb_id[1:3] / f'{pdb_id}.ent.gz').exists()]
+    pdb_ids = [
+        pdb_id
+        for pdb_id in tqdm(pdb_ids)
+        if (args.pdb_dir / pdb_id[1:3].lower() / f'pdb{pdb_id.lower()}.ent.gz').exists()
+    ]
 
     print(f'Selected {len(pdb_ids):,} PDB IDs with structures')
 

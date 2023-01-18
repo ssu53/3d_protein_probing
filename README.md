@@ -34,3 +34,5 @@ python scripts/select_pdb_ids_with_structures.py \
     --pdb_dir /oak/stanford/groups/jamesz/swansonk/pdb \
     --save_path data/pdb_single_chain_protein_30_identity_ids_with_structures.csv
 ```
+
+This selects 16,561 PDB IDs with structures.
