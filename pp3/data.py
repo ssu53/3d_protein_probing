@@ -1,5 +1,4 @@
 """Data classes and functions."""
-import gzip
 from pathlib import Path
 
 import pandas as pd
@@ -14,16 +13,42 @@ PDB_PARSER = PDBParser()
 
 class ProteinStructure:
     """A protein structure."""
-    def __init__(self, structure: Structure) -> None:
-        self.structure = structure
+    def __init__(self, pdb_structure: Structure) -> None:
+        self.pdb_structure = pdb_structure
         self.probes = {}
+
+        # Clean PDB structure
+        self.clean_pdb_structure(pdb_structure=self.pdb_structure)
 
     def add_probe(self, probe: str) -> None:
         """Add a probe to the protein structure.
 
         :param probe: The name of the probe.
         """
-        self.probes[probe] = get_probe(probe)(self.structure)
+        self.probes[probe] = get_probe(probe)(self.pdb_structure)
+
+    @staticmethod
+    def clean_pdb_structure(pdb_structure: Structure) -> None:
+        """Clean the PDB structure, including removing hetero residues.
+
+        :param pdb_structure: The PDB structure to clean.
+        """
+        for model in pdb_structure:
+            residues_to_remove, chains_to_remove = [], []
+
+            for chain in model:
+                for residue in chain:
+                    if residue.id[0] != ' ':
+                        residues_to_remove.append((chain.id, residue.id))
+
+                if len(chain) == 0:
+                    chains_to_remove.append(chain.id)
+
+            for chain_id, residue_id in residues_to_remove:
+                model[chain_id].detach_child(residue_id)
+
+            for chain in chains_to_remove:
+                model.detach_child(chain)
 
     @classmethod
     def from_file(cls, pdb_id: str, pdb_dir: Path) -> 'ProteinStructure':
@@ -33,14 +58,14 @@ class ProteinStructure:
         :param pdb_dir: The directory containing the PDB structures.
         :return: The loaded protein structure.
         """
-        pdb_path = pdb_dir / pdb_id[1:3].lower() / f'pdb{pdb_id.lower()}.ent.gz'
+        pdb_structure = PDB_PARSER.get_structure(
+            id=pdb_id,
+            file=pdb_dir / pdb_id[1:3].lower() / f'pdb{pdb_id.lower()}.ent'
+        )
 
-        with gzip.open(pdb_path, 'rt') as file:
-            structure = PDB_PARSER.get_structure(id=pdb_id, file=file)
+        structure = cls(pdb_structure=pdb_structure)
 
-        protein_structure = cls(structure=structure)
-
-        return protein_structure
+        return structure
 
 
 class ProteinDataset:

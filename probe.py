@@ -27,8 +27,12 @@ def probe(
     :param pdb_dir: Path to a directory containing PDB structures.
     :param probes: Names of the probes to use.
     """
+    # Load protein dataset
     dataset = ProteinDataset.from_file(pdb_ids_path=pdb_ids_path, pdb_dir=pdb_dir)
-    dataset.add_probe('residue_pair_distances')
+
+    # Add probes
+    for probe in probes:
+        dataset.add_probe(probe)
 
 
 if __name__ == '__main__':
