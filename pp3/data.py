@@ -1,4 +1,5 @@
 """Data classes and functions."""
+import gzip
 from pathlib import Path
 
 import pandas as pd
@@ -32,11 +33,12 @@ class ProteinStructure:
         :param pdb_dir: The directory containing the PDB structures.
         :return: The loaded protein structure.
         """
-        pdb_structure = PDB_PARSER.get_structure(
-            id=pdb_id,
-            file=pdb_dir / pdb_id[1:3].lower() / f'pdb{pdb_id.lower()}.ent.gz'
-        )
-        protein_structure = cls(structure=pdb_structure)
+        pdb_path = pdb_dir / pdb_id[1:3].lower() / f'pdb{pdb_id.lower()}.ent.gz'
+
+        with gzip.open(pdb_path, 'rt') as file:
+            structure = PDB_PARSER.get_structure(id=pdb_id, file=file)
+
+        protein_structure = cls(structure=structure)
 
         return protein_structure
 

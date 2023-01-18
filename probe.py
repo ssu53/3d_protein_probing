@@ -17,15 +17,16 @@ class Args(Tap):
 
 
 def probe(
-    pdb_ids_path: Path,
-    pdb_dir: Path,
+        pdb_ids_path: Path,
+        pdb_dir: Path,
+        probes: list[str]
 ) -> None:
     """Probe a model for 3D geometric concepts.
 
     :param pdb_ids_path: Path to a CSV file containing PDB IDs.
     :param pdb_dir: Path to a directory containing PDB structures.
+    :param probes: Names of the probes to use.
     """
-    breakpoint()
     dataset = ProteinDataset.from_file(pdb_ids_path=pdb_ids_path, pdb_dir=pdb_dir)
     dataset.add_probe('residue_pair_distances')
 
