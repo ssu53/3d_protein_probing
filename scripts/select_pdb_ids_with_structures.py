@@ -7,9 +7,9 @@ from tqdm import tqdm
 
 
 class Args(Tap):
-    ids_path: Path  # Path to TXT file containing PDB IDs.
-    pdb_dir: Path  # Path to directory containing PDB structures.
-    save_path: Path  # Path to CSV file where PDB IDs with structures will be saved.
+    ids_path: Path  # Path to a TXT file containing PDB IDs.
+    pdb_dir: Path  # Path to a directory containing PDB structures.
+    save_path: Path  # Path to a CSV file where PDB IDs with structures will be saved.
 
     def process_args(self) -> None:
         self.save_path.parent.mkdir(parents=True, exist_ok=True)
