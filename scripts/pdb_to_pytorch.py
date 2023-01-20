@@ -1,4 +1,5 @@
 """Parses PDB files and saves coordinates and sequence in PyTorch format while removing invalid structures."""
+import sys
 from functools import partial
 from multiprocessing import Pool
 from pathlib import Path
@@ -9,6 +10,10 @@ from Bio import SeqIO
 from Bio.PDB import PDBParser, Structure
 from tap import Tap
 from tqdm import tqdm
+
+sys.path.append(Path(__file__).parent.parent.as_posix())
+
+from pp3.utils.constants import AA_3_TO_1
 
 
 class Args(Tap):
@@ -71,16 +76,18 @@ def convert_pdb_to_pytorch(pdb_id: str, pdb_dir: Path, save_dir: Path) -> bool:
     # Get the residue indices and ensure none are missing
     residue_indices = [residue.get_id()[1] for residue in residues]
     if residue_indices != list(range(min(residue_indices), max(residue_indices) + 1)):
+        print(f'Invalid residue indices for {pdb_id}')
         return False
 
     # Get sequence from structure residues
-    structure_sequence = ''.join(residue.get_resname() for residue in residues)
+    structure_sequence = ''.join(AA_3_TO_1[residue.get_resname()] for residue in residues)
 
     # Parse PDB sequence
-    records = list(SeqIO.parse('pdb2go8.ent', 'pdb-seqres'))
+    records = list(SeqIO.parse(pdb_path, 'pdb-seqres'))
 
     # Ensure only one sequence record
     if len(records) != 1:
+        print(f'Invalid number of sequence records for {pdb_id}')
         return False
 
     # Get sequence
@@ -88,6 +95,10 @@ def convert_pdb_to_pytorch(pdb_id: str, pdb_dir: Path, save_dir: Path) -> bool:
 
     # Ensure the structure's sequence matches a subsequence of the full PDB sequence
     if structure_sequence not in sequence:
+        print(f'Invalid sequence for {pdb_id}')
+        print(structure_sequence)
+        print(sequence)
+        print()
         return False
 
     # Get the start and end indices of the structure's sequence in the full PDB sequence
@@ -101,6 +112,8 @@ def convert_pdb_to_pytorch(pdb_id: str, pdb_dir: Path, save_dir: Path) -> bool:
         'start_index': start_index,
         'end_index': end_index
     }, save_dir / f'{pdb_id}.pt')
+
+    return True
 
 
 def pdb_to_pytorch(args: Args) -> None:
