@@ -96,12 +96,11 @@ if __name__ == '__main__':
         pdb_dir: Path
         """Path to a directory containing PDB structures."""
         save_dir: Path
-        """Path to a directory where PyTorch files with computed concepts will be saved."""
+        """Path to a directory where PyTorch files with dictionaries mapping PDB ID to concept values will be saved."""
         concepts: Optional[list[str]] = None
         """List of concepts to compute. If None, all concepts will be computed."""
 
         def configure(self) -> None:
             self.add_argument('--concepts', choices=get_all_concept_names())
-
 
     compute_concepts(**Args().parse_args().as_dict())

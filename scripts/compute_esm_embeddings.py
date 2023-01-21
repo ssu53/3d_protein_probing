@@ -45,7 +45,7 @@ def compute_esm_embeddings_for_protein(
     :param sequences: A list of tuples of (name, sequence) for the proteins.
     :param device: The device to use (e.g., "cpu" or "cuda") for the model.
     :param batch_size: The number of sequences to process at once.
-    :return: A dictionary mapping protein name to per-residue ESM2 embedding.
+    :return: A dictionary mapping PDB ID to per-residue ESM2 embedding.
     """
     # Move model to device
     model = model.to(device)
@@ -161,11 +161,10 @@ if __name__ == '__main__':
         last_layer: int
         """Last layer of the ESM2 model, which will be used to extract embeddings."""
         save_path: Path
-        """Path to PT file where a dictionary mapping protein name to embeddings will be saved."""
+        """Path to PT file where a dictionary mapping PDB ID to embeddings will be saved."""
         device: str = DEFAULT_DEVICE
         """The device to use (e.g., "cpu" or "cuda") for the model."""
         batch_size: int = DEFAULT_BATCH_SIZE
         """The number of sequences to process at once."""
-
 
     generate_embeddings(**Args().parse_args().as_dict())

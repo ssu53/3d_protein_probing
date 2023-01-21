@@ -138,5 +138,4 @@ if __name__ == '__main__':
         ids_save_path: Path
         """Path to CSV file where PDB IDs of converted structures will be saved."""
 
-
     pdb_to_pytorch(**Args().parse_args().as_dict())
