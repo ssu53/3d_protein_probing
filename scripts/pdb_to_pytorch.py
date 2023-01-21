@@ -8,6 +8,7 @@ import numpy as np
 import torch
 from Bio import SeqIO
 from Bio.PDB import PDBParser, Structure
+from Bio.PDB.PDBExceptions import PDBConstructionException
 from tap import Tap
 from tqdm import tqdm
 
@@ -64,7 +65,10 @@ def convert_pdb_to_pytorch(pdb_id: str, pdb_dir: Path, save_dir: Path) -> bool:
         return False
 
     # Parse PDB structure
-    structure = PDBParser().get_structure(id=pdb_id, file=pdb_path)
+    try:
+        structure = PDBParser(PERMISSIVE=False).get_structure(id=pdb_id, file=pdb_path)
+    except PDBConstructionException:
+        return False
 
     # Clean the PDB structure (remove empty chains and hetero residues)
     clean_pdb_structure(structure)
@@ -86,18 +90,23 @@ def convert_pdb_to_pytorch(pdb_id: str, pdb_dir: Path, save_dir: Path) -> bool:
     # Get the residue indices and ensure none are missing
     residue_indices = [residue.get_id()[1] for residue in residues]
     if residue_indices != list(range(min(residue_indices), max(residue_indices) + 1)):
-        print(f'Invalid residue indices for {pdb_id}')
         return False
 
     # Get sequence from structure residues
-    structure_sequence = ''.join(AA_3_TO_1[residue.get_resname()] for residue in residues)
+    structure_sequence = []
+    for residue in residues:
+        resname = residue.get_resname()
+        if resname not in AA_3_TO_1:
+            return False
+        structure_sequence.append(AA_3_TO_1[resname])
+
+    structure_sequence = ''.join(structure_sequence)
 
     # Parse PDB sequence
     records = list(SeqIO.parse(pdb_path, 'pdb-seqres'))
 
     # Ensure only one sequence record
     if len(records) != 1:
-        print(f'Invalid number of sequence records for {pdb_id}')
         return False
 
     # Get sequence
@@ -105,10 +114,6 @@ def convert_pdb_to_pytorch(pdb_id: str, pdb_dir: Path, save_dir: Path) -> bool:
 
     # Ensure the structure's sequence matches a subsequence of the full PDB sequence
     if structure_sequence not in sequence:
-        print(f'Invalid sequence for {pdb_id}')
-        print(structure_sequence)
-        print(sequence)
-        print()
         return False
 
     # Get the start and end indices of the structure's sequence in the full PDB sequence
