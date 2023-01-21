@@ -4,17 +4,20 @@ from functools import partial
 from multiprocessing import Pool
 from pathlib import Path
 
-import numpy as np
 import torch
-from Bio import SeqIO
-from Bio.PDB import PDBParser, Structure
 from Bio.PDB.PDBExceptions import PDBConstructionException
 from tap import Tap
 from tqdm import tqdm
 
 sys.path.append(Path(__file__).parent.parent.as_posix())
 
-from pp3.utils.constants import AA_3_TO_1
+from pp3.utils.pdb import (
+    get_pdb_residue_coordinates,
+    get_pdb_sequence_from_structure,
+    load_pdb_sequence,
+    load_pdb_structure,
+    validate_pdb_residue_indices
+)
 
 
 class Args(Tap):
@@ -26,29 +29,6 @@ class Args(Tap):
         self.save_dir.mkdir(parents=True, exist_ok=True)
 
 
-def clean_pdb_structure(structure: Structure) -> None:
-    """Clean the PDB structure by removing empty chains and hetero residues.
-
-    :param structure: The PDB structure to clean.
-    """
-    for model in structure:
-        residues_to_remove, chains_to_remove = [], []
-
-        for chain in model:
-            for residue in chain:
-                if residue.id[0] != ' ':
-                    residues_to_remove.append((chain.id, residue.id))
-
-            if len(chain) == 0:
-                chains_to_remove.append(chain.id)
-
-        for chain_id, residue_id in residues_to_remove:
-            model[chain_id].detach_child(residue_id)
-
-        for chain in chains_to_remove:
-            model.detach_child(chain)
-
-
 def convert_pdb_to_pytorch(pdb_id: str, pdb_dir: Path, save_dir: Path) -> bool:
     """Parses PDB file and saves coordinates and sequence in PyTorch format while removing invalid structures.
 
@@ -57,60 +37,33 @@ def convert_pdb_to_pytorch(pdb_id: str, pdb_dir: Path, save_dir: Path) -> bool:
     :param save_dir: The directory where PyTorch file with coordinates and sequence will be saved.
     :return: Whether the PDB file was successfully converted.
     """
-    # Get PDB file path
-    pdb_path = pdb_dir / pdb_id[1:3].lower() / f'pdb{pdb_id.lower()}.ent'
-
-    # Check if PDB file exists
-    if not pdb_path.exists():
-        return False
-
-    # Parse PDB structure
+    # Load PDB structure
     try:
-        structure = PDBParser(PERMISSIVE=False).get_structure(id=pdb_id, file=pdb_path)
-    except PDBConstructionException:
-        return False
-
-    # Clean the PDB structure (remove empty chains and hetero residues)
-    clean_pdb_structure(structure)
-
-    # Get residue coordinates
-    residues = [residue for residue in structure.get_residues()]
-
-    # Check if there are any residues
-    if len(residues) == 0:
+        structure = load_pdb_structure(pdb_id=pdb_id, pdb_dir=pdb_dir)
+    except (FileNotFoundError, PDBConstructionException, ValueError):
         return False
 
     # Get residue coordinates
-    residue_coords = []
-    for residue in residues:
-        if 'CA' not in residue:
-            return False
-        residue_coords.append(residue['CA'].get_coord())
+    try:
+        residue_coordinates = get_pdb_residue_coordinates(structure=structure)
+    except ValueError:
+        return False
 
-    # Get the residue indices and ensure none are missing
-    residue_indices = [residue.get_id()[1] for residue in residues]
-    if residue_indices != list(range(min(residue_indices), max(residue_indices) + 1)):
+    # Check the residue indices
+    if not validate_pdb_residue_indices(structure=structure):
         return False
 
     # Get sequence from structure residues
-    structure_sequence = []
-    for residue in residues:
-        resname = residue.get_resname()
-        if resname not in AA_3_TO_1:
-            return False
-        structure_sequence.append(AA_3_TO_1[resname])
-
-    structure_sequence = ''.join(structure_sequence)
-
-    # Parse PDB sequence
-    records = list(SeqIO.parse(pdb_path, 'pdb-seqres'))
-
-    # Ensure only one sequence record
-    if len(records) != 1:
+    try:
+        structure_sequence = get_pdb_sequence_from_structure(structure=structure)
+    except ValueError:
         return False
 
-    # Get sequence
-    sequence = str(records[0].seq)
+    # Load PDB sequence
+    try:
+        sequence = load_pdb_sequence(pdb_id=pdb_id, pdb_dir=pdb_dir)
+    except ValueError:
+        return False
 
     # Ensure the structure's sequence matches a subsequence of the full PDB sequence
     if structure_sequence not in sequence:
@@ -122,7 +75,7 @@ def convert_pdb_to_pytorch(pdb_id: str, pdb_dir: Path, save_dir: Path) -> bool:
 
     # Save PyTorch file
     torch.save({
-        'residue_coords': torch.FloatTensor(np.array(residue_coords)),
+        'residue_coords': torch.FloatTensor(residue_coordinates),
         'sequence': sequence,
         'start_index': start_index,
         'end_index': end_index
