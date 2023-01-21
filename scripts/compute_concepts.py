@@ -50,9 +50,9 @@ def compute_concepts(args: Args) -> None:
 
     # Check which PDB IDs have structures
     with Pool() as pool:
-        compute_concepts_fn = partial(compute_concepts, pdb_dir=args.pdb_dir)
+        compute_concepts_for_structure_fn = partial(compute_concepts_for_structure, pdb_dir=args.pdb_dir)
         structure_concepts = list(
-            tqdm(pool.imap(compute_concepts_fn, pdb_ids), total=len(pdb_ids))
+            tqdm(pool.imap(compute_concepts_for_structure_fn, pdb_ids), total=len(pdb_ids))
         )
 
     # Map PDB IDs to concepts

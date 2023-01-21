@@ -51,7 +51,7 @@ This successfully converts 5,735 structures.
 Compute concepts from PDB structures.
 ```bash
 python scripts/compute_concepts.py \
-    --ids_path data/pdb_single_chain_protein_30_identity_pytorch_ids.csv \
+    --ids_path data/pdb_single_chain_protein_30_identity_valid_ids.csv \
     --pdb_dir pdb \
     --save_dir data/pdb_single_chain_protein_30_identity/concepts
 ```
