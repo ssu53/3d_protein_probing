@@ -40,11 +40,8 @@ Parse PDB files and save coordinates and sequence in PyTorch format while removi
 python scripts/pdb_to_pytorch.py \
     --ids_path data/pdb_single_chain_protein_30_identity_ids.txt \
     --pdb_dir pdb \
-    --save_dir data/pdb_single_chain_protein_30_identity_pytorch
+    --pytorch_save_dir data/pdb_single_chain_protein_30_identity_pytorch \
+    --ids_save_path data/pdb_single_chain_protein_30_identity_pytorch_ids.csv
 ```
 
-This successfully converts XXX structures.
-
-TODO: this using biopython parsers + multiprocessing
-
-TODO: discard PDBs with missing residues
+This successfully converts TODO structures.

@@ -1,10 +1,9 @@
-"""Parses PDB files and saves coordinates and sequence in PyTorch format while removing invalid structures."""
+"""Compute 3D geometric concepts from protein structures."""
 import sys
 from functools import partial
 from multiprocessing import Pool
 from pathlib import Path
 
-import pandas as pd
 import torch
 from Bio.PDB.PDBExceptions import PDBConstructionException
 from tap import Tap
@@ -24,12 +23,10 @@ from pp3.utils.pdb import (
 class Args(Tap):
     ids_path: Path  # Path to a TXT file containing PDB IDs.
     pdb_dir: Path  # Path to a directory containing PDB structures.
-    pytorch_save_dir: Path  # Path to a directory where PyTorch files with structures will be saved.
-    ids_save_path: Path  # Path to CSV file where PDB IDs of converted structures will be saved.
+    save_dir: Path  # Path to a directory where PyTorch files with structures will be saved.
 
     def process_args(self) -> None:
-        self.pytorch_save_dir.mkdir(parents=True, exist_ok=True)
-        self.ids_save_path.parent.mkdir(parents=True, exist_ok=True)
+        self.save_dir.mkdir(parents=True, exist_ok=True)
 
 
 def convert_pdb_to_pytorch(pdb_id: str, pdb_dir: Path, save_dir: Path) -> bool:
@@ -87,8 +84,8 @@ def convert_pdb_to_pytorch(pdb_id: str, pdb_dir: Path, save_dir: Path) -> bool:
     return True
 
 
-def pdb_to_pytorch(args: Args) -> None:
-    """Parses PDB files and saves coordinates and sequence in PyTorch format while removing invalid structures."""
+def compute_concepts(args: Args) -> None:
+    """Compute 3D geometric concepts from protein structures."""
     # Load PDB IDs
     with open(args.ids_path) as f:
         pdb_ids = f.read().strip().split(',')
@@ -97,19 +94,13 @@ def pdb_to_pytorch(args: Args) -> None:
 
     # Check which PDB IDs have structures
     with Pool() as pool:
-        convert_pdb_to_pytorch_fn = partial(convert_pdb_to_pytorch, pdb_dir=args.pdb_dir, save_dir=args.pytorch_save_dir)
+        convert_pdb_to_pytorch_fn = partial(convert_pdb_to_pytorch, pdb_dir=args.pdb_dir, save_dir=args.save_dir)
         convert_success = list(
             tqdm(pool.imap(convert_pdb_to_pytorch_fn, pdb_ids), total=len(pdb_ids))
         )
 
-    # Get PDB IDs of successfully converted structures
-    converted_pdb_ids = sorted(pdb_id for pdb_id, success in zip(pdb_ids, convert_success) if success)
-
-    print(f'Converted {len(converted_pdb_ids):,} PDB files successfully')
-
-    # Save PDB IDs of successfully converted structures
-    pd.DataFrame({'pdb_id': converted_pdb_ids}).to_csv(args.ids_save_path, index=False)
+    print(f'Converted {sum(convert_success):,} PDB files successfully')
 
 
 if __name__ == '__main__':
-    pdb_to_pytorch(Args().parse_args())
+    compute_concepts(Args().parse_args())
