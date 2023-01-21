@@ -137,5 +137,5 @@ pdb
 # PyTorch
 **/*.pt
 
-# Models
-models
+# Pretrained models
+pretrained_models

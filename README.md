@@ -63,20 +63,20 @@ python scripts/compute_concepts.py \
 ```
 
 
-## Compute ESM2 Embeddings
+## Compute ESM2 embeddings
 
 Compute ESM2 embeddings for all PDB structures.
 ```bash
 python scripts/compute_esm_embeddings.py \
     --proteins_path data/pdb_single_chain_protein_30_identity/proteins.pt \
-    --hub_dir models \
+    --hub_dir pretrained_models \
     --esm_model esm2_t33_650M_UR50D \
     --last_layer 33 \
     --save_path data/pdb_single_chain_protein_30_identity/embeddings/esm2_t33_650M_UR50D.pt
 ```
 
 
-## Probe sequence embeddings for concepts
+## Probe ESM2 embeddings for concepts
 
 Probe sequence embeddings for protein SASA concept.
 ```bash
