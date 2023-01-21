@@ -2,9 +2,13 @@
 
 ## Install dependencies
 
-Install conda environment.
+Install the conda environment. If using a GPU, first open `environment.yml` and uncomment the line with `cudatoolkit=11.3`.
 ```bash
 conda env create -f environment.yml
+```
+
+Activate the conda environment.
+```bash
 conda activate 3d_protein_probing
 ```
 
@@ -54,4 +58,16 @@ python scripts/compute_concepts.py \
     --ids_path data/pdb_single_chain_protein_30_identity_valid_ids.csv \
     --pdb_dir pdb \
     --save_dir data/pdb_single_chain_protein_30_identity/concepts
+```
+
+## Compute ESM2 Embeddings
+
+Compute ESM2 embeddings for all PDB structures.
+```bash
+python scripts/compute_esm2_embeddings.py \
+    --data_dir data/pdb_single_chain_protein_30_identity/structures \
+    --hub_dir models \
+    --esm_model esm2_t33_650M_UR50D \
+    --last_layer 33 \
+    --save_path data/pdb_single_chain_protein_30_identity/embeddings/esm2_t33_650M_UR50D.pt
 ```

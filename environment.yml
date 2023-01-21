@@ -7,15 +7,17 @@ channels:
 dependencies:
   - python>=3.10
   - biopython
+#  - cudatoolkit=11.3  # uncomment for PyTorch GPU support
   - ipdb  # for debugging
   - ipython  # for debugging
   - matplotlib
   - numpy
   - pandas
   - pip
-  - pytorch  # for chemprop
+  - pytorch
   - scikit-learn
   - scipy
   - tqdm
   - pip:
+    - fair-esm
     - typed-argument-parser

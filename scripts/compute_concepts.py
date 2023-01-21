@@ -7,26 +7,12 @@ from typing import Any, Optional
 
 import pandas as pd
 import torch
-from tap import Tap
 from tqdm import tqdm
 
 sys.path.append(Path(__file__).parent.parent.as_posix())
 
 from pp3.concepts import compute_all_concepts, get_all_concept_names, get_concept
 from pp3.utils.pdb import load_pdb_structure
-
-
-class Args(Tap):
-    ids_path: Path  # Path to a CSV file containing PDB IDs.
-    pdb_dir: Path  # Path to a directory containing PDB structures.
-    save_dir: Path  # Path to a directory where PyTorch files with computed concepts will be saved.
-    concepts: Optional[list[str]] = None  # List of concepts to compute. If None, all concepts will be computed.
-
-    def configure(self) -> None:
-        self.add_argument('--concepts', choices=get_all_concept_names())
-
-    def process_args(self) -> None:
-        self.save_dir.mkdir(parents=True, exist_ok=True)
 
 
 def compute_concepts_for_structure(
@@ -56,18 +42,32 @@ def compute_concepts_for_structure(
     return concept_name_to_value
 
 
-def compute_concepts(args: Args) -> None:
-    """Compute 3D geometric concepts from protein structures."""
+def compute_concepts(
+        ids_path: Path,
+        pdb_dir: Path,
+        save_dir: Path,
+        concepts: Optional[list[str]] = None
+) -> None:
+    """Compute 3D geometric concepts from protein structures.
+
+    :param ids_path: Path to a CSV file containing PDB IDs.
+    :param pdb_dir: Path to a directory containing PDB structures.
+    :param save_dir: Path to a directory where PyTorch files with computed concepts will be saved.
+    :param concepts: List of concepts to compute. If None, all concepts will be computed.
+    """
     # Load PDB IDs
-    pdb_ids = pd.read_csv(args.ids_path)['pdb_id'].tolist()
+    pdb_ids = pd.read_csv(ids_path)['pdb_id'].tolist()
 
     print(f'Loaded {len(pdb_ids):,} PDB IDs')
+
+    # Set up save directory
+    save_dir.mkdir(parents=True, exist_ok=True)
 
     # Set up concept function
     compute_concepts_for_structure_fn = partial(
         compute_concepts_for_structure,
-        pdb_dir=args.pdb_dir,
-        concepts=args.concepts
+        pdb_dir=pdb_dir,
+        concepts=concepts
     )
 
     # Check which PDB IDs have structures
@@ -84,8 +84,24 @@ def compute_concepts(args: Args) -> None:
         concept_pdb_to_value = {
             pdb_id: concepts[concept_name] for pdb_id, concepts in pdb_id_to_concepts.items()
         }
-        torch.save(concept_pdb_to_value, args.save_dir / f'{concept_name}.pt')
+        torch.save(concept_pdb_to_value, save_dir / f'{concept_name}.pt')
 
 
 if __name__ == '__main__':
-    compute_concepts(Args().parse_args())
+    from tap import Tap
+
+    class Args(Tap):
+        ids_path: Path
+        """Path to a CSV file containing PDB IDs."""
+        pdb_dir: Path
+        """Path to a directory containing PDB structures."""
+        save_dir: Path
+        """Path to a directory where PyTorch files with computed concepts will be saved."""
+        concepts: Optional[list[str]] = None
+        """List of concepts to compute. If None, all concepts will be computed."""
+
+        def configure(self) -> None:
+            self.add_argument('--concepts', choices=get_all_concept_names())
+
+
+    compute_concepts(**Args().parse_args().as_dict())

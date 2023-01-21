@@ -133,7 +133,9 @@ dmypy.json
 
 # PDB
 pdb
-**/*.ent
 
 # PyTorch
 **/*.pt
+
+# Models
+models
