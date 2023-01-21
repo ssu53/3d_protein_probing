@@ -67,7 +67,7 @@ python scripts/compute_concepts.py \
 
 Compute ESM2 embeddings for all PDB structures.
 ```bash
-python scripts/compute_esm2_embeddings.py \
+python scripts/compute_esm_embeddings.py \
     --data_dir data/pdb_single_chain_protein_30_identity/structures \
     --hub_dir models \
     --esm_model esm2_t33_650M_UR50D \
