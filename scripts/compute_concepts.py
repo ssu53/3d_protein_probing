@@ -5,6 +5,7 @@ from multiprocessing import Pool
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
 import torch
 from tap import Tap
 from tqdm import tqdm
@@ -43,8 +44,7 @@ def compute_concepts_for_structure(pdb_id: str, pdb_dir: Path) -> dict[str, Any]
 def compute_concepts(args: Args) -> None:
     """Compute 3D geometric concepts from protein structures."""
     # Load PDB IDs
-    with open(args.ids_path) as f:
-        pdb_ids = f.read().strip().split(',')
+    pdb_ids = pd.read_csv(args.ids_path)['pdb_id'].tolist()
 
     print(f'Loaded {len(pdb_ids):,} PDB IDs')
 
