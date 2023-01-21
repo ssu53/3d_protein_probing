@@ -4,7 +4,7 @@ from pathlib import Path
 from tap import Tap
 
 from pp3.data import ProteinDataset
-from pp3.probes import PROBE_REGISTRY
+from pp3.concepts import PROBE_REGISTRY
 
 
 class Args(Tap):

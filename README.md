@@ -40,8 +40,18 @@ Parse PDB files and save coordinates and sequence in PyTorch format while removi
 python scripts/pdb_to_pytorch.py \
     --ids_path data/pdb_single_chain_protein_30_identity_ids.txt \
     --pdb_dir pdb \
-    --pytorch_save_dir data/pdb_single_chain_protein_30_identity_pytorch \
-    --ids_save_path data/pdb_single_chain_protein_30_identity_pytorch_ids.csv
+    --structure_save_dir data/pdb_single_chain_protein_30_identity/structures \
+    --ids_save_path data/pdb_single_chain_protein_30_identity_valid_ids.csv
 ```
 
-This successfully converts TODO structures.
+This successfully converts 5,735 structures.
+
+### Compute concepts from PDB structures
+
+Compute concepts from PDB structures.
+```bash
+python scripts/compute_concepts.py \
+    --ids_path data/pdb_single_chain_protein_30_identity_pytorch_ids.csv \
+    --pdb_dir pdb \
+    --save_dir data/pdb_single_chain_protein_30_identity/concepts
+```

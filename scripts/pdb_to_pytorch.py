@@ -24,11 +24,11 @@ from pp3.utils.pdb import (
 class Args(Tap):
     ids_path: Path  # Path to a TXT file containing PDB IDs.
     pdb_dir: Path  # Path to a directory containing PDB structures.
-    pytorch_save_dir: Path  # Path to a directory where PyTorch files with structures will be saved.
+    structure_save_dir: Path  # Path to a directory where PyTorch files with structures will be saved.
     ids_save_path: Path  # Path to CSV file where PDB IDs of converted structures will be saved.
 
     def process_args(self) -> None:
-        self.pytorch_save_dir.mkdir(parents=True, exist_ok=True)
+        self.structure_save_dir.mkdir(parents=True, exist_ok=True)
         self.ids_save_path.parent.mkdir(parents=True, exist_ok=True)
 
 
@@ -78,7 +78,7 @@ def convert_pdb_to_pytorch(pdb_id: str, pdb_dir: Path, save_dir: Path) -> bool:
 
     # Save PyTorch file
     torch.save({
-        'residue_coords': torch.FloatTensor(residue_coordinates),
+        'residue_coords': residue_coordinates,
         'sequence': sequence,
         'start_index': start_index,
         'end_index': end_index
@@ -97,7 +97,7 @@ def pdb_to_pytorch(args: Args) -> None:
 
     # Check which PDB IDs have structures
     with Pool() as pool:
-        convert_pdb_to_pytorch_fn = partial(convert_pdb_to_pytorch, pdb_dir=args.pdb_dir, save_dir=args.pytorch_save_dir)
+        convert_pdb_to_pytorch_fn = partial(convert_pdb_to_pytorch, pdb_dir=args.pdb_dir, save_dir=args.structure_save_dir)
         convert_success = list(
             tqdm(pool.imap(convert_pdb_to_pytorch_fn, pdb_ids), total=len(pdb_ids))
         )

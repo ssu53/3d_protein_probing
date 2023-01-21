@@ -3,85 +3,41 @@ import sys
 from functools import partial
 from multiprocessing import Pool
 from pathlib import Path
+from typing import Any
 
 import torch
-from Bio.PDB.PDBExceptions import PDBConstructionException
 from tap import Tap
 from tqdm import tqdm
 
 sys.path.append(Path(__file__).parent.parent.as_posix())
 
-from pp3.utils.pdb import (
-    get_pdb_residue_coordinates,
-    get_pdb_sequence_from_structure,
-    load_pdb_sequence,
-    load_pdb_structure,
-    validate_pdb_residue_indices
-)
+from pp3.concepts import compute_all_concepts
+from pp3.utils.pdb import load_pdb_structure
 
 
 class Args(Tap):
-    ids_path: Path  # Path to a TXT file containing PDB IDs.
+    ids_path: Path  # Path to a CSV file containing PDB IDs.
     pdb_dir: Path  # Path to a directory containing PDB structures.
-    save_dir: Path  # Path to a directory where PyTorch files with structures will be saved.
+    save_dir: Path  # Path to a directory where PyTorch files with computed concepts will be saved.
 
     def process_args(self) -> None:
         self.save_dir.mkdir(parents=True, exist_ok=True)
 
 
-def convert_pdb_to_pytorch(pdb_id: str, pdb_dir: Path, save_dir: Path) -> bool:
-    """Parses PDB file and saves coordinates and sequence in PyTorch format while removing invalid structures.
+def compute_concepts_for_structure(pdb_id: str, pdb_dir: Path) -> dict[str, Any]:
+    """Computes 3D geometric concepts from a protein structure.
 
     :param pdb_id: The PDB ID of the protein structure.
     :param pdb_dir: The directory containing the PDB structures.
-    :param save_dir: The directory where PyTorch file with coordinates and sequence will be saved.
-    :return: Whether the PDB file was successfully converted.
+    :return: A dictionary mapping concept names to values.
     """
     # Load PDB structure
-    try:
-        structure = load_pdb_structure(pdb_id=pdb_id, pdb_dir=pdb_dir)
-    except (FileNotFoundError, PDBConstructionException, ValueError):
-        return False
+    structure = load_pdb_structure(pdb_id=pdb_id, pdb_dir=pdb_dir)
 
-    # Get residue coordinates
-    try:
-        residue_coordinates = get_pdb_residue_coordinates(structure=structure)
-    except ValueError:
-        return False
+    # Set up concept dictionary
+    concepts = compute_all_concepts(structure=structure)
 
-    # Check the residue indices
-    if not validate_pdb_residue_indices(structure=structure):
-        return False
-
-    # Get sequence from structure residues
-    try:
-        structure_sequence = get_pdb_sequence_from_structure(structure=structure)
-    except ValueError:
-        return False
-
-    # Load PDB sequence
-    try:
-        sequence = load_pdb_sequence(pdb_id=pdb_id, pdb_dir=pdb_dir)
-    except ValueError:
-        return False
-
-    # Ensure the structure's sequence matches a subsequence of the full PDB sequence
-    if structure_sequence not in sequence:
-        return False
-
-    # Get the start and end indices of the structure's sequence in the full PDB sequence
-    start_index = sequence.index(structure_sequence)
-    end_index = start_index + len(structure_sequence)
-
-    # Save PyTorch file
-    torch.save({
-        'residue_coords': torch.FloatTensor(residue_coordinates),
-        'sequence': sequence,
-        'start_index': start_index,
-        'end_index': end_index
-    }, save_dir / f'{pdb_id}.pt')
-
-    return True
+    return concepts
 
 
 def compute_concepts(args: Args) -> None:
@@ -94,12 +50,20 @@ def compute_concepts(args: Args) -> None:
 
     # Check which PDB IDs have structures
     with Pool() as pool:
-        convert_pdb_to_pytorch_fn = partial(convert_pdb_to_pytorch, pdb_dir=args.pdb_dir, save_dir=args.save_dir)
-        convert_success = list(
-            tqdm(pool.imap(convert_pdb_to_pytorch_fn, pdb_ids), total=len(pdb_ids))
+        compute_concepts_fn = partial(compute_concepts, pdb_dir=args.pdb_dir)
+        structure_concepts = list(
+            tqdm(pool.imap(compute_concepts_fn, pdb_ids), total=len(pdb_ids))
         )
 
-    print(f'Converted {sum(convert_success):,} PDB files successfully')
+    # Map PDB IDs to concepts
+    pdb_id_to_concepts = dict(zip(pdb_ids, structure_concepts))
+
+    # Save each concept separately
+    for concept_name in structure_concepts[0].keys():
+        concept_pdb_to_value = {
+            pdb_id: concepts[concept_name] for pdb_id, concepts in pdb_id_to_concepts.items()
+        }
+        torch.save(concept_pdb_to_value, args.save_dir / f'{concept_name}.pt')
 
 
 if __name__ == '__main__':

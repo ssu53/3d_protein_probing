@@ -2,6 +2,7 @@
 from pathlib import Path
 
 import numpy as np
+import torch
 from Bio import SeqIO
 from Bio.PDB import PDBParser, Structure
 
@@ -74,13 +75,13 @@ def load_pdb_structure(pdb_id: str, pdb_dir: Path) -> Structure:
     return structure
 
 
-def get_pdb_residue_coordinates(structure: Structure) -> np.ndarray:
+def get_pdb_residue_coordinates(structure: Structure) -> torch.Tensor:
     """Get the residue coordinates from a PDB structure.
 
     :raises ValueError: If any residue does not contain a CA atom.
 
     :param structure: The PDB structure.
-    :return: The coordinates of the residues (CA atoms) in the structure.
+    :return: A PyTorch tensor with the coordinates of the residues (CA atoms) in the structure.
     """
     # Get coordinates
     residue_coordinates = []
@@ -89,7 +90,7 @@ def get_pdb_residue_coordinates(structure: Structure) -> np.ndarray:
             raise ValueError(f'Residue {residue} does not contain a CA atom')
         residue_coordinates.append(residue['CA'].get_coord())
 
-    return np.array(residue_coordinates)
+    return torch.from_numpy(np.array(residue_coordinates))
 
 
 def validate_pdb_residue_indices(structure: Structure) -> bool:

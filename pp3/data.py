@@ -5,7 +5,7 @@ import pandas as pd
 from Bio.PDB import PDBParser, Structure
 from tqdm import tqdm
 
-from pp3.probes import get_probe
+from pp3.concepts import get_probe
 
 
 PDB_PARSER = PDBParser()
