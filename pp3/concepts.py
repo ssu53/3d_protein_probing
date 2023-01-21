@@ -61,4 +61,6 @@ def protein_sasa(structure: Structure) -> float:
     :param structure: The protein structure.
     :return: The solvent accessible surface area of the protein.
     """
-    return ShrakeRupley().compute(structure, level='S')
+    ShrakeRupley().compute(structure, level='S')
+
+    return structure.sasa
