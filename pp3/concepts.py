@@ -1,6 +1,7 @@
 """Contains 3D geometric concepts for proteins."""
 from typing import Any, Callable
 
+import numpy as np
 import torch
 from Bio.PDB import Structure
 from Bio.PDB.SASA import ShrakeRupley
@@ -11,6 +12,7 @@ from pp3.utils.pdb import get_pdb_residue_coordinates
 CONCEPT_TYPE = Callable[[Structure], Any]
 RESIDUE_ID_TYPE = tuple[str, int, str]
 CONCEPT_REGISTRY = {}
+np.int = np.int32  # Fix for SASA
 
 
 def register_concept(concept: CONCEPT_TYPE) -> None:
