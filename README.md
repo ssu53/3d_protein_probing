@@ -74,3 +74,15 @@ python scripts/compute_esm_embeddings.py \
     --last_layer 33 \
     --save_path data/pdb_single_chain_protein_30_identity/embeddings/esm2_t33_650M_UR50D.pt
 ```
+
+
+## Probe sequence embeddings for concepts
+
+Probe sequence embeddings for protein SASA concept.
+```bash
+python scripts/probe_sequence_embeddings.py \
+    --proteins_path data/pdb_single_chain_protein_30_identity/proteins.pt \
+    --embeddings_path data/pdb_single_chain_protein_30_identity/embeddings/esm2_t33_650M_UR50D.pt \
+    --concepts_dir data/pdb_single_chain_protein_30_identity/concepts \
+    --concept protein_sasa
+```

@@ -1,39 +1,85 @@
-"""Probe a model for 3D geometric concepts."""
+"""Probe sequence embeddings for 3D geometric concepts."""
+import sys
 from pathlib import Path
 
-from tap import Tap
+import pytorch_lightning as pl
 
-from pp3.data import ProteinDataset
-from pp3.concepts import PROBE_REGISTRY
+sys.path.append(Path(__file__).parent.parent.as_posix())
 
-
-class Args(Tap):
-    pdb_ids_path: Path  # Path to a CSV file containing PDB IDs.
-    pdb_dir: Path  # Path to a directory containing PDB structures.
-    probes: list[str]  # Names of the probes to use.
-
-    def configure(self) -> None:
-        self.add_argument('--probes', choices=sorted(PROBE_REGISTRY))
+from pp3.concepts import get_concept_names
+from pp3.data import ProteinConceptDataModule
+from pp3.models.mlp import MLP
 
 
-def probe(
-        pdb_ids_path: Path,
-        pdb_dir: Path,
-        probes: list[str]
+def probe_sequence_embeddings(
+        proteins_path: Path,
+        embeddings_path: Path,
+        concepts_dir: Path,
+        concept: str,
+        batch_size: int
 ) -> None:
-    """Probe a model for 3D geometric concepts.
+    """Probe sequence embeddings for a 3D geometric concept.
 
-    :param pdb_ids_path: Path to a CSV file containing PDB IDs.
-    :param pdb_dir: Path to a directory containing PDB structures.
-    :param probes: Names of the probes to use.
+    :param proteins_path: Path to PT file containing a dictionary mapping PDB ID to structure and sequence.
+    :param embeddings_path: Path to PT file containing a dictionary mapping PDB ID to embeddings.
+    :param concepts_dir: Path to a directory containing PT files with dictionaries mapping PDB ID to concept values.
+    :param concept: The concept to learn.
+    :param batch_size: The batch size.
     """
-    # Load protein dataset
-    dataset = ProteinDataset.from_file(pdb_ids_path=pdb_ids_path, pdb_dir=pdb_dir)
+    # Random seed
+    pl.seed_everything(0)
 
-    # Add probes
-    for probe in probes:
-        dataset.add_probe(probe)
+    # Build data module
+    data_module = ProteinConceptDataModule(
+        proteins_path=proteins_path,
+        embeddings_path=embeddings_path,
+        concepts_dir=concepts_dir,
+        concept=concept,
+        batch_size=batch_size
+    )
+    data_module.setup()
+
+    # Build MLP
+    mlp = MLP(
+        input_dim=data_module.train_dataset[0][0].shape[1],
+        output_dim=1,
+        hidden_dims=tuple()
+    )
+
+    # Build trainer
+    trainer = pl.Trainer(
+        gpus=0,
+        deterministic=True,
+        max_epochs=10
+    )
+
+    # Train model
+    trainer.fit(
+        model=mlp,
+        datamodule=data_module
+    )
+
+    # Test model
+    metrics = trainer.test(datamodule=data_module)
+    print(metrics)
 
 
 if __name__ == '__main__':
-    probe(**Args().parse_args().as_dict())
+    from tap import Tap
+
+    class Args(Tap):
+        proteins_path: Path
+        """Path to PT file containing a dictionary mapping PDB ID to structure and sequence."""
+        embeddings_path: Path
+        """"Path to PT file containing a dictionary mapping PDB ID to embeddings."""
+        concepts_dir: Path
+        """Path to a directory containing PT files with dictionaries mapping PDB ID to concept values."""
+        concept: str = None
+        """The concept to learn."""
+        batch_size: int = 100
+        """The batch size."""
+
+        def configure(self) -> None:
+            self.add_argument('--concept', choices=get_concept_names())
+
+    probe_sequence_embeddings(**Args().parse_args().as_dict())

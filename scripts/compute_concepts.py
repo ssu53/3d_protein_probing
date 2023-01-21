@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 sys.path.append(Path(__file__).parent.parent.as_posix())
 
-from pp3.concepts import compute_all_concepts, get_all_concept_names, get_concept
+from pp3.concepts import compute_all_concepts, get_concept_names, get_concept_function
 from pp3.utils.pdb import load_pdb_structure
 
 
@@ -35,7 +35,7 @@ def compute_concepts_for_structure(
         concept_name_to_value = compute_all_concepts(structure=structure)
     else:
         concept_name_to_value = {
-            concept_name: get_concept(concept_name)(structure)
+            concept_name: get_concept_function(concept_name)(structure)
             for concept_name in concepts
         }
 
@@ -101,6 +101,6 @@ if __name__ == '__main__':
         """List of concepts to compute. If None, all concepts will be computed."""
 
         def configure(self) -> None:
-            self.add_argument('--concepts', choices=get_all_concept_names())
+            self.add_argument('--concepts', choices=get_concept_names())
 
     compute_concepts(**Args().parse_args().as_dict())

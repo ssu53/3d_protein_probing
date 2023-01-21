@@ -9,28 +9,42 @@ from Bio.PDB.SASA import ShrakeRupley
 from pp3.utils.pdb import get_pdb_residue_coordinates
 
 
-CONCEPT_TYPE = Callable[[Structure], Any]
-RESIDUE_ID_TYPE = tuple[str, int, str]
-CONCEPT_REGISTRY = {}
+CONCEPT_FUNCTION_TYPE = Callable[[Structure], Any]
+CONCEPT_TO_FUNCTION = {}
+CONCEPT_TO_LEVEL = {}
 np.int = np.int32  # Fix for SASA
 
 
-def register_concept(concept: CONCEPT_TYPE) -> None:
-    """Register a concept function."""
-    CONCEPT_REGISTRY[concept.__name__] = concept
+def register_concept(concept_level: str) -> Callable[[CONCEPT_FUNCTION_TYPE], None]:
+    """Register a concept function with a specified level."""
+
+    def _register_concept(concept: CONCEPT_FUNCTION_TYPE) -> None:
+        """Register a concept function."""
+        CONCEPT_TO_FUNCTION[concept.__name__] = concept
+        CONCEPT_TO_LEVEL[concept.__name__] = concept_level
+
+    return _register_concept
 
 
-def get_concept(concept: str) -> CONCEPT_TYPE:
+def get_concept_names() -> list[str]:
+    """Get all concept names."""
+    return sorted(CONCEPT_TO_FUNCTION)
+
+
+def get_concept_function(concept: str) -> CONCEPT_FUNCTION_TYPE:
     """Get a concept class by name.
 
     :param concept: The name of the concept.
     """
-    return CONCEPT_REGISTRY[concept]
+    return CONCEPT_TO_FUNCTION[concept]
 
 
-def get_all_concept_names() -> list[str]:
-    """Get all concept names."""
-    return sorted(CONCEPT_REGISTRY)
+def get_concept_level(concept: str) -> str:
+    """Get the level of a concept.
+
+    :param concept: The name of the concept.
+    """
+    return CONCEPT_TO_LEVEL[concept]
 
 
 def compute_all_concepts(structure: Structure) -> dict[str, Any]:
@@ -41,11 +55,11 @@ def compute_all_concepts(structure: Structure) -> dict[str, Any]:
     """
     return {
         concept_name: concept_function(structure)
-        for concept_name, concept_function in CONCEPT_REGISTRY.items()
+        for concept_name, concept_function in CONCEPT_TO_FUNCTION.items()
     }
 
 
-@register_concept
+@register_concept('residue_pair')
 def residue_pair_distances(structure: Structure) -> torch.Tensor:
     """Get the distances between residue pairs.
 
@@ -59,7 +73,7 @@ def residue_pair_distances(structure: Structure) -> torch.Tensor:
     return torch.cdist(residue_coordinates, residue_coordinates, p=2)
 
 
-@register_concept
+@register_concept('protein')
 def protein_sasa(structure: Structure) -> float:
     """Get the solvent accessible surface area of a protein.
 
