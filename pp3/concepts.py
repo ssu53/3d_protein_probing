@@ -34,7 +34,7 @@ def compute_all_concepts(structure: Structure) -> dict[str, Any]:
     """
     return {
         concept_name: concept_function(structure)
-        for concept_name, concept_function in CONCEPT_REGISTRY
+        for concept_name, concept_function in CONCEPT_REGISTRY.items()
     }
 
 
