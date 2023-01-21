@@ -71,7 +71,13 @@ def convert_pdb_to_pytorch(pdb_id: str, pdb_dir: Path, save_dir: Path) -> bool:
 
     # Get residue coordinates
     residues = [residue for residue in structure.get_residues()]
-    residue_coords = [residue['CA'].get_coord() for residue in residues]
+
+    # Get residue coordinates
+    residue_coords = []
+    for residue in residues:
+        if 'CA' not in residue:
+            return False
+        residue_coords.append(residue['CA'].get_coord())
 
     # Get the residue indices and ensure none are missing
     residue_indices = [residue.get_id()[1] for residue in residues]
