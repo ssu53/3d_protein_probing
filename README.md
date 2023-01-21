@@ -35,7 +35,7 @@ gunzip -r pdb
 3. Return "Polymer Entities" groupd by "Sequence Identity 30%" displaying as "Representatives"
 4. Click Search (this finds 68,394 polymer entities of which 68,081 are in 16,653 groups)
 5. Click the download button
-6. Copy and paste the 16,653 PDB IDs into `data/pdb_single_chain_protein_30_identity_ids.txt`
+6. Copy and paste the 16,653 PDB IDs into `data/pdb_single_chain_protein_30_identity/pdb_ids.txt`
 
 
 ### Convert PDB to PyTorch
@@ -43,10 +43,10 @@ gunzip -r pdb
 Parse PDB files and save coordinates and sequence in PyTorch format while removing invalid structures.
 ```bash
 python scripts/pdb_to_pytorch.py \
-    --ids_path data/pdb_single_chain_protein_30_identity_ids.txt \
+    --ids_path data/pdb_single_chain_protein_30_identity/pdb_ids.txt \
     --pdb_dir pdb \
-    --structure_save_dir data/pdb_single_chain_protein_30_identity/structures \
-    --ids_save_path data/pdb_single_chain_protein_30_identity_valid_ids.csv
+    --proteins_save_path data/pdb_single_chain_protein_30_identity/proteins.pt \
+    --ids_save_path data/pdb_single_chain_protein_30_identity/valid_pdb_ids.csv
 ```
 
 This successfully converts 5,735 structures.
@@ -57,7 +57,7 @@ This successfully converts 5,735 structures.
 Compute concepts from PDB structures.
 ```bash
 python scripts/compute_concepts.py \
-    --ids_path data/pdb_single_chain_protein_30_identity_valid_ids.csv \
+    --ids_path data/pdb_single_chain_protein_30_identity/valid_pdb_ids.csv \
     --pdb_dir pdb \
     --save_dir data/pdb_single_chain_protein_30_identity/concepts
 ```
@@ -68,7 +68,7 @@ python scripts/compute_concepts.py \
 Compute ESM2 embeddings for all PDB structures.
 ```bash
 python scripts/compute_esm_embeddings.py \
-    --data_dir data/pdb_single_chain_protein_30_identity/structures \
+    --proteins_path data/pdb_single_chain_protein_30_identity/proteins.pt \
     --hub_dir models \
     --esm_model esm2_t33_650M_UR50D \
     --last_layer 33 \

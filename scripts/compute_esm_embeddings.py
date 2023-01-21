@@ -26,7 +26,7 @@ def load_esm_model(
 
 
 def compute_esm_embeddings(
-        data_dir: Path,
+        proteins_path: Path,
         hub_dir: Path,
         esm_model: str,
         last_layer: int,
@@ -35,18 +35,21 @@ def compute_esm_embeddings(
 ) -> None:
     """Compute protein residue embeddings using an ESM2 model from https://github.com/facebookresearch/esm.
 
-    :param data_dir: Path to directory containing protein structure/sequence PyTorch files.
+    :param proteins_path: Path to PT file containing a dictionary mapping PDB ID to structure and sequence
     :param hub_dir: Path to directory where torch hub models are saved.
     :param esm_model: Pretrained ESM2 model to use. See options at https://github.com/facebookresearch/esm.
     :param last_layer: Last layer of the ESM2 model, which will be used to extract embeddings.
     :param save_path: Path to PT file where a dictionary mapping protein name to embeddings will be saved.
     :param batch_size: The batch size.
     """
-    # Load map from PDB ID to protein sequence
-    pdb_ids_and_sequences = []
-    for protein_path in data_dir.glob('*.pt'):
-        protein = torch.load(protein_path)
-        pdb_ids_and_sequences.append((protein['pdb_id'], protein['sequence']))
+    # Load PDB ID to proteins dictionary
+    pdb_id_to_protein = torch.load(proteins_path)
+
+    # Create tuples of PDB IDs and sequences
+    pdb_ids_and_sequences = [
+        (pdb_id, protein['sequence'])
+        for pdb_id, protein in pdb_id_to_protein.items()
+    ]
 
     print(f'Loaded {len(pdb_ids_and_sequences):,} proteins')
 
@@ -95,8 +98,8 @@ if __name__ == '__main__':
     from tap import Tap
 
     class Args(Tap):
-        data_dir: Path
-        """"Path to directory containing protein structure/sequence PyTorch files."""
+        proteins_path: Path
+        """"Path to PT file containing a dictionary mapping PDB ID to structure and sequence."""
         hub_dir: Path
         """Path to directory where torch hub models are saved."""
         esm_model: str
