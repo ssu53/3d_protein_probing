@@ -28,6 +28,11 @@ def get_concept(concept: str) -> CONCEPT_TYPE:
     return CONCEPT_REGISTRY[concept]
 
 
+def get_all_concept_names() -> list[str]:
+    """Get all concept names."""
+    return sorted(CONCEPT_REGISTRY)
+
+
 def compute_all_concepts(structure: Structure) -> dict[str, Any]:
     """Compute all concepts for a protein structure.
 

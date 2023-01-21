@@ -95,9 +95,11 @@ def pdb_to_pytorch(args: Args) -> None:
 
     print(f'Loaded {len(pdb_ids):,} PDB IDs')
 
+    # Set up conversion function
+    convert_pdb_to_pytorch_fn = partial(convert_pdb_to_pytorch, pdb_dir=args.pdb_dir, save_dir=args.structure_save_dir)
+
     # Check which PDB IDs have structures
     with Pool() as pool:
-        convert_pdb_to_pytorch_fn = partial(convert_pdb_to_pytorch, pdb_dir=args.pdb_dir, save_dir=args.structure_save_dir)
         convert_success = list(
             tqdm(pool.imap(convert_pdb_to_pytorch_fn, pdb_ids), total=len(pdb_ids))
         )
