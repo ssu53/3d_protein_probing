@@ -6,8 +6,9 @@ channels:
   - nvidia
 
 dependencies:
-  - python>=3.10
+  - python=3.10
   - biopython
+  - cudatoolkit=11.3
   - ipdb  # for debugging
   - ipython  # for debugging
   - matplotlib
@@ -15,7 +16,6 @@ dependencies:
   - pandas
   - pip
   - pytorch
-  - pytorch-cuda=11.7
   - pytorch-lightning
   - scikit-learn
   - scipy

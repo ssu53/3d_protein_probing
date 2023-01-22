@@ -72,5 +72,7 @@ class MLP(pl.LightningModule):
 
         return loss
 
+    # TODO: need val step
+
     def configure_optimizers(self) -> torch.optim.Optimizer:
         return torch.optim.Adam(self.parameters(), lr=1e-4)

@@ -108,7 +108,7 @@ if __name__ == '__main__':
         """Last layer of the ESM2 model, which will be used to extract embeddings."""
         save_path: Path
         """Path to PT file where a dictionary mapping PDB ID to embeddings will be saved."""
-        batch_size: int = 100
+        batch_size: int = 2
         """The number of sequences to process at once."""
 
     compute_esm_embeddings(**Args().parse_args().as_dict())

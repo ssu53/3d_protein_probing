@@ -40,13 +40,18 @@ def probe_sequence_embeddings(
     data_module.setup()
 
     # Build MLP
+    # TODO: add learning rate as hyperparameter
+    # TODO: add loss as hyperparameter
     mlp = MLP(
-        input_dim=data_module.train_dataset[0][0].shape[1],
+        input_dim=data_module.train_dataset[0].shape[-1],
         output_dim=1,
         hidden_dims=tuple()
     )
 
     # Build trainer
+    # TODO: checkpoints
+    # TODO: specify logging location and metrics/loss and how to split metrics by data, maybe in the model
+    # TODO: maybe in the val step, log the loss and metrics
     trainer = pl.Trainer(
         gpus=0,
         deterministic=True,
