@@ -82,4 +82,4 @@ def protein_sasa(structure: Structure) -> float:
     """
     ShrakeRupley().compute(structure, level='S')
 
-    return structure.sasa
+    return float(structure.sasa)

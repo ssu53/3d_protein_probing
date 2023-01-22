@@ -1,4 +1,5 @@
 """Data classes and functions."""
+from multiprocessing import cpu_count
 from pathlib import Path
 from typing import Optional
 
@@ -101,6 +102,7 @@ class ProteinConceptDataModule(pl.LightningDataModule):
         self.batch_size = batch_size
         self.train_dataset = self.val_dataset = self.test_dataset = None
         self.is_setup = False
+        self.num_workers = cpu_count()
 
     def setup(self, stage: Optional[str] = None) -> None:
         """Prepare the data module by loading the data and splitting into train, val, and test."""
@@ -160,7 +162,8 @@ class ProteinConceptDataModule(pl.LightningDataModule):
         return DataLoader(
             dataset=self.train_dataset,
             batch_size=self.batch_size,
-            shuffle=True
+            shuffle=True,
+            num_workers=self.num_workers
         )
 
     def val_dataloader(self) -> DataLoader:
@@ -168,7 +171,8 @@ class ProteinConceptDataModule(pl.LightningDataModule):
         return DataLoader(
             dataset=self.val_dataset,
             batch_size=self.batch_size,
-            shuffle=False
+            shuffle=False,
+            num_workers=self.num_workers
         )
 
     def test_dataloader(self) -> DataLoader:
@@ -176,7 +180,8 @@ class ProteinConceptDataModule(pl.LightningDataModule):
         return DataLoader(
             dataset=self.test_dataset,
             batch_size=self.batch_size,
-            shuffle=False
+            shuffle=False,
+            num_workers=self.num_workers
         )
 
     @property
