@@ -58,7 +58,8 @@ def probe_sequence_embeddings(
         accelerator='gpu',
         devices=1,
         deterministic=True,
-        max_epochs=10
+        max_epochs=100,
+        log_every_n_steps=10
     )
 
     # Train model

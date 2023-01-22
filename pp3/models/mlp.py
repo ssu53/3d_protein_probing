@@ -71,7 +71,7 @@ class MLP(pl.LightningModule):
         """
         x, y = batch
         y_hat = self(x)
-        loss = self.loss(y_hat, y)
+        loss = self.loss(y_hat.squeeze(dim=1), y.float())
         self.log(f'{step_type}_loss', loss)
 
         return loss

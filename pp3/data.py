@@ -1,5 +1,4 @@
 """Data classes and functions."""
-from multiprocessing import cpu_count
 from pathlib import Path
 from typing import Optional
 
@@ -83,7 +82,8 @@ class ProteinConceptDataModule(pl.LightningDataModule):
             embeddings_path: Path,
             concepts_dir: Path,
             concept: str,
-            batch_size: int
+            batch_size: int,
+            num_workers: int = 1
     ) -> None:
         """Initialize the data module.
 
@@ -92,6 +92,7 @@ class ProteinConceptDataModule(pl.LightningDataModule):
         :param concepts_dir: Path to a directory containing PT files with dictionaries mapping PDB ID to concept values.
         :param concept: The concept to learn.
         :param batch_size: The batch size.
+        :param num_workers: The number of workers to use for data loading.
         """
         super().__init__()
         self.proteins_path = proteins_path
@@ -102,7 +103,7 @@ class ProteinConceptDataModule(pl.LightningDataModule):
         self.batch_size = batch_size
         self.train_dataset = self.val_dataset = self.test_dataset = None
         self.is_setup = False
-        self.num_workers = cpu_count()
+        self.num_workers = num_workers
 
     def setup(self, stage: Optional[str] = None) -> None:
         """Prepare the data module by loading the data and splitting into train, val, and test."""
