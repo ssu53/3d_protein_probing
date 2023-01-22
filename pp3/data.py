@@ -100,9 +100,13 @@ class ProteinConceptDataModule(pl.LightningDataModule):
         self.concept_level = get_concept_level(concept)
         self.batch_size = batch_size
         self.train_dataset = self.val_dataset = self.test_dataset = None
+        self.is_setup = False
 
     def setup(self, stage: Optional[str] = None) -> None:
         """Prepare the data module by loading the data and splitting into train, val, and test."""
+        if self.is_setup:
+            return
+
         print('Loading data')
 
         # Load PDB ID to proteins dictionary
@@ -148,6 +152,8 @@ class ProteinConceptDataModule(pl.LightningDataModule):
             concept_level=self.concept_level
         )
         print(f'Test dataset size: {len(self.test_dataset):,}')
+
+        self.is_setup = True
 
     def train_dataloader(self) -> DataLoader:
         """Get the train data loader."""
