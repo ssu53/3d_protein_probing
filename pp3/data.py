@@ -35,6 +35,11 @@ class ProteinConceptDataset(Dataset):
         self.pdb_id_to_concept_value = pdb_id_to_concept_value
         self.concept_level = concept_level
 
+    @property
+    def embedding_dim(self) -> int:
+        """Get the embedding size."""
+        return self.pdb_id_to_embeddings[self.pdb_ids[0]].shape[-1]
+
     def __len__(self) -> int:
         """Get the number of items in the dataset."""
         return len(self.pdb_ids)
@@ -98,6 +103,8 @@ class ProteinConceptDataModule(pl.LightningDataModule):
 
     def setup(self, stage: Optional[str] = None) -> None:
         """Prepare the data module by loading the data and splitting into train, val, and test."""
+        print('Loading data')
+
         # Load PDB ID to proteins dictionary
         pdb_id_to_proteins = torch.load(self.proteins_path)
 
@@ -165,3 +172,8 @@ class ProteinConceptDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=False
         )
+
+    @property
+    def embedding_dim(self) -> int:
+        """Get the embedding size."""
+        return self.train_dataset.embedding_dim

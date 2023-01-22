@@ -72,7 +72,23 @@ class MLP(pl.LightningModule):
 
         return loss
 
-    # TODO: need val step
+    def validation_step(
+            self,
+            batch: tuple[torch.Tensor, torch.Tensor],
+            batch_idx: int
+    ) -> float:
+        """Runs a training step.
+
+        :param batch: A tuple containing the input and target.
+        :param batch_idx: The index of the batch.
+        :return: The loss.
+        """
+        x, y = batch
+        y_hat = self(x)
+        loss = self.loss(y_hat, y)
+        self.log('val_loss', loss)
+
+        return loss
 
     def configure_optimizers(self) -> torch.optim.Optimizer:
         return torch.optim.Adam(self.parameters(), lr=1e-4)
