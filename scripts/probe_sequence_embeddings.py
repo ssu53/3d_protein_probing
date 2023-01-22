@@ -30,6 +30,7 @@ def probe_sequence_embeddings(
     pl.seed_everything(0)
 
     # Build data module
+    # TODO: scale data for training and unscale for testing
     data_module = ProteinConceptDataModule(
         proteins_path=proteins_path,
         embeddings_path=embeddings_path,
@@ -69,7 +70,7 @@ def probe_sequence_embeddings(
     )
 
     # Test model
-    metrics = trainer.test(datamodule=data_module)
+    metrics = trainer.test(datamodule=data_module, ckpt_path='best')
     print(metrics)
 
 

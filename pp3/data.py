@@ -83,7 +83,7 @@ class ProteinConceptDataModule(pl.LightningDataModule):
             concepts_dir: Path,
             concept: str,
             batch_size: int,
-            num_workers: int = 1
+            num_workers: int = 8
     ) -> None:
         """Initialize the data module.
 
