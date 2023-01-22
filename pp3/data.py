@@ -2,9 +2,11 @@
 from pathlib import Path
 from typing import Optional
 
+import numpy as np
 import pytorch_lightning as pl
 import torch
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
 from torch.utils.data import DataLoader, Dataset
 
 from pp3.concepts import get_concept_level
@@ -102,6 +104,7 @@ class ProteinConceptDataModule(pl.LightningDataModule):
         self.concept_level = get_concept_level(concept)
         self.batch_size = batch_size
         self.train_dataset = self.val_dataset = self.test_dataset = None
+        self.scaler = StandardScaler()
         self.is_setup = False
         self.num_workers = num_workers
 
@@ -129,6 +132,7 @@ class ProteinConceptDataModule(pl.LightningDataModule):
         train_pdb_ids, test_pdb_ids = train_test_split(pdb_ids, test_size=0.2, random_state=0)
         val_pdb_ids, test_pdb_ids = train_test_split(test_pdb_ids, test_size=0.5, random_state=0)
 
+        # Create train dataset
         self.train_dataset = ProteinConceptDataset(
             pdb_ids=train_pdb_ids,
             pdb_id_to_protein=pdb_id_to_proteins,
@@ -138,6 +142,15 @@ class ProteinConceptDataModule(pl.LightningDataModule):
         )
         print(f'Train dataset size: {len(self.train_dataset):,}')
 
+        # Fit scaler on train concept data
+        # TODO: need to adjust this for non-scalar data
+        self.scaler.fit(
+            np.array([
+                concept_value for concept_value in pdb_id_to_concept_value.values()
+            ]).reshape(-1, 1)
+        )
+
+        # Create val dataset
         self.val_dataset = ProteinConceptDataset(
             pdb_ids=val_pdb_ids,
             pdb_id_to_protein=pdb_id_to_proteins,
@@ -147,6 +160,7 @@ class ProteinConceptDataModule(pl.LightningDataModule):
         )
         print(f'Val dataset size: {len(self.val_dataset):,}')
 
+        # Create test dataset
         self.test_dataset = ProteinConceptDataset(
             pdb_ids=test_pdb_ids,
             pdb_id_to_protein=pdb_id_to_proteins,

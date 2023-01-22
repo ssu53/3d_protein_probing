@@ -46,7 +46,8 @@ def probe_sequence_embeddings(
     mlp = MLP(
         input_dim=data_module.embedding_dim,
         output_dim=1,
-        hidden_dims=tuple()
+        hidden_dims=tuple(),
+        scaler=data_module.scaler
     )
 
     print(mlp)
