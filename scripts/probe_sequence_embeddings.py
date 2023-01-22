@@ -37,7 +37,6 @@ def probe_sequence_embeddings(
         concept=concept,
         batch_size=batch_size
     )
-    data_module.setup()
 
     # Build MLP
     # TODO: add learning rate as hyperparameter

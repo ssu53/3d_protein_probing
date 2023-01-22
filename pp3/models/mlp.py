@@ -11,12 +11,13 @@ class MLP(pl.LightningModule):
             self,
             input_dim: int,
             output_dim: int,
-            hidden_dims: tuple[int, ...]
+            hidden_dims: tuple[int, ...],
+            learning_rate: float = 1e-4
     ) -> None:
         """Initialize the model.
 
         :param input_dim: The dimensionality of the input to the model.
-        :param output_dim: The dimensionality of the input to the model.
+        :param output_dim: The dimensionality of the output of the model.
         :param hidden_dims: The dimensionalities of the hidden layers.
         """
         super(MLP, self).__init__()
@@ -24,6 +25,7 @@ class MLP(pl.LightningModule):
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.hidden_dims = hidden_dims
+        self.learning_rate = learning_rate
 
         self.layer_dims = [self.input_dim] + list(self.hidden_dims) + [self.output_dim]
 
@@ -54,6 +56,26 @@ class MLP(pl.LightningModule):
 
         return x
 
+    def step(
+            self,
+            batch: tuple[torch.Tensor, torch.Tensor],
+            batch_idx: int,
+            step_type: str
+    ) -> float:
+        """Runs a training, validation, or test step.
+
+        :param batch: A tuple containing the input and target.
+        :param batch_idx: The index of the batch.
+        :param step_type: The type of step (train, val, or test).
+        :return: The loss.
+        """
+        x, y = batch
+        y_hat = self(x)
+        loss = self.loss(y_hat, y)
+        self.log(f'{step_type}_loss', loss)
+
+        return loss
+
     def training_step(
             self,
             batch: tuple[torch.Tensor, torch.Tensor],
@@ -65,30 +87,46 @@ class MLP(pl.LightningModule):
         :param batch_idx: The index of the batch.
         :return: The loss.
         """
-        x, y = batch
-        y_hat = self(x)
-        loss = self.loss(y_hat, y)
-        self.log('train_loss', loss)
-
-        return loss
+        return self.step(
+            batch=batch,
+            batch_idx=batch_idx,
+            step_type='train'
+        )
 
     def validation_step(
             self,
             batch: tuple[torch.Tensor, torch.Tensor],
             batch_idx: int
     ) -> float:
-        """Runs a training step.
+        """Runs a validation step.
 
         :param batch: A tuple containing the input and target.
         :param batch_idx: The index of the batch.
         :return: The loss.
         """
-        x, y = batch
-        y_hat = self(x)
-        loss = self.loss(y_hat, y)
-        self.log('val_loss', loss)
+        return self.step(
+            batch=batch,
+            batch_idx=batch_idx,
+            step_type='val'
+        )
 
-        return loss
+    def test_step(
+            self,
+            batch: tuple[torch.Tensor, torch.Tensor],
+            batch_idx: int
+    ) -> float:
+        """Runs a test step.
+
+        :param batch: A tuple containing the input and target.
+        :param batch_idx: The index of the batch.
+        :return: The loss.
+        """
+        return self.step(
+            batch=batch,
+            batch_idx=batch_idx,
+            step_type='test'
+        )
 
     def configure_optimizers(self) -> torch.optim.Optimizer:
-        return torch.optim.Adam(self.parameters(), lr=1e-4)
+        """Configures the optimizer."""
+        return torch.optim.Adam(self.parameters(), lr=self.learning_rate)
