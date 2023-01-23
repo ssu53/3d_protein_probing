@@ -1,8 +1,9 @@
 """A class for a multilayer perceptron model."""
+import numpy as np
 import pytorch_lightning as pl
 import torch
 import torch.nn as nn
-from sklearn.metrics import r2_score
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 
 class MLP(pl.LightningModule):
@@ -87,16 +88,18 @@ class MLP(pl.LightningModule):
         y_hat_scaled = self(x).squeeze(dim=1)
         y_hat = y_hat_scaled * self.target_std + self.target_mean
 
-        loss_scaled = self.loss(y_hat_scaled, y_scaled)
-        loss = self.loss(y_hat, y)
+        loss = self.loss(y_hat_scaled, y_scaled)
 
-        r2 = r2_score(y.cpu().numpy(), y_hat.cpu().numpy())
-
-        self.log(f'{step_type}_loss_scaled', loss_scaled)
         self.log(f'{step_type}_loss', loss)
-        self.log(f'{step_type}_r2', r2)
 
-        return loss_scaled
+        y_np = y.cpu().numpy()
+        y_hat_np = y_hat.cpu().numpy()
+
+        self.log(f'{step_type}_mae', mean_absolute_error(y_np, y_hat_np))
+        self.log(f'{step_type}_rmse', np.sqrt(mean_squared_error(y_np, y_hat_np)))
+        self.log(f'{step_type}_r2', r2_score(y_np, y_hat_np))
+
+        return loss
 
     def training_step(
             self,
