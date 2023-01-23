@@ -92,8 +92,8 @@ class MLP(pl.LightningModule):
 
         self.log(f'{step_type}_loss', loss)
 
-        y_np = y.cpu().numpy()
-        y_hat_np = y_hat.cpu().numpy()
+        y_np = y.detach().cpu().numpy()
+        y_hat_np = y_hat.detach().cpu().numpy()
 
         self.log(f'{step_type}_mae', mean_absolute_error(y_np, y_hat_np))
         self.log(f'{step_type}_rmse', np.sqrt(mean_squared_error(y_np, y_hat_np)))
