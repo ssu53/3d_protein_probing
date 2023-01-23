@@ -2,7 +2,6 @@
 import pytorch_lightning as pl
 import torch
 import torch.nn as nn
-from sklearn.preprocessing import StandardScaler
 
 
 class MLP(pl.LightningModule):
@@ -13,7 +12,8 @@ class MLP(pl.LightningModule):
             input_dim: int,
             output_dim: int,
             hidden_dims: tuple[int, ...],
-            scaler: StandardScaler,
+            target_mean: float,
+            target_std: float,
             learning_rate: float = 1e-4
     ) -> None:
         """Initialize the model.
@@ -21,7 +21,8 @@ class MLP(pl.LightningModule):
         :param input_dim: The dimensionality of the input to the model.
         :param output_dim: The dimensionality of the output of the model.
         :param hidden_dims: The dimensionalities of the hidden layers.
-        :param scaler: A scalar to scale the target values.
+        :param target_mean: The mean target value across the training set.
+        :param target_std: The standard deviation of the target values across the training set.
         :param learning_rate: The learning rate.
         """
         super(MLP, self).__init__()
@@ -29,7 +30,8 @@ class MLP(pl.LightningModule):
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.hidden_dims = hidden_dims
-        self.scaler = scaler
+        self.target_mean = target_mean
+        self.target_std = target_std
         self.learning_rate = learning_rate
 
         self.layer_dims = [self.input_dim] + list(self.hidden_dims) + [self.output_dim]
@@ -76,11 +78,10 @@ class MLP(pl.LightningModule):
         """
         x, y = batch
         y = y.float()
-        y_scaled = torch.from_numpy(self.scaler.transform(y.numpy()))
+        y_scaled = (y - self.target_mean) / self.target_std
 
-        y_hat_scaled = self(x)
-        y_hat = torch.from_numpy(self.scaler.inverse_transform(y_hat_scaled.detach().numpy()))
-        y_hat_scaled, y_hat = y_hat_scaled.squeeze(dim=1), y_hat.squeeze(dim=1)
+        y_hat_scaled = self(x).squeeze(dim=1)
+        y_hat = y * self.target_std + self.target_mean
 
         loss_scaled = self.loss(y_hat_scaled, y_scaled)
         loss = self.loss(y_hat, y)

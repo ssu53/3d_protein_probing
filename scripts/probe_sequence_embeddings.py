@@ -47,7 +47,8 @@ def probe_sequence_embeddings(
         input_dim=data_module.embedding_dim,
         output_dim=1,
         hidden_dims=tuple(),
-        scaler=data_module.scaler
+        target_mean=data_module.train_dataset.target_mean,
+        target_std=data_module.train_dataset.target_std,
     )
 
     print(mlp)

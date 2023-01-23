@@ -6,7 +6,6 @@ import numpy as np
 import pytorch_lightning as pl
 import torch
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
 from torch.utils.data import DataLoader, Dataset
 
 from pp3.concepts import get_concept_level
@@ -41,6 +40,18 @@ class ProteinConceptDataset(Dataset):
     def embedding_dim(self) -> int:
         """Get the embedding size."""
         return self.pdb_id_to_embeddings[self.pdb_ids[0]].shape[-1]
+
+    @property
+    def target_mean(self) -> float:
+        """Get the mean of the concept values."""
+        # TODO: enable for non-scalar values
+        return float(np.mean([self.pdb_id_to_concept_value[pdb_id] for pdb_id in self.pdb_ids]))
+
+    @property
+    def target_std(self) -> float:
+        """Get the standard deviation of the concept values."""
+        # TODO: enable for non-scalar values
+        return float(np.std([self.pdb_id_to_concept_value[pdb_id] for pdb_id in self.pdb_ids]))
 
     def __len__(self) -> int:
         """Get the number of items in the dataset."""
@@ -104,7 +115,6 @@ class ProteinConceptDataModule(pl.LightningDataModule):
         self.concept_level = get_concept_level(concept)
         self.batch_size = batch_size
         self.train_dataset = self.val_dataset = self.test_dataset = None
-        self.scaler = StandardScaler()
         self.is_setup = False
         self.num_workers = num_workers
 
@@ -141,14 +151,6 @@ class ProteinConceptDataModule(pl.LightningDataModule):
             concept_level=self.concept_level
         )
         print(f'Train dataset size: {len(self.train_dataset):,}')
-
-        # Fit scaler on train concept data
-        # TODO: need to adjust this for non-scalar data
-        self.scaler.fit(
-            np.array([
-                concept_value for concept_value in pdb_id_to_concept_value.values()
-            ]).reshape(-1, 1)
-        )
 
         # Create val dataset
         self.val_dataset = ProteinConceptDataset(
