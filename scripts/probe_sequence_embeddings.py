@@ -61,7 +61,7 @@ def probe_sequence_embeddings(
         accelerator='gpu',
         devices=1,
         deterministic=True,
-        max_epochs=100,
+        max_epochs=1000,
         log_every_n_steps=10
     )
 

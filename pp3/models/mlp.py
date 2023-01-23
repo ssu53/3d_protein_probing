@@ -34,6 +34,9 @@ class MLP(pl.LightningModule):
         self.target_std = target_std
         self.learning_rate = learning_rate
 
+        self.log('target_mean', self.target_mean)
+        self.log('target_std', self.target_std)
+
         self.layer_dims = [self.input_dim] + list(self.hidden_dims) + [self.output_dim]
 
         # Create layers
@@ -81,7 +84,7 @@ class MLP(pl.LightningModule):
         y_scaled = (y - self.target_mean) / self.target_std
 
         y_hat_scaled = self(x).squeeze(dim=1)
-        y_hat = y * self.target_std + self.target_mean
+        y_hat = y_hat_scaled * self.target_std + self.target_mean
 
         loss_scaled = self.loss(y_hat_scaled, y_scaled)
         loss = self.loss(y_hat, y)
