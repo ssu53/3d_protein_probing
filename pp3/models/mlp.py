@@ -2,6 +2,7 @@
 import pytorch_lightning as pl
 import torch
 import torch.nn as nn
+from sklearn.metrics import r2_score
 
 
 class MLP(pl.LightningModule):
@@ -89,8 +90,11 @@ class MLP(pl.LightningModule):
         loss_scaled = self.loss(y_hat_scaled, y_scaled)
         loss = self.loss(y_hat, y)
 
+        r2 = r2_score(y.cpu().numpy(), y_hat.cpu().numpy())
+
         self.log(f'{step_type}_loss_scaled', loss_scaled)
         self.log(f'{step_type}_loss', loss)
+        self.log(f'{step_type}_r2', r2)
 
         return loss_scaled
 
