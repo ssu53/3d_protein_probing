@@ -38,6 +38,7 @@ def probe_sequence_embeddings(
     pl.seed_everything(0)
 
     # Build data module
+    # TODO: compute and predict per-residue SASA
     # TODO: remove concept outliers (like 5 huge SASAs)
     data_module = ProteinConceptDataModule(
         proteins_path=proteins_path,

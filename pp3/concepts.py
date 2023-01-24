@@ -83,3 +83,15 @@ def protein_sasa(structure: Structure) -> float:
     ShrakeRupley().compute(structure, level='S')
 
     return float(structure.sasa)
+
+
+@register_concept('residue')
+def residue_sasa(structure: Structure) -> torch.Tensor:
+    """Get the solvent accessible surface area of all residues.
+
+    :param structure: The protein structure.
+    :return: The solvent accessible surface area of all residues.
+    """
+    ShrakeRupley().compute(structure, level='R')
+
+    return torch.FloatTensor([residue.sasa for residue in structure.get_residues()])
