@@ -36,9 +36,6 @@ class MLP(pl.LightningModule):
         self.target_std = target_std
         self.learning_rate = learning_rate
 
-        self.log('target_mean', self.target_mean)
-        self.log('target_std', self.target_std)
-
         self.layer_dims = [self.input_dim] + list(self.hidden_dims) + [self.output_dim]
 
         # Create layers
@@ -51,6 +48,7 @@ class MLP(pl.LightningModule):
         self.activation = nn.ReLU()
 
         # Create loss function
+        # TODO: try other losses like huber loss
         self.loss = nn.MSELoss()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -95,9 +93,12 @@ class MLP(pl.LightningModule):
         y_np = y.detach().cpu().numpy()
         y_hat_np = y_hat.detach().cpu().numpy()
 
+        # TODO: add MAPE (mean average percentage error)
         self.log(f'{step_type}_mae', mean_absolute_error(y_np, y_hat_np))
         self.log(f'{step_type}_rmse', np.sqrt(mean_squared_error(y_np, y_hat_np)))
         self.log(f'{step_type}_r2', r2_score(y_np, y_hat_np))
+
+        # TODO: for test, save true and predicted values for scatter plots
 
         return loss
 

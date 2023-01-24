@@ -42,16 +42,21 @@ class ProteinConceptDataset(Dataset):
         return self.pdb_id_to_embeddings[self.pdb_ids[0]].shape[-1]
 
     @property
+    def targets(self) -> list[torch.Tensor | float]:
+        """Get the concept values."""
+        return [self.pdb_id_to_concept_value[pdb_id] for pdb_id in self.pdb_ids]
+
+    @property
     def target_mean(self) -> float:
         """Get the mean of the concept values."""
         # TODO: enable for non-scalar values
-        return float(np.mean([self.pdb_id_to_concept_value[pdb_id] for pdb_id in self.pdb_ids]))
+        return float(np.mean(self.targets))
 
     @property
     def target_std(self) -> float:
         """Get the standard deviation of the concept values."""
         # TODO: enable for non-scalar values
-        return float(np.std([self.pdb_id_to_concept_value[pdb_id] for pdb_id in self.pdb_ids]))
+        return float(np.std(self.targets))
 
     def __len__(self) -> int:
         """Get the number of items in the dataset."""
@@ -200,6 +205,8 @@ class ProteinConceptDataModule(pl.LightningDataModule):
             shuffle=False,
             num_workers=self.num_workers
         )
+
+    predict_dataloader = test_dataloader
 
     @property
     def embedding_dim(self) -> int:

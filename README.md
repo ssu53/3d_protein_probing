@@ -62,6 +62,8 @@ python scripts/compute_concepts.py \
     --save_dir data/pdb_single_chain_protein_30_identity/concepts
 ```
 
+TODO: plot concept value distribution
+
 
 ## Compute ESM2 embeddings
 
