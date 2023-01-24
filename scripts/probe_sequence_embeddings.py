@@ -90,7 +90,7 @@ def probe_sequence_embeddings(
     torch.save({
         'preds': test_preds,
         'true': data_module.test_dataset.targets
-    }, save_dir / f'{concept}_preds.pt')
+    }, save_dir / 'preds_and_true.pt')
 
 
 from pp3.models.mlp import MLP

@@ -85,6 +85,7 @@ Probe sequence embeddings for protein SASA concept.
 python scripts/probe_sequence_embeddings.py \
     --proteins_path data/pdb_single_chain_protein_30_identity/proteins.pt \
     --embeddings_path data/pdb_single_chain_protein_30_identity/embeddings/esm2_t33_650M_UR50D.pt \
+    --save_dir results/pdb_single_chain_protein_30_identity/esm2_t33_650M_UR50D/protein_sasa \
     --concepts_dir data/pdb_single_chain_protein_30_identity/concepts \
     --concept protein_sasa
 ```
