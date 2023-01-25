@@ -40,6 +40,8 @@ gunzip -r pdb
 
 ### Convert PDB to PyTorch
 
+TODO: remove large proteins? Perhaps use length cutoff of 1500?
+
 Parse PDB files and save coordinates and sequence in PyTorch format while removing invalid structures.
 ```bash
 python scripts/pdb_to_pytorch.py \

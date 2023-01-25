@@ -1,6 +1,7 @@
 """Probe sequence embeddings for 3D geometric concepts."""
 import sys
 from pathlib import Path
+from typing import Literal
 
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import TensorBoardLogger
@@ -18,6 +19,7 @@ def probe_sequence_embeddings(
         save_dir: Path,
         concepts_dir: Path,
         concept: str,
+        protein_embedding_method: Literal['sum', 'mean'],
         hidden_dims: tuple[int, ...],
         batch_size: int
 ) -> None:
@@ -28,6 +30,7 @@ def probe_sequence_embeddings(
     :param save_dir: Path to directory where results and predictions will be saved.
     :param concepts_dir: Path to a directory containing PT files with dictionaries mapping PDB ID to concept values.
     :param concept: The concept to learn.
+    :param protein_embedding_method: The method to use to compute the protein embedding from the residue embeddings
     :param hidden_dims: The hidden dimensions of the MLP.
     :param batch_size: The batch size.
     """
@@ -45,6 +48,7 @@ def probe_sequence_embeddings(
         embeddings_path=embeddings_path,
         concepts_dir=concepts_dir,
         concept=concept,
+        protein_embedding_method=protein_embedding_method,
         batch_size=batch_size
     )
     data_module.setup()
@@ -52,6 +56,7 @@ def probe_sequence_embeddings(
     # Build MLP
     # TODO: add learning rate as hyperparameter
     # TODO: add loss as hyperparameter
+    # TODO: change protein embedding to sum
     mlp = MLP(
         input_dim=data_module.embedding_dim,
         output_dim=1,
@@ -111,6 +116,8 @@ if __name__ == '__main__':
         """Path to a directory containing PT files with dictionaries mapping PDB ID to concept values."""
         concept: str
         """The concept to learn."""
+        protein_embedding_method: Literal['sum', 'mean'] = 'sum'
+        """The method to use to compute the protein embedding from the residue embeddings."""
         hidden_dims: tuple[int, ...] = tuple()
         """Hidden dimensions of the MLP."""
         batch_size: int = 100

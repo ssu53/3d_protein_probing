@@ -20,7 +20,8 @@ class ProteinConceptDataset(Dataset):
             pdb_id_to_protein: dict[str, dict[str, torch.Tensor | str | int]],
             pdb_id_to_embeddings: dict[str, torch.Tensor],
             pdb_id_to_concept_value: dict[str, torch.Tensor],
-            concept_level: str
+            concept_level: str,
+            protein_embedding_method: str,
     ) -> None:
         """Initialize the dataset.
 
@@ -29,12 +30,14 @@ class ProteinConceptDataset(Dataset):
         :param pdb_id_to_embeddings: A dictionary mapping PDB ID to sequence embeddings.
         :param pdb_id_to_concept_value: A dictionary mapping PDB ID to concept values.
         :param concept_level: The level of the concept.
+        :param protein_embedding_method: The method to use to compute the protein embedding from the residue embeddings.
         """
         self.pdb_ids = pdb_ids
         self.pdb_id_to_protein = pdb_id_to_protein
         self.pdb_id_to_embeddings = pdb_id_to_embeddings
         self.pdb_id_to_concept_value = pdb_id_to_concept_value
         self.concept_level = concept_level
+        self.protein_embedding_method = protein_embedding_method
 
     @property
     def embedding_dim(self) -> int:
@@ -81,7 +84,12 @@ class ProteinConceptDataset(Dataset):
             embeddings = self.pdb_id_to_embeddings[pdb_id][start_index:end_index]
         # If protein level, then get average embedding across all residues
         elif self.concept_level == 'protein':
-            embeddings = self.pdb_id_to_embeddings[pdb_id].mean(dim=0)
+            if self.protein_embedding_method == 'sum':
+                embeddings = self.pdb_id_to_embeddings[pdb_id].sum(dim=0)
+            elif self.protein_embedding_method == 'mean':
+                embeddings = self.pdb_id_to_embeddings[pdb_id].mean(dim=0)
+            else:
+                raise ValueError(f'Invalid protein embedding method: {self.protein_embedding_method}')
         else:
             raise ValueError(f'Invalid concept level: {self.concept_level}')
 
@@ -100,6 +108,7 @@ class ProteinConceptDataModule(pl.LightningDataModule):
             embeddings_path: Path,
             concepts_dir: Path,
             concept: str,
+            protein_embedding_method: str,
             batch_size: int,
             num_workers: int = 8
     ) -> None:
@@ -110,6 +119,7 @@ class ProteinConceptDataModule(pl.LightningDataModule):
         :param concepts_dir: Path to a directory containing PT files with dictionaries mapping PDB ID to concept values.
         :param concept: The concept to learn.
         :param batch_size: The batch size.
+        :param protein_embedding_method: The method to use to compute the protein embedding from the residue embeddings.
         :param num_workers: The number of workers to use for data loading.
         """
         super().__init__()
@@ -118,6 +128,7 @@ class ProteinConceptDataModule(pl.LightningDataModule):
         self.concepts_dir = concepts_dir
         self.concept = concept
         self.concept_level = get_concept_level(concept)
+        self.protein_embedding_method = protein_embedding_method
         self.batch_size = batch_size
         self.train_dataset = self.val_dataset = self.test_dataset = None
         self.is_setup = False
@@ -153,7 +164,8 @@ class ProteinConceptDataModule(pl.LightningDataModule):
             pdb_id_to_protein=pdb_id_to_proteins,
             pdb_id_to_embeddings=pdb_id_to_embeddings,
             pdb_id_to_concept_value=pdb_id_to_concept_value,
-            concept_level=self.concept_level
+            concept_level=self.concept_level,
+            protein_embedding_method=self.protein_embedding_method
         )
         print(f'Train dataset size: {len(self.train_dataset):,}')
 
@@ -163,7 +175,8 @@ class ProteinConceptDataModule(pl.LightningDataModule):
             pdb_id_to_protein=pdb_id_to_proteins,
             pdb_id_to_embeddings=pdb_id_to_embeddings,
             pdb_id_to_concept_value=pdb_id_to_concept_value,
-            concept_level=self.concept_level
+            concept_level=self.concept_level,
+            protein_embedding_method=self.protein_embedding_method
         )
         print(f'Val dataset size: {len(self.val_dataset):,}')
 
@@ -173,7 +186,8 @@ class ProteinConceptDataModule(pl.LightningDataModule):
             pdb_id_to_protein=pdb_id_to_proteins,
             pdb_id_to_embeddings=pdb_id_to_embeddings,
             pdb_id_to_concept_value=pdb_id_to_concept_value,
-            concept_level=self.concept_level
+            concept_level=self.concept_level,
+            protein_embedding_method=self.protein_embedding_method
         )
         print(f'Test dataset size: {len(self.test_dataset):,}')
 
