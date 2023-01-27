@@ -11,6 +11,28 @@ from torch.utils.data import DataLoader, Dataset
 from pp3.concepts import get_concept_level
 
 
+def collate_protein(batch: list[tuple[torch.Tensor, float]]) -> tuple[torch.Tensor, torch.Tensor]:
+    """Collate a batch of items at the protein level.
+
+    :param batch: A batch of items at the protein level, where embeddings are 1D tensors and concepts are floats.
+    :return: A collated batch.
+    """
+    embeddings, concept_values = zip(*batch)
+
+    return torch.stack(embeddings), torch.stack(concept_values)
+
+
+def collate_residue(batch: list[tuple[torch.Tensor, torch.Tensor]]) -> tuple[torch.Tensor, torch.Tensor]:
+    """Collate a batch of items at the residue level.
+
+    :param batch: A batch of items at the residue level, where embeddings are 2D tensors and concepts are 1D tensors.
+    :return: A collated batch.
+    """
+    embeddings, concept_values = zip(*batch)
+
+    return torch.cat(embeddings), torch.cat(concept_values)
+
+
 class ProteinConceptDataset(Dataset):
     """A dataset of protein structures and 3D geometric concepts."""
 
@@ -39,15 +61,22 @@ class ProteinConceptDataset(Dataset):
         self.concept_level = concept_level
         self.protein_embedding_method = protein_embedding_method
 
+        if self.concept_level == 'protein':
+            self.collate_fn = collate_protein
+        elif self.concept_level == 'residue':
+            self.collate_fn = collate_residue
+        else:
+            raise ValueError(f'Invalid concept level: {self.concept_level}')
+
     @property
     def embedding_dim(self) -> int:
         """Get the embedding size."""
         return self.pdb_id_to_embeddings[self.pdb_ids[0]].shape[-1]
 
     @property
-    def targets(self) -> list[torch.Tensor | float]:
-        """Get the concept values."""
-        return [self.pdb_id_to_concept_value[pdb_id] for pdb_id in self.pdb_ids]
+    def targets(self) -> np.ndarray:
+        """Get the concept values across the entire dataset."""
+        return np.concatenate([self.pdb_id_to_concept_value[pdb_id] for pdb_id in self.pdb_ids])
 
     @property
     def target_mean(self) -> float:
@@ -199,7 +228,8 @@ class ProteinConceptDataModule(pl.LightningDataModule):
             dataset=self.train_dataset,
             batch_size=self.batch_size,
             shuffle=True,
-            num_workers=self.num_workers
+            num_workers=self.num_workers,
+            collate_fn=self.train_dataset.collate_fn
         )
 
     def val_dataloader(self) -> DataLoader:
@@ -208,7 +238,8 @@ class ProteinConceptDataModule(pl.LightningDataModule):
             dataset=self.val_dataset,
             batch_size=self.batch_size,
             shuffle=False,
-            num_workers=self.num_workers
+            num_workers=self.num_workers,
+            collate_fn=self.val_dataset.collate_fn
         )
 
     def test_dataloader(self) -> DataLoader:
@@ -217,7 +248,8 @@ class ProteinConceptDataModule(pl.LightningDataModule):
             dataset=self.test_dataset,
             batch_size=self.batch_size,
             shuffle=False,
-            num_workers=self.num_workers
+            num_workers=self.num_workers,
+            collate_fn=self.test_dataset.collate_fn
         )
 
     predict_dataloader = test_dataloader
