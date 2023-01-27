@@ -107,3 +107,22 @@ def residue_sasa(structure: Structure) -> torch.Tensor:
     ShrakeRupley().compute(structure, level='R')
 
     return torch.FloatTensor([residue.sasa for residue in structure.get_residues()])
+
+
+@register_concept('residue_triplet')
+def residue_triplet_angles(structure: Structure) -> torch.Tensor:
+    """Get the angle between residue triplets.
+
+    :param structure: The protein structure.
+    :return: A PyTorch tensor with the angles between residue triplets.
+    """
+    # Get residue coordinates
+    residue_coordinates = get_pdb_residue_coordinates(structure=structure)
+    v1 = residue_coordinates[:-2] - residue_coordinates[1:-1]
+    v2 = residue_coordinates[2:] - residue_coordinates[1:-1]
+    # Compute pairwise angles
+    return torch.acos(
+        torch.einsum('ij,ij->i', v1, v2) # N x 3, N x 3 -> N
+        / torch.norm(v1, dim=1)
+        / torch.norm(v2, dim=1)
+    )
