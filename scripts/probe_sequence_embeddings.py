@@ -90,13 +90,14 @@ def probe_sequence_embeddings(
     print(metrics)
 
     # Make test predictions
-    test_preds = trainer.predict(datamodule=data_module, ckpt_path='best')
-
-    # Save test predictions and true values
-    torch.save({
-        'preds': test_preds,
-        'true': data_module.test_dataset.targets
-    }, save_dir / 'preds_and_true.pt')
+    # TODO: debug this
+    # test_preds = trainer.predict(datamodule=data_module, ckpt_path='best')
+    # 
+    # # Save test predictions and true values
+    # torch.save({
+    #     'preds': test_preds,
+    #     'true': data_module.test_dataset.targets
+    # }, save_dir / 'preds_and_true.pt')
 
 
 from pp3.models.mlp import MLP

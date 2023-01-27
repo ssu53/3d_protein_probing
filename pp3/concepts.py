@@ -85,6 +85,18 @@ def protein_sasa(structure: Structure) -> float:
     return float(structure.sasa)
 
 
+@register_concept('protein')
+def protein_sasa_normalized(structure: Structure) -> float:
+    """Get the solvent accessible surface area of a protein, normalized by protein length.
+
+    :param structure: The protein structure.
+    :return: The solvent accessible surface area of the protein, normalized by protein length
+    """
+    ShrakeRupley().compute(structure, level='S')
+
+    return float(structure.sasa) / len(structure.get_residues())
+
+
 @register_concept('residue')
 def residue_sasa(structure: Structure) -> torch.Tensor:
     """Get the solvent accessible surface area of all residues.
