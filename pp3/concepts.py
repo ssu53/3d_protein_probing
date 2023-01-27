@@ -94,7 +94,7 @@ def protein_sasa_normalized(structure: Structure) -> float:
     """
     ShrakeRupley().compute(structure, level='S')
 
-    return float(structure.sasa) / len(structure.get_residues())
+    return float(structure.sasa) / len(list(structure.get_residues()))
 
 
 @register_concept('residue')
