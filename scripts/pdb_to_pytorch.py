@@ -15,8 +15,7 @@ from pp3.utils.pdb import (
     get_pdb_residue_coordinates,
     get_pdb_sequence_from_structure,
     load_pdb_sequence,
-    load_pdb_structure,
-    validate_pdb_residue_indices
+    load_pdb_structure
 )
 
 
