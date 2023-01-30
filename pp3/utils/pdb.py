@@ -82,7 +82,7 @@ def get_pdb_residue_coordinates(structure: AtomArray) -> torch.Tensor:
     :param structure: The PDB structure.
     :return: A numpy array with the coordinates of the residues (CA atoms) in the structure.
     """
-    residue_coords = structure[structure.atom_name == 'CA'].coords
+    residue_coords = structure[structure.atom_name == 'CA'].coord
 
     if len(residue_coords) != get_residue_count(structure):
         raise ValueError('PDB structure does not contain coordinates for all residues')
