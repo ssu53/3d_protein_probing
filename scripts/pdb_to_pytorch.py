@@ -32,13 +32,15 @@ def convert_pdb_to_pytorch(
     # Load PDB structure
     try:
         structure = load_pdb_structure(pdb_id=pdb_id, pdb_dir=pdb_dir)
-    except (FileNotFoundError, ValueError):
+    except (FileNotFoundError, ValueError, TypeError) as e:
+        print(e)
         return None
 
     # Get residue coordinates
     try:
         residue_coordinates = get_pdb_residue_coordinates(structure=structure)
-    except ValueError:
+    except ValueError as e:
+        print(e)
         return None
 
     # Get sequence from structure residues
@@ -47,7 +49,8 @@ def convert_pdb_to_pytorch(
     # Load PDB sequence
     try:
         sequence = load_pdb_sequence(pdb_id=pdb_id, pdb_dir=pdb_dir)
-    except ValueError:
+    except ValueError as e:
+        print(e)
         return None
 
     # Ensure the structure's sequence matches a subsequence of the full PDB sequence
