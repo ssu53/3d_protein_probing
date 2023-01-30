@@ -6,3 +6,10 @@ AA_3_TO_1 = {
     'GLY': 'G', 'HIS': 'H', 'LEU': 'L', 'ARG': 'R', 'TRP': 'W',
     'ALA': 'A', 'VAL': 'V', 'GLU': 'E', 'TYR': 'Y', 'MET': 'M'
 }
+
+# Mapping from secondary structure letters to indices
+SS_LETTER_TO_INDEX = {
+    'a': 0,  # alpha helix
+    'b': 1,  # beta sheet
+    'c': 2   # coil
+}

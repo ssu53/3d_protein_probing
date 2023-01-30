@@ -6,6 +6,7 @@ from biotite.structure import (
     AtomArray,
     check_res_id_continuity,
     filter_canonical_amino_acids,
+    get_chain_count,
     get_residue_count,
     get_residues
 )
@@ -48,11 +49,16 @@ def load_pdb_structure(pdb_id: str, pdb_dir: Path) -> AtomArray:
     structure = PDBFile.read(pdb_path).get_structure()
 
     # Ensure only one model
+    # TODO: maybe just choose one model?
     if len(structure) != 1:
         raise ValueError(f'PDB file must contain only one model but contains {len(structure):,}')
 
     # Get model
     structure = structure[0]
+
+    # Ensure only one chain
+    if get_chain_count(structure) != 1:
+        raise ValueError(f'PDB file must contain only one chain but contains {get_chain_count(structure):,}')
 
     # Keep only amino acid residues
     structure = structure[filter_canonical_amino_acids(structure)]

@@ -3,8 +3,16 @@ from typing import Any, Callable
 
 import numpy as np
 import torch
-from biotite.structure import AtomArray, get_residue_count, index_angle, sasa
+from biotite.structure import (
+    annotate_sse,
+    AtomArray,
+    get_chains,
+    get_residue_count,
+    index_angle,
+    sasa
+)
 
+from pp3.utils.constants import SS_LETTER_TO_INDEX
 from pp3.utils.pdb import get_pdb_residue_coordinates
 
 
@@ -58,7 +66,7 @@ def compute_all_concepts(structure: AtomArray) -> dict[str, Any]:
 
 
 @register_concept('residue_pair')
-def residue_pair_distances(structure: AtomArray) -> torch.Tensor:
+def residue_distances(structure: AtomArray) -> torch.Tensor:
     """Get the distances between residue pairs.
 
     :param structure: The protein structure.
@@ -99,6 +107,23 @@ def residue_sasa(structure: AtomArray) -> torch.Tensor:
     :return: The solvent accessible surface area of all residues.
     """
     return torch.from_numpy(sasa(structure))
+
+
+# TODO: need to handle multi-class classification concepts
+@register_concept('residue')
+def secondary_structure(structure: AtomArray) -> torch.Tensor:
+    """Get the secondary structure of all residues.
+
+    :param structure: The protein structure.
+    :return: The secondary structure of all residues as indices (0 = alpha helix, 1 = beta sheet, 2 = coil).
+    """
+    # Get secondary structure
+    sse = annotate_sse(structure, get_chains(structure)[0])
+
+    # Convert letters to indices
+    sse = np.vectorize(SS_LETTER_TO_INDEX.get)(sse)
+
+    return torch.from_numpy(sse)
 
 
 @register_concept('residue_triplet')
