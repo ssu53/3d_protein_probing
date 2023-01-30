@@ -7,7 +7,6 @@ from typing import Optional
 
 import pandas as pd
 import torch
-from Bio.PDB.PDBExceptions import PDBConstructionException
 from tqdm import tqdm
 
 sys.path.append(Path(__file__).parent.parent.as_posix())
@@ -34,7 +33,7 @@ def convert_pdb_to_pytorch(
     # Load PDB structure
     try:
         structure = load_pdb_structure(pdb_id=pdb_id, pdb_dir=pdb_dir)
-    except (FileNotFoundError, PDBConstructionException, ValueError):
+    except (FileNotFoundError, ValueError):
         return None
 
     # Get residue coordinates
@@ -48,10 +47,7 @@ def convert_pdb_to_pytorch(
         return None
 
     # Get sequence from structure residues
-    try:
-        structure_sequence = get_pdb_sequence_from_structure(structure=structure)
-    except ValueError:
-        return None
+    structure_sequence = get_pdb_sequence_from_structure(structure=structure)
 
     # Load PDB sequence
     try:

@@ -139,3 +139,12 @@ pdb
 
 # Pretrained models
 pretrained_models
+
+# Data
+data
+
+# Results
+results
+
+# Mac
+.DS_Store
