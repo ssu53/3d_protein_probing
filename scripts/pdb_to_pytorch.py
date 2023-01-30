@@ -56,6 +56,7 @@ def convert_pdb_to_pytorch(
 
     # Ensure the structure's sequence matches a subsequence of the full PDB sequence
     if structure_sequence not in sequence:
+        print(f'PDB ID {pdb_id} has a structure sequence that does not match the PDB sequence')
         return None
 
     # Get the start and end indices of the structure's sequence in the full PDB sequence

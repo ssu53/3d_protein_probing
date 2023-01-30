@@ -4,16 +4,17 @@ from pathlib import Path
 import torch
 from biotite.structure import (
     AtomArray,
-    check_res_id_continuity,
     filter_canonical_amino_acids,
     get_chain_count,
     get_residue_count,
-    get_residues
+    get_residues,
+    residue_iter
 )
+from biotite.structure.info import standardize_order
 from biotite.structure.io.pdb import PDBFile
 from Bio import SeqIO
 
-from pp3.utils.constants import AA_3_TO_1
+from pp3.utils.constants import AA_3_TO_1, AA_ATOM_NAMES
 
 
 def get_pdb_path(pdb_id: str, pdb_dir: Path) -> Path:
@@ -24,6 +25,21 @@ def get_pdb_path(pdb_id: str, pdb_dir: Path) -> Path:
     :return: The path of the PDB file.
     """
     return pdb_dir / pdb_id[1:3].lower() / f'pdb{pdb_id.lower()}.ent'
+
+
+def verify_residue_atoms(structure: AtomArray) -> bool:
+    """Verify that every residue contains the expected atoms.
+
+    Note: Assumes that structure atoms are already in canonical order.
+
+    :param structure: The structure to verify.
+    :return: True if the structure contains all valid residues, False otherwise.
+    """
+    for residue in residue_iter(structure):
+        if residue.atom_name != AA_ATOM_NAMES[residue.res_name[0]]:
+            return False
+
+    return True
 
 
 def load_pdb_structure(pdb_id: str, pdb_dir: Path) -> AtomArray:
@@ -49,7 +65,6 @@ def load_pdb_structure(pdb_id: str, pdb_dir: Path) -> AtomArray:
     structure = PDBFile.read(pdb_path).get_structure()
 
     # Ensure only one model
-    # TODO: maybe just choose one model for NMR data?
     if len(structure) != 1:
         raise ValueError(f'PDB {pdb_id} must contain only one model but contains {len(structure):,}')
 
@@ -66,6 +81,13 @@ def load_pdb_structure(pdb_id: str, pdb_dir: Path) -> AtomArray:
     # Check if there are no residues
     if len(structure) == 0:
         raise ValueError(f'PDB {pdb_id} does not contain any residues after cleaning')
+
+    # Standardize atom order
+    structure = structure[standardize_order(structure)]
+
+    # Verify residue atoms
+    if not verify_residue_atoms(structure):
+        raise ValueError(f'PDB {pdb_id} contains residues with invalid or missing atoms')
 
     return structure
 
