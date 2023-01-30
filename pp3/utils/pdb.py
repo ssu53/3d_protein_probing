@@ -1,6 +1,7 @@
 """PDB helper functions."""
 from pathlib import Path
 
+import numpy as np
 import torch
 from biotite.structure import (
     AtomArray,
@@ -36,7 +37,10 @@ def verify_residue_atoms(structure: AtomArray) -> bool:
     :return: True if the structure contains all valid residues, False otherwise.
     """
     for residue in residue_iter(structure):
-        if residue.atom_name != AA_ATOM_NAMES[residue.res_name[0]]:
+        atom_names = residue.atom_name
+        ref_atom_names = AA_ATOM_NAMES[residue.res_name[0]]
+
+        if len(atom_names) != len(ref_atom_names) or np.any(atom_names != ref_atom_names):
             return False
 
     return True
@@ -45,7 +49,7 @@ def verify_residue_atoms(structure: AtomArray) -> bool:
 def load_pdb_structure(pdb_id: str, pdb_dir: Path) -> AtomArray:
     """Load the structure from a PDB file.
 
-    Note: Only keeps canonical amino acids.
+    Note: Only keeps canonical amino acids and standardizes atom order.
 
     :raises FileNotFoundError: If the PDB file does not exist.
     :raises ValueError: If the PDB file contains errors.
