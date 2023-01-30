@@ -7,6 +7,7 @@ from typing import Optional
 
 import pandas as pd
 import torch
+from biotite import InvalidFileError
 from tqdm import tqdm
 
 sys.path.append(Path(__file__).parent.parent.as_posix())
@@ -32,7 +33,7 @@ def convert_pdb_to_pytorch(
     # Load PDB structure
     try:
         structure = load_pdb_structure(pdb_id=pdb_id, pdb_dir=pdb_dir)
-    except (FileNotFoundError, ValueError, TypeError) as e:
+    except (FileNotFoundError, InvalidFileError, ValueError, TypeError) as e:
         print(e)
         return None
 
