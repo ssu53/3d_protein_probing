@@ -43,33 +43,29 @@ def load_pdb_structure(pdb_id: str, pdb_dir: Path) -> AtomArray:
 
     # Check if PDB file exists
     if not pdb_path.exists():
-        raise FileNotFoundError(f'PDB file {pdb_path} does not exist')
+        raise FileNotFoundError(f'PDB {pdb_id} file does not exist')
 
     # Parse PDB structure
     structure = PDBFile.read(pdb_path).get_structure()
 
     # Ensure only one model
-    # TODO: maybe just choose one model?
+    # TODO: maybe just choose one model for NMR data?
     if len(structure) != 1:
-        raise ValueError(f'PDB file must contain only one model but contains {len(structure):,}')
+        raise ValueError(f'PDB {pdb_id} must contain only one model but contains {len(structure):,}')
 
     # Get model
     structure = structure[0]
 
     # Ensure only one chain
     if get_chain_count(structure) != 1:
-        raise ValueError(f'PDB file must contain only one chain but contains {get_chain_count(structure):,}')
+        raise ValueError(f'PDB {pdb_id} must contain only one chain but contains {get_chain_count(structure):,}')
 
     # Keep only amino acid residues
     structure = structure[filter_canonical_amino_acids(structure)]
 
     # Check if there are no residues
     if len(structure) == 0:
-        raise ValueError(f'PDB file {pdb_path} does not contain any residues after cleaning')
-
-    # Ensure no discontinuities in residue IDs
-    if len(check_res_id_continuity(structure)) > 0:
-        raise ValueError('PDB file contains discontinuities in residue IDs')
+        raise ValueError(f'PDB {pdb_id} does not contain any residues after cleaning')
 
     return structure
 
