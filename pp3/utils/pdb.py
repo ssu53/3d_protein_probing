@@ -2,7 +2,13 @@
 from pathlib import Path
 
 import torch
-from biotite.structure import AtomArray, filter_canonical_amino_acids, get_residue_count, get_residues
+from biotite.structure import (
+    AtomArray,
+    check_res_id_continuity,
+    filter_canonical_amino_acids,
+    get_residue_count,
+    get_residues
+)
 from biotite.structure.io.pdb import PDBFile
 from Bio import SeqIO
 
@@ -22,14 +28,14 @@ def get_pdb_path(pdb_id: str, pdb_dir: Path) -> Path:
 def load_pdb_structure(pdb_id: str, pdb_dir: Path) -> AtomArray:
     """Load the structure from a PDB file.
 
-    Note: Removes hetero residues.
+    Note: Only keeps canonical amino acids.
 
     :raises FileNotFoundError: If the PDB file does not exist.
-    :raises ValueError: If the PDB file does not contain any residues after cleaning.
+    :raises ValueError: If the PDB file contains errors.
 
     :param pdb_id: The PDB ID of the protein structure.
     :param pdb_dir: The directory containing the PDB structures.
-    :return: The loaded PDB structure.
+    :return: The loaded (and cleaned) PDB structure.
     """
     # Get PDB file path
     pdb_path = get_pdb_path(pdb_id=pdb_id, pdb_dir=pdb_dir)
@@ -43,7 +49,7 @@ def load_pdb_structure(pdb_id: str, pdb_dir: Path) -> AtomArray:
 
     # Ensure only one model
     if len(structure) != 1:
-        raise ValueError('PDB file must contain only one model')
+        raise ValueError(f'PDB file must contain only one model but contains {len(structure):,}')
 
     # Get model
     structure = structure[0]
@@ -54,6 +60,10 @@ def load_pdb_structure(pdb_id: str, pdb_dir: Path) -> AtomArray:
     # Check if there are no residues
     if len(structure) == 0:
         raise ValueError(f'PDB file {pdb_path} does not contain any residues after cleaning')
+
+    # Ensure no discontinuities in residue IDs
+    if len(check_res_id_continuity(structure)) > 0:
+        raise ValueError('PDB file contains discontinuities in residue IDs')
 
     return structure
 
@@ -72,22 +82,6 @@ def get_pdb_residue_coordinates(structure: AtomArray) -> torch.Tensor:
         raise ValueError('PDB structure does not contain coordinates for all residues')
 
     return torch.from_numpy(residue_coords)
-
-
-def validate_pdb_residue_indices(structure: AtomArray) -> bool:
-    """Validate if the residue indices from a PDB structure are sequential.
-
-    :param structure: The PDB structure.
-    :return: True if the residue indices are sequential, False otherwise.
-    """
-    # Get residue indices
-    residue_indices = structure.res_id.tolist()
-
-    # Check if residue indices are sequential
-    if residue_indices != list(range(min(residue_indices), max(residue_indices) + 1)):
-        return False
-
-    return True
 
 
 def get_pdb_sequence_from_structure(structure: AtomArray) -> str:

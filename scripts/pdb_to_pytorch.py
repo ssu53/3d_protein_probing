@@ -42,10 +42,6 @@ def convert_pdb_to_pytorch(
     except ValueError:
         return None
 
-    # Check the residue indices
-    if not validate_pdb_residue_indices(structure=structure):
-        return None
-
     # Get sequence from structure residues
     structure_sequence = get_pdb_sequence_from_structure(structure=structure)
 
