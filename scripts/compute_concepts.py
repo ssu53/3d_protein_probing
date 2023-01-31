@@ -7,7 +7,6 @@ from typing import Any, Optional
 
 import pandas as pd
 import torch
-from biotite.structure.io.pdb import PDBFile
 from tqdm import tqdm
 
 sys.path.append(Path(__file__).parent.parent.as_posix())
