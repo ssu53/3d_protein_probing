@@ -21,13 +21,15 @@ CONCEPT_TO_FUNCTION = {}
 CONCEPT_TO_LEVEL = {}
 
 
-def register_concept(concept_level: str) -> Callable[[CONCEPT_FUNCTION_TYPE], None]:
+def register_concept(concept_level: str) -> Callable[[CONCEPT_FUNCTION_TYPE], CONCEPT_FUNCTION_TYPE]:
     """Register a concept function with a specified level."""
 
-    def _register_concept(concept: CONCEPT_FUNCTION_TYPE) -> None:
+    def _register_concept(concept: CONCEPT_FUNCTION_TYPE) -> CONCEPT_FUNCTION_TYPE:
         """Register a concept function."""
         CONCEPT_TO_FUNCTION[concept.__name__] = concept
         CONCEPT_TO_LEVEL[concept.__name__] = concept_level
+
+        return concept
 
     return _register_concept
 
