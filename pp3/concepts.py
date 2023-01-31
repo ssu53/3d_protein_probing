@@ -89,7 +89,7 @@ def protein_sasa(structure: AtomArray) -> float:
     :param structure: The protein structure.
     :return: The solvent accessible surface area of the protein.
     """
-    return float(np.sum(sasa(structure)))
+    return float(np.nansum(sasa(structure)))
 
 
 @register_concept('protein')
@@ -110,7 +110,7 @@ def residue_sasa(structure: AtomArray) -> torch.Tensor:
     :return: The solvent accessible surface area of all residues.
     """
     atom_sasa = sasa(structure)
-    res_sasa = apply_residue_wise(structure, atom_sasa, np.sum)
+    res_sasa = apply_residue_wise(structure, atom_sasa, np.nansum)
 
     return torch.from_numpy(res_sasa)
 
