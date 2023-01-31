@@ -19,6 +19,6 @@ SS_LETTER_TO_INDEX = {
 
 # Canonical amino acid atom names (without hydrogen atoms)
 AA_ATOM_NAMES = {
-    aa: set(residue(aa)[residue(aa).element != 'H'].atom_name)
+    aa: set(residue(aa).atom_name)
     for aa in AA_3_TO_1
 }
