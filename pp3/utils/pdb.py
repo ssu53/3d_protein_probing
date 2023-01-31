@@ -28,24 +28,6 @@ def get_pdb_path(pdb_id: str, pdb_dir: Path) -> Path:
     return pdb_dir / pdb_id[1:3].lower() / f'pdb{pdb_id.lower()}.ent'
 
 
-def verify_residue_atoms(structure: AtomArray) -> bool:
-    """Verify that every residue contains the expected atoms.
-
-    Note: Assumes that structure atoms are already in canonical order.
-
-    :param structure: The structure to verify.
-    :return: True if the structure contains all valid residues, False otherwise.
-    """
-    for residue in residue_iter(structure):
-        atom_names = residue.atom_name
-        ref_atom_names = AA_ATOM_NAMES[residue.res_name[0]]
-
-        if len(atom_names) != len(ref_atom_names) or np.any(atom_names != ref_atom_names):
-            return False
-
-    return True
-
-
 def load_pdb_structure(pdb_id: str, pdb_dir: Path) -> AtomArray:
     """Load the structure from a PDB file.
 
@@ -76,10 +58,12 @@ def load_pdb_structure(pdb_id: str, pdb_dir: Path) -> AtomArray:
     structure = structure[0]
 
     # Ensure only one chain
+    # TODO: can include multiple chains and then do biggest one
     if get_chain_count(structure) != 1:
         raise ValueError(f'PDB {pdb_id} must contain only one chain but contains {get_chain_count(structure):,}')
 
     # Keep only amino acid residues
+    # TODO: maybe filter less
     structure = structure[filter_canonical_amino_acids(structure)]
 
     # Check if there are no residues
@@ -88,10 +72,6 @@ def load_pdb_structure(pdb_id: str, pdb_dir: Path) -> AtomArray:
 
     # Standardize atom order
     structure = structure[standardize_order(structure)]
-
-    # Verify residue atoms
-    if not verify_residue_atoms(structure):
-        raise ValueError(f'PDB {pdb_id} contains residues with invalid or missing atoms')
 
     return structure
 
