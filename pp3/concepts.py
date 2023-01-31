@@ -5,6 +5,7 @@ import numpy as np
 import torch
 from biotite.structure import (
     annotate_sse,
+    apply_residue_wise,
     AtomArray,
     get_chains,
     get_residue_count,
@@ -108,7 +109,10 @@ def residue_sasa(structure: AtomArray) -> torch.Tensor:
     :param structure: The protein structure.
     :return: The solvent accessible surface area of all residues.
     """
-    return torch.from_numpy(sasa(structure))
+    atom_sasa = sasa(structure)
+    res_sasa = apply_residue_wise(structure, atom_sasa, np.sum)
+
+    return torch.from_numpy(res_sasa)
 
 
 # TODO: need to handle multi-class classification concepts
