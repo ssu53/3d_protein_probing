@@ -76,7 +76,14 @@ class ProteinConceptDataset(Dataset):
     @property
     def targets(self) -> np.ndarray:
         """Get the concept values across the entire dataset."""
-        return np.concatenate([self.pdb_id_to_concept_value[pdb_id] for pdb_id in self.pdb_ids])
+        target_array = [self.pdb_id_to_concept_value[pdb_id] for pdb_id in self.pdb_ids]
+
+        if self.concept_level == 'protein':
+            target_array = np.array(target_array)
+        else:
+            target_array = np.concatenate(target_array)
+
+        return target_array
 
     @property
     def target_mean(self) -> float:
