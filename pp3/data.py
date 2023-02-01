@@ -19,7 +19,7 @@ def collate_protein(batch: list[tuple[torch.Tensor, float]]) -> tuple[torch.Tens
     """
     embeddings, concept_values = zip(*batch)
 
-    return torch.stack(embeddings), torch.stack(concept_values)
+    return torch.stack(embeddings), torch.Tensor(concept_values)
 
 
 def collate_residue(batch: list[tuple[torch.Tensor, torch.Tensor]]) -> tuple[torch.Tensor, torch.Tensor]:
