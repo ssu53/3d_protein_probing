@@ -94,7 +94,7 @@ def probe_sequence_embeddings(
         dirpath=save_dir,
         save_top_k=2,
         monitor="val_loss",
-        every_n_val_epochs=ckpt_every_k_epochs
+        every_n_epochs=ckpt_every_k_epochs
     )
     
     trainer = pl.Trainer(
