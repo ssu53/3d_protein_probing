@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Literal
 
 import pytorch_lightning as pl
-from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning.callbacks import ModelCheckpoint
 import torch
 
 sys.path.append(Path(__file__).parent.parent.as_posix())
@@ -21,7 +21,11 @@ def probe_sequence_embeddings(
         concept: str,
         protein_embedding_method: Literal['sum', 'mean'],
         hidden_dims: tuple[int, ...],
-        batch_size: int
+        batch_size: int,
+        logger_type: str,
+        loss_fn: str = "mse",
+        learning_rate: float = 1e-4,
+        ckpt_every_k_epochs: int = 10
 ) -> None:
     """Probe sequence embeddings for a 3D geometric concept.
 
@@ -33,6 +37,9 @@ def probe_sequence_embeddings(
     :param protein_embedding_method: The method to use to compute the protein embedding from the residue embeddings
     :param hidden_dims: The hidden dimensions of the MLP.
     :param batch_size: The batch size.
+    :param logger_type: The logger_type to use.
+    :param learning_rate: The learning rate for the optimizer.
+    :param ckpt_every_k_epochs: Save a checkpoint every k epochs.
     """
     # Create save directory
     save_dir.mkdir(parents=True, exist_ok=True)
@@ -54,8 +61,6 @@ def probe_sequence_embeddings(
     data_module.setup()
 
     # Build MLP
-    # TODO: add learning rate as hyperparameter
-    # TODO: add loss as hyperparameter
     # TODO: change protein embedding to sum
     mlp = MLP(
         input_dim=data_module.embedding_dim,
@@ -63,20 +68,43 @@ def probe_sequence_embeddings(
         hidden_dims=hidden_dims,
         target_mean=data_module.train_dataset.target_mean,
         target_std=data_module.train_dataset.target_std,
+        loss_fn=loss_fn,
+        learning_rate=learning_rate
     )
 
     print(mlp)
 
+    if logger_type == "wandb":
+        from pytorch_lightning.loggers import WandbLogger
+        logger = WandbLogger(project=f"Probing", save_dir=str(save_dir), name=f"{concept}_mlp")
+        logger.experiment.config.update({
+            "concept": concept,
+            "hidden_dims": hidden_dims,
+            "batch_size": batch_size,
+            "loss_fn": loss_fn,
+            "learning_rate": learning_rate
+        })
+    else:
+        from pytorch_lightning.loggers import TensorBoardLogger
+        logger = TensorBoardLogger(save_dir=str(save_dir), name=f"{concept}_mlp")
+    
     # Build trainer
-    # TODO: checkpoints
     # TODO: how to split metrics by data, maybe in the model
+    ckpt_callback = ModelCheckpoint(
+        dirpath=save_dir,
+        save_top_k=2,
+        monitor="val_loss",
+        every_n_val_epochs=ckpt_every_k_epochs
+    )
+    
     trainer = pl.Trainer(
-        logger=TensorBoardLogger(save_dir=str(save_dir)),
+        logger=logger,
         accelerator='gpu',
         devices=1,
         deterministic=True,
         max_epochs=1000,
-        log_every_n_steps=25
+        log_every_n_steps=25,
+        callbacks=[ckpt_callback]
     )
 
     # Train model
@@ -123,8 +151,17 @@ if __name__ == '__main__':
         """Hidden dimensions of the MLP."""
         batch_size: int = 100
         """The batch size."""
+        logger_type: str = "wandb"
+        """The logger_type to use."""
+        loss_fn: str = "mse"
+        """The loss function to use."""
+        learning_rate: float = 1e-4
+        """The learning rate for the optimizer."""
+        ckpt_every_k_epochs: int = 10
+        """Checkpoint every k epochs."""
 
         def configure(self) -> None:
             self.add_argument('--concept', choices=get_concept_names())
+            self.add_argument('--loss_fn', choices=['mse', 'mae', "huber", "ce"])
 
     probe_sequence_embeddings(**Args().parse_args().as_dict())

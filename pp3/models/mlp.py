@@ -16,7 +16,8 @@ class MLP(pl.LightningModule):
             hidden_dims: tuple[int, ...],
             target_mean: float,
             target_std: float,
-            learning_rate: float = 1e-4
+            learning_rate: float = 1e-4,
+            loss_fn: str = "mse"
     ) -> None:
         """Initialize the model.
 
@@ -26,6 +27,7 @@ class MLP(pl.LightningModule):
         :param target_mean: The mean target value across the training set.
         :param target_std: The standard deviation of the target values across the training set.
         :param learning_rate: The learning rate.
+        :param loss_fn: The loss function to use.
         """
         super(MLP, self).__init__()
 
@@ -48,9 +50,9 @@ class MLP(pl.LightningModule):
         self.activation = nn.ReLU()
 
         # Create loss function
-        # TODO: try other losses like huber loss
-        self.loss = nn.MSELoss()
-
+        self.loss = self._get_loss_fn(loss_fn)
+    
+    
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Runs the model on the data.
 
@@ -156,3 +158,21 @@ class MLP(pl.LightningModule):
     def configure_optimizers(self) -> torch.optim.Optimizer:
         """Configures the optimizer."""
         return torch.optim.Adam(self.parameters(), lr=self.learning_rate)
+    
+    def _get_loss_fn(self, loss_fn: str) -> nn.Module:
+        """Returns the loss function.
+
+        :param loss_fn: The name of the loss function.
+        :return: The loss function.
+        """
+        if loss_fn == "mse":
+            return nn.MSELoss()
+        elif loss_fn == "mae":
+            return nn.L1Loss()
+        elif loss_fn == "huber":
+            return nn.HuberLoss()
+        elif loss_fn == "ce":
+            return nn.CrossEntropyLoss()
+        else:
+            raise ValueError(f"Loss function {loss_fn} not recognized.")
+        
