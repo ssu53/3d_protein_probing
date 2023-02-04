@@ -80,11 +80,13 @@ def probe_sequence_embeddings(
             "loss_fn": loss_fn,
             "learning_rate": learning_rate
         })
-    else:
+    elif logger_type == "tensorboard":
         from pytorch_lightning.loggers import TensorBoardLogger
         logger = TensorBoardLogger(save_dir=str(save_dir), name=f"{concept}_mlp")
-    
-    # Build trainer
+    else:
+        raise ValueError(f'Invalid logger type {logger_type}')
+
+    # Build model checkpoint
     # TODO: how to split metrics by data, maybe in the model
     ckpt_callback = ModelCheckpoint(
         dirpath=save_dir,
@@ -92,7 +94,8 @@ def probe_sequence_embeddings(
         monitor="val_loss",
         every_n_epochs=ckpt_every_k_epochs
     )
-    
+
+    # Build trainer
     trainer = pl.Trainer(
         logger=logger,
         accelerator='gpu',
@@ -144,7 +147,7 @@ if __name__ == '__main__':
         """Hidden dimensions of the MLP."""
         batch_size: int = 100
         """The batch size."""
-        logger_type: str = "wandb"
+        logger_type: Literal['wandb', 'tensorboard'] = "wandb"
         """The logger_type to use."""
         loss_fn: str = "mse"
         """The loss function to use."""

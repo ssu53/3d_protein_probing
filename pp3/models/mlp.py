@@ -3,6 +3,7 @@ import numpy as np
 import pytorch_lightning as pl
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from sklearn.metrics import (
     average_precision_score,
     mean_absolute_error,
@@ -95,18 +96,24 @@ class MLP(pl.LightningModule):
         # Remove NaN values (included for some concepts)
         nan_mask = torch.isnan(y)
         x = x[~nan_mask]
-        y = y[~nan_mask].float()
+        y = y[~nan_mask]
 
         # Make predictions and unscale them
         y_hat_scaled = self(x).squeeze(dim=1)
 
         # Scale/unscale target and predictions
         if self.target_type == 'regression':
+            y = y.float()
             y_scaled = (y - self.target_mean) / self.target_std
             y_hat = y_hat_scaled * self.target_std + self.target_mean
-        else:
+        elif self.target_type == 'binary_classification':
             y_scaled = y
-            y_hat = y_hat_scaled
+            y_hat = F.sigmoid(y_hat_scaled)
+        elif self.target_type == 'multi_classification':
+            y_scaled = F.one_hot(y)
+            y_hat = F.softmax(y_hat_scaled, dim=-1)
+        else:
+            raise ValueError(f'Invalid target type: {self.target_type}')
 
         # Compute loss
         loss = self.loss(y_hat_scaled, y_scaled)
@@ -128,7 +135,7 @@ class MLP(pl.LightningModule):
             self.log(f'{step_type}_ap', average_precision_score(y_np, y_hat_np))
         elif self.target_type == 'multi_classification':
             # TODO: convert to one-hot encoding
-            self.log(f'{step_type}_accuracy', (y_np == y_hat_np).mean())
+            self.log(f'{step_type}_accuracy', (np.argmax(y_np) == y_hat_np).mean())
         else:
             raise ValueError(f'Invalid target type: {self.target_type}')
 
