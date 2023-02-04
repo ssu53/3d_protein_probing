@@ -3,7 +3,7 @@ import numpy as np
 import pytorch_lightning as pl
 import torch
 import torch.nn as nn
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.metrics import average_precision_score, mean_absolute_error, mean_squared_error, r2_score, roc_auc_score
 
 
 class MLP(pl.LightningModule):
@@ -14,6 +14,7 @@ class MLP(pl.LightningModule):
             input_dim: int,
             output_dim: int,
             hidden_dims: tuple[int, ...],
+            target_type: str,
             target_mean: float,
             target_std: float,
             learning_rate: float = 1e-4,
@@ -24,6 +25,7 @@ class MLP(pl.LightningModule):
         :param input_dim: The dimensionality of the input to the model.
         :param output_dim: The dimensionality of the output of the model.
         :param hidden_dims: The dimensionalities of the hidden layers.
+        :param target_type: The type of the target values (e.g., regression or classification)
         :param target_mean: The mean target value across the training set.
         :param target_std: The standard deviation of the target values across the training set.
         :param learning_rate: The learning rate.
@@ -34,6 +36,7 @@ class MLP(pl.LightningModule):
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.hidden_dims = hidden_dims
+        self.target_type = target_type
         self.target_mean = target_mean
         self.target_std = target_std
         self.learning_rate = learning_rate
@@ -86,15 +89,18 @@ class MLP(pl.LightningModule):
         # Remove NaN values (included for some concepts)
         nan_mask = torch.isnan(y)
         x = x[~nan_mask]
-        y = y[~nan_mask]
-
-        # Scale target
-        y = y.float()
-        y_scaled = (y - self.target_mean) / self.target_std
+        y = y[~nan_mask].float()
 
         # Make predictions and unscale them
         y_hat_scaled = self(x).squeeze(dim=1)
-        y_hat = y_hat_scaled * self.target_std + self.target_mean
+
+        # Scale/unscale target and predictions
+        if self.target_type == 'regression':
+            y_scaled = (y - self.target_mean) / self.target_std
+            y_hat = y_hat_scaled * self.target_std + self.target_mean
+        else:
+            y_scaled = y
+            y_hat = y_hat_scaled
 
         # Compute loss
         loss = self.loss(y_hat_scaled, y_scaled)
@@ -104,11 +110,21 @@ class MLP(pl.LightningModule):
         y_hat_np = y_hat.detach().cpu().numpy()
 
         # Log metrics
-        # TODO: add MAPE (mean average percentage error)
         self.log(f'{step_type}_loss', loss)
-        self.log(f'{step_type}_mae', mean_absolute_error(y_np, y_hat_np))
-        self.log(f'{step_type}_rmse', np.sqrt(mean_squared_error(y_np, y_hat_np)))
-        self.log(f'{step_type}_r2', r2_score(y_np, y_hat_np))
+
+        if self.target_type == 'regression':
+            # TODO: add MAPE (mean average percentage error)
+            self.log(f'{step_type}_mae', mean_absolute_error(y_np, y_hat_np))
+            self.log(f'{step_type}_rmse', np.sqrt(mean_squared_error(y_np, y_hat_np)))
+            self.log(f'{step_type}_r2', r2_score(y_np, y_hat_np))
+        elif self.target_type == 'binary_classification':
+            self.log(f'{step_type}_auc', roc_auc_score(y_np, y_hat_np))
+            self.log(f'{step_type}_ap', average_precision_score(y_np, y_hat_np))
+        elif self.target_type == 'multi_classification':
+            # TODO: convert to one-hot encoding
+            self.log(f'{step_type}_accuracy', (y_np == y_hat_np).mean())
+        else:
+            raise ValueError(f'Invalid target type: {self.target_type}')
 
         # TODO: for test, save true and predicted values for scatter plots
 

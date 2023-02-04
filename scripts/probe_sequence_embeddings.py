@@ -8,7 +8,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 
 sys.path.append(Path(__file__).parent.parent.as_posix())
 
-from pp3.concepts import get_concept_names, get_concept_output_dim
+from pp3.concepts import get_concept_names, get_concept_output_dim, get_concept_type
 from pp3.data import ProteinConceptDataModule
 
 
@@ -47,8 +47,6 @@ def probe_sequence_embeddings(
     pl.seed_everything(0)
 
     # Build data module
-    # TODO: compute and predict per-residue SASA
-    # TODO: remove concept outliers (like 5 huge SASAs)
     data_module = ProteinConceptDataModule(
         proteins_path=proteins_path,
         embeddings_path=embeddings_path,
@@ -60,11 +58,11 @@ def probe_sequence_embeddings(
     data_module.setup()
 
     # Build MLP
-    # TODO: change protein embedding to sum
     mlp = MLP(
         input_dim=data_module.embedding_dim,
         output_dim=get_concept_output_dim(concept),
         hidden_dims=hidden_dims,
+        target_type=get_concept_type(concept),
         target_mean=data_module.train_dataset.target_mean,
         target_std=data_module.train_dataset.target_std,
         loss_fn=loss_fn,
