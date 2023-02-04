@@ -53,7 +53,7 @@ python scripts/pdb_to_pytorch.py \
     --ids_save_path data/pdb_single_chain_protein_30_identity/valid_pdb_ids.csv
 ```
 
-This successfully converts 4,757 structures.
+This successfully converts 4,469 structures.
 
 
 ### Compute concepts from PDB structures
