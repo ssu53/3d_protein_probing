@@ -22,3 +22,6 @@ AA_ATOM_NAMES = {
     aa: set(residue(aa).atom_name)
     for aa in AA_3_TO_1
 }
+
+# Backbone atom names
+BACKBONE_ATOM_NAMES = {'N', 'CA', 'C'}

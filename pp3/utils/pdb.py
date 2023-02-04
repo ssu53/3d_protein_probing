@@ -1,7 +1,6 @@
 """PDB helper functions."""
 from pathlib import Path
 
-import numpy as np
 import torch
 from biotite.structure import (
     AtomArray,
@@ -15,7 +14,7 @@ from biotite.structure.info import standardize_order
 from biotite.structure.io.pdb import PDBFile
 from Bio import SeqIO
 
-from pp3.utils.constants import AA_3_TO_1, AA_ATOM_NAMES
+from pp3.utils.constants import AA_3_TO_1, AA_ATOM_NAMES, BACKBONE_ATOM_NAMES
 
 
 def get_pdb_path(pdb_id: str, pdb_dir: Path) -> Path:
@@ -38,12 +37,16 @@ def verify_residues(structure: AtomArray) -> bool:
     """
     # Iterate over residues
     for residue in residue_iter(structure):
-        # Check if residue contains CA
-        if 'CA' not in residue.atom_name:
+        # Get residue name and atom names
+        residue_name = residue.res_name[0]
+        residue_atom_names = set(residue.atom_name)
+
+        # Check if residue contains all backbone atoms
+        if not BACKBONE_ATOM_NAMES.issubset(residue_atom_names):
             return False
 
-        # Check if residue contains subset of canonical atoms
-        if not set(residue.atom_name).issubset(AA_ATOM_NAMES[residue.res_name[0]]):
+        # Check if residue contains subset of canonical atoms for that residue
+        if not residue_atom_names.issubset(AA_ATOM_NAMES[residue_name]):
             return False
 
     return True
@@ -55,7 +58,10 @@ def load_pdb_structure(pdb_id: str, pdb_dir: Path) -> AtomArray:
     Note: Only keeps canonical amino acids and standardizes atom order.
 
     :raises FileNotFoundError: If the PDB file does not exist.
+    :raises InvalidFileError: If the PDB file is invalid.
+    :raises BadStructureError: If the PDB structure is invalid.
     :raises ValueError: If the PDB file contains errors.
+    :raises TypeError: If the PDB file contains type errors.
 
     :param pdb_id: The PDB ID of the protein structure.
     :param pdb_dir: The directory containing the PDB structures.
@@ -66,22 +72,18 @@ def load_pdb_structure(pdb_id: str, pdb_dir: Path) -> AtomArray:
 
     # Check if PDB file exists
     if not pdb_path.exists():
-        raise FileNotFoundError(f'PDB {pdb_id} file does not exist')
+        raise FileNotFoundError('PDB file does not exist')
 
     # Parse PDB structure
     structure = PDBFile.read(pdb_path).get_structure()
 
-    # Ensure only one model
-    if len(structure) != 1:
-        raise ValueError(f'PDB {pdb_id} must contain only one model but contains {len(structure):,}')
-
-    # Get model
+    # Get first model
     structure = structure[0]
 
     # Ensure only one chain
     # TODO: can include multiple chains and then do biggest one
     if get_chain_count(structure) != 1:
-        raise ValueError(f'PDB {pdb_id} must contain only one chain but contains {get_chain_count(structure):,}')
+        raise ValueError('Structure contains more than one chain')
 
     # Keep only amino acid residues
     # TODO: maybe filter less
@@ -89,14 +91,14 @@ def load_pdb_structure(pdb_id: str, pdb_dir: Path) -> AtomArray:
 
     # Check if there are no residues
     if len(structure) == 0:
-        raise ValueError(f'PDB {pdb_id} does not contain any residues after cleaning')
+        raise ValueError('Structure does not contain any residues after cleaning')
 
     # Standardize atom order
     structure = structure[standardize_order(structure)]
 
     # Check if residues are valid
     if not verify_residues(structure):
-        raise ValueError(f'PDB {pdb_id} contains invalid residues')
+        raise ValueError('Structure contains invalid residues')
 
     return structure
 
@@ -112,7 +114,7 @@ def get_pdb_residue_coordinates(structure: AtomArray) -> torch.Tensor:
     residue_coords = structure[structure.atom_name == 'CA'].coord
 
     if len(residue_coords) != get_residue_count(structure):
-        raise ValueError('PDB structure does not contain coordinates for all residues')
+        raise ValueError('Structure does not contain coordinates for all residues')
 
     return torch.from_numpy(residue_coords)
 
@@ -146,7 +148,7 @@ def load_pdb_sequence(pdb_id: str, pdb_dir: Path) -> str:
 
     # Ensure only one sequence record
     if len(records) != 1:
-        raise ValueError(f'PDB file {pdb_path} contains multiple sequence records')
+        raise ValueError('PDB file contains multiple sequence records')
 
     # Get sequence
     sequence = str(records[0].seq)

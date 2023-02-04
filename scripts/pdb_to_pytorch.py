@@ -1,5 +1,6 @@
 """Parses PDB files and saves coordinates and sequence in PyTorch format while removing invalid structures."""
 import sys
+from collections import Counter
 from functools import partial
 from multiprocessing import Pool
 from pathlib import Path
@@ -35,15 +36,13 @@ def convert_pdb_to_pytorch(
     try:
         structure = load_pdb_structure(pdb_id=pdb_id, pdb_dir=pdb_dir)
     except (BadStructureError, FileNotFoundError, InvalidFileError, ValueError, TypeError) as e:
-        print(e)
-        return None
+        return {'error': repr(e)}
 
     # Get residue coordinates
     try:
         residue_coordinates = get_pdb_residue_coordinates(structure=structure)
     except ValueError as e:
-        print(e)
-        return None
+        return {'error': repr(e)}
 
     # Get sequence from structure residues
     structure_sequence = get_pdb_sequence_from_structure(structure=structure)
@@ -52,13 +51,11 @@ def convert_pdb_to_pytorch(
     try:
         sequence = load_pdb_sequence(pdb_id=pdb_id, pdb_dir=pdb_dir)
     except ValueError as e:
-        print(e)
-        return None
+        return {'error': repr(e)}
 
     # Ensure the structure's sequence matches a subsequence of the full PDB sequence
     if structure_sequence not in sequence:
-        print(f'PDB ID {pdb_id} has a structure sequence that does not match the PDB sequence')
-        return None
+        return {'error': repr(ValueError('Structure sequence does not match annotated sequence'))}
 
     # Get the start and end indices of the structure's sequence in the full PDB sequence
     start_index = sequence.index(structure_sequence)
@@ -98,20 +95,22 @@ def pdb_to_pytorch(
         pdb_dir=pdb_dir
     )
 
-    # Check which PDB IDs have structures
+    # Convert PDB files to PyTorch format
+    pdb_id_to_protein = {}
+    error_counter = Counter()
+
     with Pool() as pool:
-        proteins = list(
-            tqdm(pool.imap(convert_pdb_to_pytorch_fn, pdb_ids), total=len(pdb_ids))
-        )
+        for pdb_id, protein in tqdm(zip(pdb_ids, pool.imap(convert_pdb_to_pytorch_fn, pdb_ids)), total=len(pdb_ids)):
+            if 'error' in protein:
+                error_counter[protein['error']] += 1
+            else:
+                pdb_id_to_protein[pdb_id] = protein
 
-    # Get PDB IDs of successfully converted structures
-    pdb_id_to_protein = {
-        pdb_id: protein
-        for pdb_id, protein in zip(pdb_ids, proteins)
-        if protein is not None
-    }
+    # Print errors
+    for error, count in error_counter.most_common():
+        print(f'{count:,} errors: {error}')
 
-    print(f'Converted {len(pdb_id_to_protein):,} PDB files successfully')
+    print(f'\nConverted {len(pdb_id_to_protein):,} PDB files successfully')
 
     # Save protein structures and sequences of successfully converted structures
     proteins_save_path.parent.mkdir(parents=True, exist_ok=True)
