@@ -27,10 +27,13 @@ def get_pdb_path(pdb_id: str, pdb_dir: Path) -> Path:
     return pdb_dir / pdb_id[1:3].lower() / f'pdb{pdb_id.lower()}.ent'
 
 
-def verify_residues(structure: AtomArray) -> bool:
+def verify_residues(structure: AtomArray) -> None:
     """Verify that the residues in the structure contain the correct atoms.
 
-    Specifically, enforce that the residue contains CA and a subset of the atoms in the canonical residue.
+    Specifically, enforce that the residue contains all three backbone atoms
+    and a subset of the atoms in the canonical residue.
+
+    :raises ValueError: If the structure contains invalid residues.
 
     :param structure: The PDB structure.
     :return: True if the structure contains all valid residues, False otherwise.
@@ -43,13 +46,11 @@ def verify_residues(structure: AtomArray) -> bool:
 
         # Check if residue contains all backbone atoms
         if not BACKBONE_ATOM_NAMES.issubset(residue_atom_names):
-            return False
+            raise ValueError('Residue does not contain all backbone atoms')
 
         # Check if residue contains subset of canonical atoms for that residue
         if not residue_atom_names.issubset(AA_ATOM_NAMES[residue_name]):
-            return False
-
-    return True
+            raise ValueError('Residue contains invalid atoms')
 
 
 def load_pdb_structure(pdb_id: str, pdb_dir: Path) -> AtomArray:
@@ -97,8 +98,7 @@ def load_pdb_structure(pdb_id: str, pdb_dir: Path) -> AtomArray:
     structure = structure[standardize_order(structure)]
 
     # Check if residues are valid
-    if not verify_residues(structure):
-        raise ValueError('Structure contains invalid residues')
+    verify_residues(structure)
 
     return structure
 
