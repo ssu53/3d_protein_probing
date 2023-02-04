@@ -107,10 +107,10 @@ class MLP(pl.LightningModule):
             y_scaled = (y - self.target_mean) / self.target_std
             y_hat = y_hat_scaled * self.target_std + self.target_mean
         elif self.target_type == 'binary_classification':
-            y_scaled = y
+            y_scaled = y.float()
             y_hat = F.sigmoid(y_hat_scaled)
         elif self.target_type == 'multi_classification':
-            y_scaled = F.one_hot(y)
+            y_scaled = F.one_hot(y).float()
             y_hat = F.softmax(y_hat_scaled, dim=-1)
         else:
             raise ValueError(f'Invalid target type: {self.target_type}')
