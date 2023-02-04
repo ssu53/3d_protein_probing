@@ -20,15 +20,17 @@ from pp3.utils.pdb import get_pdb_residue_coordinates
 CONCEPT_FUNCTION_TYPE = Callable[[AtomArray], Any]
 CONCEPT_TO_FUNCTION = {}
 CONCEPT_TO_LEVEL = {}
+CONCEPT_TO_OUTPUT_DIM = {}
 
 
-def register_concept(concept_level: str) -> Callable[[CONCEPT_FUNCTION_TYPE], CONCEPT_FUNCTION_TYPE]:
-    """Register a concept function with a specified level."""
+def register_concept(concept_level: str, output_dim: int) -> Callable[[CONCEPT_FUNCTION_TYPE], CONCEPT_FUNCTION_TYPE]:
+    """Register a concept function with a specified level and output size."""
 
     def _register_concept(concept: CONCEPT_FUNCTION_TYPE) -> CONCEPT_FUNCTION_TYPE:
         """Register a concept function."""
         CONCEPT_TO_FUNCTION[concept.__name__] = concept
         CONCEPT_TO_LEVEL[concept.__name__] = concept_level
+        CONCEPT_TO_OUTPUT_DIM[concept.__name__] = output_dim
 
         return concept
 
@@ -56,6 +58,14 @@ def get_concept_level(concept: str) -> str:
     return CONCEPT_TO_LEVEL[concept]
 
 
+def get_concept_output_dim(concept: str) -> int:
+    """Get the output dimension of a concept.
+
+    :param concept: The name of the concept.
+    """
+    return CONCEPT_TO_OUTPUT_DIM[concept]
+
+
 def compute_all_concepts(structure: AtomArray) -> dict[str, Any]:
     """Compute all concepts for a protein structure.
 
@@ -68,7 +78,7 @@ def compute_all_concepts(structure: AtomArray) -> dict[str, Any]:
     }
 
 
-@register_concept('residue_pair')
+@register_concept(concept_level='residue_pair', output_dim=1)
 def residue_distances(structure: AtomArray) -> torch.Tensor:
     """Get the distances between residue pairs.
 
@@ -82,7 +92,7 @@ def residue_distances(structure: AtomArray) -> torch.Tensor:
     return torch.cdist(residue_coordinates, residue_coordinates, p=2)
 
 
-@register_concept('protein')
+@register_concept(concept_level='protein', output_dim=1)
 def protein_sasa(structure: AtomArray) -> float:
     """Get the solvent accessible surface area of a protein.
 
@@ -92,7 +102,7 @@ def protein_sasa(structure: AtomArray) -> float:
     return float(np.nansum(sasa(structure)))
 
 
-@register_concept('protein')
+@register_concept(concept_level='protein', output_dim=1)
 def protein_sasa_normalized(structure: AtomArray) -> float:
     """Get the solvent accessible surface area of a protein, normalized by protein length.
 
@@ -102,7 +112,7 @@ def protein_sasa_normalized(structure: AtomArray) -> float:
     return protein_sasa(structure) / get_residue_count(structure)
 
 
-@register_concept('residue')
+@register_concept(concept_level='residue', output_dim=1)
 def residue_sasa(structure: AtomArray) -> torch.Tensor:
     """Get the solvent accessible surface area of all residues.
 
@@ -116,7 +126,7 @@ def residue_sasa(structure: AtomArray) -> torch.Tensor:
 
 
 # TODO: need to handle multi-class classification concepts
-@register_concept('residue')
+@register_concept(concept_level='residue', output_dim=3)
 def secondary_structure(structure: AtomArray) -> torch.Tensor:
     """Get the secondary structure of all residues.
 
@@ -132,11 +142,12 @@ def secondary_structure(structure: AtomArray) -> torch.Tensor:
     return torch.from_numpy(sse)
 
 
-@register_concept('residue_triplet')
-def bond_angles(structure: AtomArray) -> torch.Tensor:
+@register_concept(concept_level='residue', output_dim=1)
+def bond_angles(structure: AtomArray, first_last_nan: bool = True) -> torch.Tensor:
     """Get the angle between residue triplets.
 
     :param structure: The protein structure.
+    :param first_last_nan: If True, set the first and last angles to NaN. Otherwise, exclude them (length = N - 2).
     :return: A PyTorch tensor with the angles between residue triplets.
     """
     # Get CA indices
@@ -147,5 +158,9 @@ def bond_angles(structure: AtomArray) -> torch.Tensor:
 
     # Get bond angles
     angles = index_angle(structure, index)
+
+    # Optionally, set first and last angles to NaN
+    if first_last_nan:
+        angles = np.concatenate([np.full(1, np.nan), angles, np.full(1, np.nan)])
 
     return torch.from_numpy(angles)

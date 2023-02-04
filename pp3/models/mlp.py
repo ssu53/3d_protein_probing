@@ -51,8 +51,7 @@ class MLP(pl.LightningModule):
 
         # Create loss function
         self.loss = self._get_loss_fn(loss_fn)
-    
-    
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Runs the model on the data.
 
@@ -81,21 +80,32 @@ class MLP(pl.LightningModule):
         :param step_type: The type of step (train, val, or test).
         :return: The loss.
         """
+        # Unpack batch
         x, y = batch
+
+        # Remove NaN values (included for some concepts)
+        nan_mask = torch.isnan(y)
+        x = x[~nan_mask]
+        y = y[~nan_mask]
+
+        # Scale target
         y = y.float()
         y_scaled = (y - self.target_mean) / self.target_std
 
+        # Make predictions and unscale them
         y_hat_scaled = self(x).squeeze(dim=1)
         y_hat = y_hat_scaled * self.target_std + self.target_mean
 
+        # Compute loss
         loss = self.loss(y_hat_scaled, y_scaled)
 
-        self.log(f'{step_type}_loss', loss)
-
+        # Convert target and predictions to NumPy
         y_np = y.detach().cpu().numpy()
         y_hat_np = y_hat.detach().cpu().numpy()
 
+        # Log metrics
         # TODO: add MAPE (mean average percentage error)
+        self.log(f'{step_type}_loss', loss)
         self.log(f'{step_type}_mae', mean_absolute_error(y_np, y_hat_np))
         self.log(f'{step_type}_rmse', np.sqrt(mean_squared_error(y_np, y_hat_np)))
         self.log(f'{step_type}_r2', r2_score(y_np, y_hat_np))
@@ -158,8 +168,9 @@ class MLP(pl.LightningModule):
     def configure_optimizers(self) -> torch.optim.Optimizer:
         """Configures the optimizer."""
         return torch.optim.Adam(self.parameters(), lr=self.learning_rate)
-    
-    def _get_loss_fn(self, loss_fn: str) -> nn.Module:
+
+    @staticmethod
+    def _get_loss_fn(loss_fn: str) -> nn.Module:
         """Returns the loss function.
 
         :param loss_fn: The name of the loss function.
@@ -175,4 +186,3 @@ class MLP(pl.LightningModule):
             return nn.CrossEntropyLoss()
         else:
             raise ValueError(f"Loss function {loss_fn} not recognized.")
-        

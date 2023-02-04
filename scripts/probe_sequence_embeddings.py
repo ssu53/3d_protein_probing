@@ -5,11 +5,10 @@ from typing import Literal
 
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint
-import torch
 
 sys.path.append(Path(__file__).parent.parent.as_posix())
 
-from pp3.concepts import get_concept_names
+from pp3.concepts import get_concept_names, get_concept_output_dim
 from pp3.data import ProteinConceptDataModule
 
 
@@ -64,7 +63,7 @@ def probe_sequence_embeddings(
     # TODO: change protein embedding to sum
     mlp = MLP(
         input_dim=data_module.embedding_dim,
-        output_dim=1,
+        output_dim=get_concept_output_dim(concept),
         hidden_dims=hidden_dims,
         target_mean=data_module.train_dataset.target_mean,
         target_std=data_module.train_dataset.target_std,
