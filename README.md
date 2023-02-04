@@ -12,6 +12,11 @@ Activate the conda environment.
 conda activate 3d_protein_probing
 ```
 
+Install the `3d_protein_probing` package.
+```bash
+pip install -e .
+```
+
 ## Set up PDB data
 
 ### Download PDB
@@ -42,8 +47,6 @@ Search for single chain proteins with 30% sequence clustering on 2/4/23.
 
 ### Convert PDB to PyTorch
 
-TODO: remove large proteins? Perhaps use length cutoff of 1500?
-
 Parse PDB files and save coordinates and sequence in PyTorch format while removing invalid structures.
 ```bash
 python scripts/pdb_to_pytorch.py \
@@ -65,8 +68,6 @@ python scripts/compute_concepts.py \
     --pdb_dir pdb \
     --save_dir data/pdb_single_chain_protein_30_identity/concepts
 ```
-
-TODO: plot concept value distribution
 
 
 ## Compute ESM2 embeddings

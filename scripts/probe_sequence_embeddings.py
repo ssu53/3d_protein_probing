@@ -1,14 +1,12 @@
 """Probe sequence embeddings for 3D geometric concepts."""
-import sys
 from pathlib import Path
 from typing import Literal
 
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint
 
-sys.path.append(Path(__file__).parent.parent.as_posix())
-
 from pp3.concepts import get_concept_names, get_concept_output_dim, get_concept_type
+from pp3.models.mlp import MLP
 from pp3.data import ProteinConceptDataModule
 
 
@@ -37,6 +35,7 @@ def probe_sequence_embeddings(
     :param hidden_dims: The hidden dimensions of the MLP.
     :param batch_size: The batch size.
     :param logger_type: The logger_type to use.
+    :param loss_fn: The loss function to use.
     :param learning_rate: The learning rate for the optimizer.
     :param ckpt_every_k_epochs: Save a checkpoint every k epochs.
     """
@@ -123,9 +122,6 @@ def probe_sequence_embeddings(
     #     'preds': test_preds,
     #     'true': data_module.test_dataset.targets
     # }, save_dir / 'preds_and_true.pt')
-
-
-from pp3.models.mlp import MLP
 
 
 if __name__ == '__main__':

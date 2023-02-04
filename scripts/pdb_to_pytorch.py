@@ -1,5 +1,4 @@
 """Parses PDB files and saves coordinates and sequence in PyTorch format while removing invalid structures."""
-import sys
 from collections import Counter
 from functools import partial
 from multiprocessing import Pool
@@ -11,8 +10,6 @@ import torch
 from biotite import InvalidFileError
 from biotite.structure import BadStructureError
 from tqdm import tqdm
-
-sys.path.append(Path(__file__).parent.parent.as_posix())
 
 from pp3.utils.pdb import (
     get_pdb_residue_coordinates,

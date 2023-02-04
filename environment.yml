@@ -21,6 +21,7 @@ dependencies:
   - scikit-learn
   - scipy
   - tqdm
+  - wandb
   - pip:
     - fair-esm
     - typed-argument-parser

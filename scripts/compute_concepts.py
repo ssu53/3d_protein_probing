@@ -1,5 +1,4 @@
 """Compute 3D geometric concepts from protein structures."""
-import sys
 from functools import partial
 from multiprocessing import Pool
 from pathlib import Path
@@ -8,8 +7,6 @@ from typing import Any, Optional
 import pandas as pd
 import torch
 from tqdm import tqdm
-
-sys.path.append(Path(__file__).parent.parent.as_posix())
 
 from pp3.concepts import compute_all_concepts, get_concept_names, get_concept_function
 from pp3.utils.pdb import load_pdb_structure
