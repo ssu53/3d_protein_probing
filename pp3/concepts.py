@@ -9,9 +9,11 @@ from biotite.structure import (
     AtomArray,
     get_chains,
     get_residue_count,
+    filter_backbone,
     index_angle,
     sasa
 )
+from biotite.structure.info import standardize_order
 
 from pp3.utils.constants import SS_LETTER_TO_INDEX
 from pp3.utils.pdb import get_pdb_residue_coordinates
@@ -86,6 +88,21 @@ def compute_all_concepts(structure: AtomArray) -> dict[str, Any]:
         concept_name: concept_function(structure)
         for concept_name, concept_function in CONCEPT_TO_FUNCTION.items()
     }
+
+
+def get_backbone_residues(structure: AtomArray) -> AtomArray:
+    """Get the backbone atoms of a protein structure in canonical order.
+
+    :param structure: The protein structure.
+    :return: The backbone atoms of the protein structure.
+    """
+    # Standardize atom order
+    structure = structure[standardize_order(structure)]
+
+    # Filter to only backbone residues
+    structure = structure[filter_backbone(structure)]
+
+    return structure
 
 
 @register_concept(concept_level='residue_pair', concept_type='regression', output_dim=1)
