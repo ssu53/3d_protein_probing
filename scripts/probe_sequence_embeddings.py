@@ -17,7 +17,8 @@ def probe_sequence_embeddings(
         concepts_dir: Path,
         concept: str,
         protein_embedding_method: Literal['sum', 'mean'],
-        hidden_dims: tuple[int, ...],
+        hidden_dim: int,
+        num_layers: int,
         batch_size: int,
         logger_type: str,
         loss_fn: str = "mse",
@@ -32,7 +33,8 @@ def probe_sequence_embeddings(
     :param concepts_dir: Path to a directory containing PT files with dictionaries mapping PDB ID to concept values.
     :param concept: The concept to learn.
     :param protein_embedding_method: The method to use to compute the protein embedding from the residue embeddings
-    :param hidden_dims: The hidden dimensions of the MLP.
+    :param hidden_dim: The hidden dimension of the MLP.
+    :param num_layers: The number of layers in the MLP.
     :param batch_size: The batch size.
     :param logger_type: The logger_type to use.
     :param loss_fn: The loss function to use.
@@ -40,6 +42,8 @@ def probe_sequence_embeddings(
     :param ckpt_every_k_epochs: Save a checkpoint every k epochs.
     """
     # Create save directory
+    run_name = f'{concept}_mlp_{num_layers}_layers'
+    save_dir = save_dir / run_name
     save_dir.mkdir(parents=True, exist_ok=True)
 
     # Random seed
@@ -60,7 +64,8 @@ def probe_sequence_embeddings(
     mlp = MLP(
         input_dim=data_module.embedding_dim,
         output_dim=get_concept_output_dim(concept),
-        hidden_dims=hidden_dims,
+        hidden_dim=hidden_dim,
+        num_layers=num_layers,
         target_type=get_concept_type(concept),
         target_mean=data_module.train_dataset.target_mean,
         target_std=data_module.train_dataset.target_std,
@@ -72,17 +77,18 @@ def probe_sequence_embeddings(
 
     if logger_type == "wandb":
         from pytorch_lightning.loggers import WandbLogger
-        logger = WandbLogger(project=f"Probing", save_dir=str(save_dir), name=f"{concept}_mlp")
+        logger = WandbLogger(project=f"Probing", save_dir=str(save_dir), name=run_name)
         logger.experiment.config.update({
             "concept": concept,
-            "hidden_dims": hidden_dims,
+            "hidden_dim": hidden_dim,
+            "num_layers": num_layers,
             "batch_size": batch_size,
             "loss_fn": loss_fn,
             "learning_rate": learning_rate
         })
     elif logger_type == "tensorboard":
         from pytorch_lightning.loggers import TensorBoardLogger
-        logger = TensorBoardLogger(save_dir=str(save_dir), name=f"{concept}_mlp")
+        logger = TensorBoardLogger(save_dir=str(save_dir), name=run_name)
     else:
         raise ValueError(f'Invalid logger type {logger_type}')
 
@@ -143,8 +149,10 @@ if __name__ == '__main__':
         """The concept to learn."""
         protein_embedding_method: Literal['sum', 'mean'] = 'sum'
         """The method to use to compute the protein embedding from the residue embeddings."""
-        hidden_dims: tuple[int, ...] = tuple()
-        """Hidden dimensions of the MLP."""
+        hidden_dim: int = 100
+        """Hidden dimension of the MLP."""
+        num_layers: int = 1
+        """The number of layers in the MLP."""
         batch_size: int = 100
         """The batch size."""
         logger_type: Literal['wandb', 'tensorboard'] = "wandb"

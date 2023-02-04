@@ -20,7 +20,8 @@ class MLP(pl.LightningModule):
             self,
             input_dim: int,
             output_dim: int,
-            hidden_dims: tuple[int, ...],
+            hidden_dim: int,
+            num_layers: int,
             target_type: str,
             target_mean: float,
             target_std: float,
@@ -31,7 +32,8 @@ class MLP(pl.LightningModule):
 
         :param input_dim: The dimensionality of the input to the model.
         :param output_dim: The dimensionality of the output of the model.
-        :param hidden_dims: The dimensionalities of the hidden layers.
+        :param hidden_dim: The dimensionality of the hidden layers.
+        :param num_layers: The number of layers.
         :param target_type: The type of the target values (e.g., regression or classification)
         :param target_mean: The mean target value across the training set.
         :param target_std: The standard deviation of the target values across the training set.
@@ -42,13 +44,14 @@ class MLP(pl.LightningModule):
 
         self.input_dim = input_dim
         self.output_dim = output_dim
-        self.hidden_dims = hidden_dims
+        self.hidden_dim = hidden_dim
+        self.num_layers = num_layers
         self.target_type = target_type
         self.target_mean = target_mean
         self.target_std = target_std
         self.learning_rate = learning_rate
 
-        self.layer_dims = [self.input_dim] + list(self.hidden_dims) + [self.output_dim]
+        self.layer_dims = [self.input_dim] + [hidden_dim] * (self.num_layers - 1) + [self.output_dim]
 
         # Create layers
         self.layers = nn.ModuleList([
