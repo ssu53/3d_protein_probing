@@ -146,7 +146,8 @@ class ProteinConceptDataModule(pl.LightningDataModule):
             concept: str,
             protein_embedding_method: str,
             batch_size: int,
-            num_workers: int = 8
+            num_workers: int = 8,
+            split_seed: int = 0
     ) -> None:
         """Initialize the data module.
 
@@ -157,6 +158,7 @@ class ProteinConceptDataModule(pl.LightningDataModule):
         :param batch_size: The batch size.
         :param protein_embedding_method: The method to use to compute the protein embedding from the residue embeddings.
         :param num_workers: The number of workers to use for data loading.
+        :param split_seed: The random seed to use for the train/val/test split.
         """
         super().__init__()
         self.proteins_path = proteins_path
@@ -169,6 +171,7 @@ class ProteinConceptDataModule(pl.LightningDataModule):
         self.train_dataset = self.val_dataset = self.test_dataset = None
         self.is_setup = False
         self.num_workers = num_workers
+        self.split_seed = split_seed
 
     def setup(self, stage: Optional[str] = None) -> None:
         """Prepare the data module by loading the data and splitting into train, val, and test."""
@@ -191,8 +194,8 @@ class ProteinConceptDataModule(pl.LightningDataModule):
 
         # Split PDB IDs into train and test sets
         pdb_ids = sorted(pdb_id_to_proteins)
-        train_pdb_ids, test_pdb_ids = train_test_split(pdb_ids, test_size=0.2, random_state=0)
-        val_pdb_ids, test_pdb_ids = train_test_split(test_pdb_ids, test_size=0.5, random_state=0)
+        train_pdb_ids, test_pdb_ids = train_test_split(pdb_ids, test_size=0.2, random_state=self.split_seed)
+        val_pdb_ids, test_pdb_ids = train_test_split(test_pdb_ids, test_size=0.5, random_state=self.split_seed)
 
         # Create train dataset
         self.train_dataset = ProteinConceptDataset(

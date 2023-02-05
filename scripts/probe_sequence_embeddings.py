@@ -23,7 +23,8 @@ def probe_sequence_embeddings(
         logger_type: str,
         loss_fn: str = "mse",
         learning_rate: float = 1e-4,
-        ckpt_every_k_epochs: int = 10
+        ckpt_every_k_epochs: int = 10,
+        split_seed: int = 0
 ) -> None:
     """Probe sequence embeddings for a 3D geometric concept.
 
@@ -40,9 +41,10 @@ def probe_sequence_embeddings(
     :param loss_fn: The loss function to use.
     :param learning_rate: The learning rate for the optimizer.
     :param ckpt_every_k_epochs: Save a checkpoint every k epochs.
+    :param split_seed: The random seed to use for the train/val/test split.
     """
     # Create save directory
-    run_name = f'{concept}_mlp_{num_layers}_layers'
+    run_name = f'{concept}_mlp_{num_layers}_layers_{split_seed}_split_seed'
     save_dir = save_dir / run_name
     save_dir.mkdir(parents=True, exist_ok=True)
 
@@ -56,7 +58,8 @@ def probe_sequence_embeddings(
         concepts_dir=concepts_dir,
         concept=concept,
         protein_embedding_method=protein_embedding_method,
-        batch_size=batch_size
+        batch_size=batch_size,
+        split_seed=split_seed
     )
     data_module.setup()
 
@@ -84,7 +87,8 @@ def probe_sequence_embeddings(
             "num_layers": num_layers,
             "batch_size": batch_size,
             "loss_fn": loss_fn,
-            "learning_rate": learning_rate
+            "learning_rate": learning_rate,
+            "split_seed": split_seed
         })
     elif logger_type == "tensorboard":
         from pytorch_lightning.loggers import TensorBoardLogger
@@ -163,6 +167,8 @@ if __name__ == '__main__':
         """The learning rate for the optimizer."""
         ckpt_every_k_epochs: int = 10
         """Checkpoint every k epochs."""
+        split_seed: int = 0
+        """The random seed to use for the train/val/test split."""
 
         def configure(self) -> None:
             self.add_argument('--concept', choices=get_concept_names())
