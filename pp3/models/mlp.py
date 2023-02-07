@@ -26,7 +26,7 @@ class MLP(pl.LightningModule):
             target_mean: float,
             target_std: float,
             learning_rate: float = 1e-4,
-            loss_fn: str = "mse"
+            loss_fn: str = 'huber'
     ) -> None:
         """Initialize the model.
 
@@ -137,8 +137,7 @@ class MLP(pl.LightningModule):
             self.log(f'{step_type}_auc', roc_auc_score(y_np, y_hat_np))
             self.log(f'{step_type}_ap', average_precision_score(y_np, y_hat_np))
         elif self.target_type == 'multi_classification':
-            # TODO: convert to one-hot encoding
-            self.log(f'{step_type}_accuracy', (np.argmax(y_np) == y_hat_np).mean())
+            self.log(f'{step_type}_accuracy', (y_np == np.argmax(y_hat_np, axis=1)).mean())
         else:
             raise ValueError(f'Invalid target type: {self.target_type}')
 

@@ -21,7 +21,7 @@ def probe_sequence_embeddings(
         num_layers: int,
         batch_size: int,
         logger_type: str,
-        loss_fn: str = "mse",
+        loss_fn: str = 'huber',
         learning_rate: float = 1e-4,
         ckpt_every_k_epochs: int = 10,
         split_seed: int = 0
@@ -44,7 +44,7 @@ def probe_sequence_embeddings(
     :param split_seed: The random seed to use for the train/val/test split.
     """
     # Create save directory
-    run_name = f'{concept}_mlp_{num_layers}_layers_{split_seed}_split_seed'
+    run_name = f'{concept}_mlp_{num_layers}_layers'
     save_dir = save_dir / run_name
     save_dir.mkdir(parents=True, exist_ok=True)
 
@@ -161,7 +161,7 @@ if __name__ == '__main__':
         """The batch size."""
         logger_type: Literal['wandb', 'tensorboard'] = "wandb"
         """The logger_type to use."""
-        loss_fn: str = "mse"
+        loss_fn: Literal['mse', 'mae', 'huber', 'ce'] = 'huber'
         """The loss function to use."""
         learning_rate: float = 1e-4
         """The learning rate for the optimizer."""
@@ -172,6 +172,5 @@ if __name__ == '__main__':
 
         def configure(self) -> None:
             self.add_argument('--concept', choices=get_concept_names())
-            self.add_argument('--loss_fn', choices=['mse', 'mae', "huber", "ce"])
 
     probe_sequence_embeddings(**Args().parse_args().as_dict())

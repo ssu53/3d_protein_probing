@@ -89,13 +89,13 @@ class ProteinConceptDataset(Dataset):
     def target_mean(self) -> float:
         """Get the mean of the concept values."""
         # TODO: enable for non-scalar values
-        return float(np.mean(self.targets))
+        return float(np.nanmean(self.targets))
 
     @property
     def target_std(self) -> float:
         """Get the standard deviation of the concept values."""
         # TODO: enable for non-scalar values
-        return float(np.std(self.targets))
+        return float(np.nanstd(self.targets))
 
     def __len__(self) -> int:
         """Get the number of items in the dataset."""
