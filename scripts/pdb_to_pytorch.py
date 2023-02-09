@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import torch
 from biotite import InvalidFileError
-from biotite.sequence import ProteinSequence
+from biotite.sequence import AlphabetError, ProteinSequence
 from biotite.sequence.align import align_optimal, remove_terminal_gaps, get_sequence_identity, SubstitutionMatrix
 from biotite.structure import BadStructureError
 from tqdm import tqdm
@@ -55,10 +55,17 @@ def convert_pdb_to_pytorch(
 
     # Ensure the structure's sequence matches a subsequence of the full PDB sequence
     if structure_sequence not in sequence:
+        # Convert the sequences to biotite ProteinSequence objects, checking for invalid characters
+        try:
+            structure_sequence = ProteinSequence(structure_sequence)
+            sequence = ProteinSequence(sequence)
+        except AlphabetError as e:
+            return {'error': repr(e)}
+
         # Align the structure's sequence to the full PDB sequence
         alignments = align_optimal(
-            ProteinSequence(structure_sequence),
-            ProteinSequence(sequence),
+            structure_sequence,
+            sequence,
             SubstitutionMatrix.std_protein_matrix()
         )
 
