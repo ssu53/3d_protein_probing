@@ -5,9 +5,12 @@ from multiprocessing import Pool
 from pathlib import Path
 from typing import Optional
 
+import numpy as np
 import pandas as pd
 import torch
 from biotite import InvalidFileError
+from biotite.sequence import ProteinSequence
+from biotite.sequence.align import align_optimal, remove_terminal_gaps, get_sequence_identity, SubstitutionMatrix
 from biotite.structure import BadStructureError
 from tqdm import tqdm
 
@@ -52,7 +55,27 @@ def convert_pdb_to_pytorch(
 
     # Ensure the structure's sequence matches a subsequence of the full PDB sequence
     if structure_sequence not in sequence:
-        return {'error': repr(ValueError('Structure sequence does not match annotated sequence'))}
+        # Align the structure's sequence to the full PDB sequence
+        alignments = align_optimal(
+            ProteinSequence(structure_sequence),
+            ProteinSequence(sequence),
+            SubstitutionMatrix.std_protein_matrix()
+        )
+
+        # Remove gaps at the ends, using the first alignment
+        alignment = remove_terminal_gaps(alignments[0])
+
+        # Get the trace of the alignment and determine the number of gaps
+        trace = alignment.trace
+        num_structure_gaps = np.sum(trace[0] == -1)
+        num_sequence_gaps = np.sum(trace[1] == -1)
+        sequence_identity = get_sequence_identity(alignment)
+
+        return {'error': repr(ValueError(
+            f'Structure sequence does not match annotated sequence '
+            f'with {num_structure_gaps:,} structure gaps and {num_sequence_gaps:,} sequence gaps '
+            f'and {sequence_identity:.3f} sequence identity'
+        ))}
 
     # Get the start and end indices of the structure's sequence in the full PDB sequence
     start_index = sequence.index(structure_sequence)
