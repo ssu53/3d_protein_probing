@@ -5,20 +5,16 @@ from multiprocessing import Pool
 from pathlib import Path
 from typing import Optional
 
-import numpy as np
 import pandas as pd
 import torch
 from biotite import InvalidFileError
-from biotite.sequence import AlphabetError, ProteinSequence
-from biotite.sequence.align import align_optimal, remove_terminal_gaps, get_sequence_identity, SubstitutionMatrix
 from biotite.structure import BadStructureError
 from tqdm import tqdm
 
 from pp3.utils.pdb import (
-    get_pdb_residue_coordinates,
-    get_pdb_sequence_from_structure,
-    load_pdb_sequence,
-    load_pdb_structure
+    get_residue_coordinates,
+    get_sequence_from_structure,
+    load_structure
 )
 
 
@@ -30,70 +26,27 @@ def convert_pdb_to_pytorch(
 
     :param pdb_id: The PDB ID of the protein structure.
     :param pdb_dir: The directory containing the PDB structures.
-    :return: A dictionary containing the structure and sequence or None if the structure is invalid.
+    :return: A dictionary containing the structure and sequence or an error message if the structure is invalid.
     """
     # Load PDB structure
     try:
-        structure = load_pdb_structure(pdb_id=pdb_id, pdb_dir=pdb_dir)
+        structure = load_structure(pdb_id=pdb_id, pdb_dir=pdb_dir)
     except (BadStructureError, FileNotFoundError, InvalidFileError, ValueError, TypeError) as e:
         return {'error': repr(e)}
 
     # Get residue coordinates
     try:
-        residue_coordinates = get_pdb_residue_coordinates(structure=structure)
+        residue_coordinates = get_residue_coordinates(structure=structure)
     except ValueError as e:
         return {'error': repr(e)}
 
     # Get sequence from structure residues
-    structure_sequence = get_pdb_sequence_from_structure(structure=structure)
-
-    # Load PDB sequence
-    try:
-        sequence = load_pdb_sequence(pdb_id=pdb_id, pdb_dir=pdb_dir)
-    except ValueError as e:
-        return {'error': repr(e)}
-
-    # Ensure the structure's sequence matches a subsequence of the full PDB sequence
-    if structure_sequence not in sequence:
-        # Convert the sequences to biotite ProteinSequence objects, checking for invalid characters
-        try:
-            structure_sequence = ProteinSequence(structure_sequence)
-            sequence = ProteinSequence(sequence)
-        except AlphabetError as e:
-            return {'error': repr(e)}
-
-        # Align the structure's sequence to the full PDB sequence
-        alignments = align_optimal(
-            structure_sequence,
-            sequence,
-            SubstitutionMatrix.std_protein_matrix()
-        )
-
-        # Remove gaps at the ends, using the first alignment
-        alignment = remove_terminal_gaps(alignments[0])
-
-        # Get the trace of the alignment and determine the number of gaps
-        trace = alignment.trace
-        num_structure_gaps = np.sum(trace[0] == -1)
-        num_sequence_gaps = np.sum(trace[1] == -1)
-        sequence_identity = get_sequence_identity(alignment)
-
-        return {'error': repr(ValueError(
-            f'Structure sequence does not match annotated sequence '
-            f'with {num_structure_gaps:,} structure gaps and {num_sequence_gaps:,} sequence gaps '
-            f'and {sequence_identity:.3f} sequence identity'
-        ))}
-
-    # Get the start and end indices of the structure's sequence in the full PDB sequence
-    start_index = sequence.index(structure_sequence)
-    end_index = start_index + len(structure_sequence)
+    sequence = get_sequence_from_structure(structure=structure)
 
     # Return dictionary containing structure and sequence
     return {
         'structure': residue_coordinates,
-        'sequence': sequence,
-        'start_index': start_index,
-        'end_index': end_index
+        'sequence': sequence
     }
 
 

@@ -16,7 +16,7 @@ from biotite.structure import (
 from biotite.structure.info import standardize_order
 
 from pp3.utils.constants import SS_LETTER_TO_INDEX
-from pp3.utils.pdb import get_pdb_residue_coordinates
+from pp3.utils.pdb import get_residue_coordinates
 
 
 CONCEPT_FUNCTION_TYPE = Callable[[AtomArray], Any]
@@ -113,7 +113,7 @@ def residue_distances(structure: AtomArray) -> torch.Tensor:
     :return: A PyTorch tensor with the distances between residue pairs.
     """
     # Get residue coordinates
-    residue_coordinates = get_pdb_residue_coordinates(structure=structure)
+    residue_coordinates = get_residue_coordinates(structure=structure)
 
     # Compute pairwise distances
     return torch.cdist(residue_coordinates, residue_coordinates, p=2)

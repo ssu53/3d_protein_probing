@@ -9,7 +9,7 @@ import torch
 from tqdm import tqdm
 
 from pp3.concepts import compute_all_concepts, get_concept_names, get_concept_function
-from pp3.utils.pdb import load_pdb_structure
+from pp3.utils.pdb import load_structure
 
 
 def compute_concepts_for_structure(
@@ -25,7 +25,7 @@ def compute_concepts_for_structure(
     :return: A dictionary mapping concept names to values.
     """
     # Load PDB structure
-    structure = load_pdb_structure(pdb_id=pdb_id, pdb_dir=pdb_dir)
+    structure = load_structure(pdb_id=pdb_id, pdb_dir=pdb_dir)
 
     # Set up concept dictionary
     if concepts is None:

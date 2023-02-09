@@ -110,24 +110,17 @@ class ProteinConceptDataset(Dataset):
         # Get PDB ID
         pdb_id = self.pdb_ids[index]
 
-        # TODO: precompute this once or cache this?
-        # If residue level, then get residue embeddings for residues in structure
-        if 'residue' in self.concept_level:
-            # TODO: modify MLP or this preloading to handle residue-level embeddings
-            start_index = self.pdb_id_to_protein[pdb_id]['start_index']
-            end_index = self.pdb_id_to_protein[pdb_id]['end_index']
+        # Get residue embeddings
+        embeddings = self.pdb_id_to_embeddings[pdb_id]
 
-            embeddings = self.pdb_id_to_embeddings[pdb_id][start_index:end_index]
-        # If protein level, then get average embedding across all residues
-        elif self.concept_level == 'protein':
+        # If protein concept, aggregate residue embeddings to protein embedding
+        if self.concept_level == 'protein':
             if self.protein_embedding_method == 'sum':
-                embeddings = self.pdb_id_to_embeddings[pdb_id].sum(dim=0)
+                embeddings = embeddings.sum(dim=0)
             elif self.protein_embedding_method == 'mean':
-                embeddings = self.pdb_id_to_embeddings[pdb_id].mean(dim=0)
+                embeddings = embeddings.mean(dim=0)
             else:
                 raise ValueError(f'Invalid protein embedding method: {self.protein_embedding_method}')
-        else:
-            raise ValueError(f'Invalid concept level: {self.concept_level}')
 
         # Get concept value
         concept_value = self.pdb_id_to_concept_value[pdb_id]
