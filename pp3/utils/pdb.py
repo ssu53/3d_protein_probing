@@ -6,7 +6,7 @@ from biotite.structure import (
     AtomArray,
     check_bond_continuity,
     check_duplicate_atoms,
-    filter_amino_acids,
+    filter_canonical_amino_acids,
     get_chain_count,
     get_residue_count,
     get_residues,
@@ -83,7 +83,7 @@ def load_structure(pdb_id: str, pdb_dir: Path) -> AtomArray:
     structure = structure[0]
 
     # Keep only amino acid residues
-    structure = structure[filter_amino_acids(structure)]
+    structure = structure[filter_canonical_amino_acids(structure)]
 
     # Check if there are no residues
     if len(structure) == 0:
