@@ -81,11 +81,6 @@ def load_pdb_structure(pdb_id: str, pdb_dir: Path) -> AtomArray:
     # Get first model
     structure = structure[0]
 
-    # Ensure only one chain
-    # TODO: can include multiple chains and then do biggest one
-    if get_chain_count(structure) != 1:
-        raise ValueError('Structure contains more than one chain')
-
     # Keep only amino acid residues
     # TODO: maybe filter less
     structure = structure[filter_canonical_amino_acids(structure)]
@@ -93,6 +88,11 @@ def load_pdb_structure(pdb_id: str, pdb_dir: Path) -> AtomArray:
     # Check if there are no residues
     if len(structure) == 0:
         raise ValueError('Structure does not contain any residues after cleaning')
+
+    # Ensure only one chain
+    # TODO: can include multiple chains and then do biggest one
+    if get_chain_count(structure) != 1:
+        raise ValueError('Structure contains more than one chain')
 
     # Standardize atom order
     structure = structure[standardize_order(structure)]
