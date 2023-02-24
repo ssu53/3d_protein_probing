@@ -96,11 +96,6 @@ class MLP(pl.LightningModule):
         # Unpack batch
         x, y = batch
 
-        # Remove NaN values (included for some concepts)
-        nan_mask = torch.isnan(y)
-        x = x[~nan_mask]
-        y = y[~nan_mask]
-
         # Make predictions
         y_hat_scaled = self(x).squeeze(dim=1)
 

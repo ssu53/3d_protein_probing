@@ -63,7 +63,7 @@ class ProteinConceptDataset(Dataset):
 
         if self.concept_level == 'protein':
             self.collate_fn = collate_protein
-        elif self.concept_level == 'residue':
+        elif self.concept_level.startswith('residue'):
             self.collate_fn = collate_residue
         else:
             raise ValueError(f'Invalid concept level: {self.concept_level}')
@@ -80,8 +80,10 @@ class ProteinConceptDataset(Dataset):
 
         if self.concept_level == 'protein':
             target_array = np.array(target_array)
-        else:
+        elif self.concept_level.startswith('residue'):
             target_array = np.concatenate(target_array)
+        else:
+            raise ValueError(f'Invalid concept level: {self.concept_level}')
 
         return target_array
 
@@ -207,7 +209,7 @@ class ProteinConceptDataModule(pl.LightningDataModule):
                     pdb_id: aggregate_fn(embeddings, dim=0)
                     for pdb_id, embeddings in pdb_id_to_embeddings.items()
                 }
-            elif self.concept_level != 'residue':
+            elif not self.concept_level.startswith('residue'):
                 raise ValueError(f'Invalid concept level: {self.concept_level}')
 
         # Baseline embeddings
@@ -215,7 +217,7 @@ class ProteinConceptDataModule(pl.LightningDataModule):
             # Get appropriate baseline embedding method for concept level
             if self.concept_level == 'protein':
                 baseline_embedding_fn = get_baseline_protein_embedding
-            elif self.concept_level == 'residue':
+            elif self.concept_level.startswith('residue'):
                 baseline_embedding_fn = get_baseline_residue_embedding
             else:
                 raise ValueError(f'Invalid concept level: {self.concept_level}')
