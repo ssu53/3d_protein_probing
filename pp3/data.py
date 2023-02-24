@@ -183,7 +183,7 @@ class ProteinConceptDataModule(pl.LightningDataModule):
                     pdb_id: aggregate_fn(embeddings, dim=0)
                     for pdb_id, embeddings in pdb_id_to_embeddings.items()
                 }
-            elif self.protein_embedding_method != 'residue':
+            elif self.concept_level != 'residue':
                 raise ValueError(f'Invalid concept level: {self.concept_level}')
 
         # Baseline embeddings
