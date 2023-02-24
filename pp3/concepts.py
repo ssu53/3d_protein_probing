@@ -169,7 +169,7 @@ def secondary_structure(structure: AtomArray) -> torch.Tensor:
     return torch.from_numpy(sse)
 
 
-@register_concept(concept_level='residue', concept_type='regression', output_dim=1)
+@register_concept(concept_level='residue_triplet', concept_type='regression', output_dim=1)
 def bond_angles(structure: AtomArray, first_last_nan: bool = True) -> torch.Tensor:
     """Get the angle between residue triplets.
 

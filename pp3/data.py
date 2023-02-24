@@ -116,6 +116,30 @@ class ProteinConceptDataset(Dataset):
         # Get concept value
         concept_value = self.pdb_id_to_concept_value[pdb_id]
 
+        # If needed, modify embedding structure based on concept level
+        if self.concept_level == 'residue_pair':
+            # Get number of residues
+            num_residues = len(embeddings)
+
+            # Create all pairs of embeddings
+            embeddings = torch.cat([
+                torch.repeat_interleave(embeddings, num_residues, dim=0),  # (num_residues * num_residues, embedding_dim)
+                torch.tile(embeddings, (num_residues, 1))  # (num_residues * num_residues, embedding_dim)
+            ], dim=1)  # (num_residues * num_residues, 2 * embedding_dim)
+
+            # Flatten concept values
+            concept_value = concept_value.flatten()  # (num_residues * num_residues,)
+        elif self.concept_level == 'residue_triplet':
+            # Create adjacent triples of residue embeddings
+            embeddings = torch.stack([
+                embeddings[:-2],  # (num_residues - 2, embedding_dim)
+                embeddings[1:-1],  # (num_residues - 2, embedding_dim)
+                embeddings[2:]  # (num_residues - 2, embedding_dim)
+            ], dim=1)
+
+            # Select corresponding concept values
+            concept_value = concept_value[1:-1]  # (num_residues - 2,)
+
         return embeddings, concept_value
 
 
