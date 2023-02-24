@@ -133,7 +133,7 @@ class ProteinConceptDataset(Dataset):
             concept_value = concept_value.flatten()  # (num_residues * num_residues,)
         elif self.concept_level == 'residue_triplet':
             # Create adjacent triples of residue embeddings
-            embeddings = torch.stack([
+            embeddings = torch.cat([
                 embeddings[:-2],  # (num_residues - 2, embedding_dim)
                 embeddings[1:-1],  # (num_residues - 2, embedding_dim)
                 embeddings[2:]  # (num_residues - 2, embedding_dim)
