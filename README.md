@@ -87,17 +87,23 @@ python scripts/compute_esm_embeddings.py \
 
 Probe sequence embeddings for protein SASA concept.
 ```bash
+#!/bin/bash
+
 for CONCEPT in protein_sasa protein_sasa_normalized residue_sasa bond_angles secondary_structure
 do
-    for NUM_LAYERS in 1 2
+    for PROTEIN_EMBEDDING_METHOD in plm baseline
     do
-        python scripts/probe_sequence_embeddings.py \
-            --proteins_path data/pdb_single_chain_protein_30_identity/proteins.pt \
-            --embeddings_path data/pdb_single_chain_protein_30_identity/embeddings/esm2_t33_650M_UR50D.pt \
-            --save_dir results/pdb_single_chain_protein_30_identity/esm2_t33_650M_UR50D \
-            --concepts_dir data/pdb_single_chain_protein_30_identity/concepts \
-            --concept $CONCEPT \
-            --num_layers $NUM_LAYERS
+        for NUM_LAYERS in 1 2
+        do
+            python scripts/probe_sequence_embeddings.py \
+                --proteins_path data/pdb_single_chain_protein_30_identity/proteins.pt \
+                --embeddings_path data/pdb_single_chain_protein_30_identity/embeddings/esm2_t33_650M_UR50D.pt \
+                --save_dir results/pdb_single_chain_protein_30_identity/esm2_t33_650M_UR50D \
+                --concepts_dir data/pdb_single_chain_protein_30_identity/concepts \
+                --concept $CONCEPT \
+                --protein_embedding_method $PROTEIN_EMBEDDING_METHOD \
+                --num_layers $NUM_LAYERS
+        done
     done
 done
 ```

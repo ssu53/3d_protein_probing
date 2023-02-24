@@ -101,7 +101,7 @@ class MLP(pl.LightningModule):
         x = x[~nan_mask]
         y = y[~nan_mask]
 
-        # Make predictions and unscale them
+        # Make predictions
         y_hat_scaled = self(x).squeeze(dim=1)
 
         # Scale/unscale target and predictions
@@ -195,6 +195,41 @@ class MLP(pl.LightningModule):
             batch_idx=batch_idx,
             step_type='test'
         )
+
+    def predict_step(
+            self,
+            batch: tuple[torch.Tensor, torch.Tensor],
+            batch_idx: int,
+            dataloader_idx: int = 0
+    ) -> torch.Tensor:
+        """Runs a prediction step.
+
+        :param batch: A tuple containing the input and target.
+        :param batch_idx: The index of the batch.
+        :param dataloader_idx: The index of the dataloader.
+        :return: A tensor of predictions for the batch.
+        """
+        # Unpack batch
+        x, y = batch
+
+        # Remove NaN values (included for some concepts)
+        nan_mask = torch.isnan(y)
+        x = x[~nan_mask]
+
+        # Make predictions
+        y_hat_scaled = self(x).squeeze(dim=1)
+
+        # Unscale predictions
+        if self.target_type == 'regression':
+            y_hat = y_hat_scaled * self.target_std + self.target_mean
+        elif self.target_type == 'binary_classification':
+            y_hat = F.sigmoid(y_hat_scaled)
+        elif self.target_type == 'multi_classification':
+            y_hat = F.softmax(y_hat_scaled, dim=-1)
+        else:
+            raise ValueError(f'Invalid target type: {self.target_type}')
+
+        return y_hat
 
     def configure_optimizers(self) -> torch.optim.Optimizer:
         """Configures the optimizer."""

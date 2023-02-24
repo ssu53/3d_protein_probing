@@ -2,6 +2,7 @@
 from pathlib import Path
 from typing import Literal
 
+import torch
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint
 
@@ -24,6 +25,7 @@ def probe_sequence_embeddings(
         logger_type: str,
         loss_fn: str = 'huber',
         learning_rate: float = 1e-4,
+        max_epochs: int = 1000,
         ckpt_every_k_epochs: int = 10,
         split_seed: int = 0
 ) -> None:
@@ -42,6 +44,7 @@ def probe_sequence_embeddings(
     :param logger_type: The logger_type to use.
     :param loss_fn: The loss function to use.
     :param learning_rate: The learning rate for the optimizer.
+    :param max_epochs: The maximum number of epochs to train for.
     :param ckpt_every_k_epochs: Save a checkpoint every k epochs.
     :param split_seed: The random seed to use for the train/val/test split.
     """
@@ -114,7 +117,7 @@ def probe_sequence_embeddings(
         accelerator='gpu',
         devices=1,
         deterministic=True,
-        max_epochs=1000,
+        max_epochs=max_epochs,
         log_every_n_steps=25,
         callbacks=[ckpt_callback]
     )
@@ -126,18 +129,16 @@ def probe_sequence_embeddings(
     )
 
     # Test model
-    metrics = trainer.test(datamodule=data_module, ckpt_path='best')
-    print(metrics)
+    trainer.test(datamodule=data_module, ckpt_path='best')
 
     # Make test predictions
-    # TODO: debug this
-    # test_preds = trainer.predict(datamodule=data_module, ckpt_path='best')
-    # 
-    # # Save test predictions and true values
-    # torch.save({
-    #     'preds': test_preds,
-    #     'true': data_module.test_dataset.targets
-    # }, save_dir / 'preds_and_true.pt')
+    test_preds = trainer.predict(datamodule=data_module, ckpt_path='best')
+
+    # Save test targets and predictions
+    torch.save({
+        'target': data_module.test_dataset.targets,
+        'prediction': test_preds
+    }, save_dir / 'target_and_prediction.pt')
 
 
 if __name__ == '__main__':
@@ -170,6 +171,8 @@ if __name__ == '__main__':
         """The loss function to use."""
         learning_rate: float = 1e-4
         """The learning rate for the optimizer."""
+        max_epochs: int = 1000
+        """The maximum number of epochs to train for."""
         ckpt_every_k_epochs: int = 10
         """Checkpoint every k epochs."""
         split_seed: int = 0
