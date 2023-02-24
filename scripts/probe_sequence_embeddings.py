@@ -49,7 +49,7 @@ def probe_sequence_embeddings(
     :param split_seed: The random seed to use for the train/val/test split.
     """
     # Create save directory
-    run_name = f'{concept}_mlp_{num_layers}_layers'
+    run_name = f'{concept}_mlp_{protein_embedding_method}_{num_layers}_layers'
     save_dir = save_dir / run_name
     save_dir.mkdir(parents=True, exist_ok=True)
 
