@@ -8,6 +8,7 @@ import torch
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset
 
+from pp3.baseline_embeddings import get_baseline_protein_embedding, get_baseline_residue_embedding
 from pp3.concepts import get_concept_level
 
 
@@ -39,7 +40,7 @@ class ProteinConceptDataset(Dataset):
     def __init__(
             self,
             pdb_ids: list[str],
-            pdb_id_to_protein: dict[str, dict[str, torch.Tensor | str | int]],
+            pdb_id_to_protein: dict[str, dict[str, torch.Tensor | str]],
             pdb_id_to_embeddings: dict[str, torch.Tensor],
             pdb_id_to_concept_value: dict[str, torch.Tensor],
             concept_level: str,
@@ -48,7 +49,7 @@ class ProteinConceptDataset(Dataset):
         """Initialize the dataset.
 
         :param pdb_ids: The PDB IDs in this dataset.
-        :param pdb_id_to_protein: A dictionary mapping PDB IDs to protein dictionaries.
+        :param pdb_id_to_protein: A dictionary mapping PDB ID  to protein dictionary with sequence and structure.
         :param pdb_id_to_embeddings: A dictionary mapping PDB ID to sequence embeddings.
         :param pdb_id_to_concept_value: A dictionary mapping PDB ID to concept values.
         :param concept_level: The level of the concept.
@@ -110,17 +111,8 @@ class ProteinConceptDataset(Dataset):
         # Get PDB ID
         pdb_id = self.pdb_ids[index]
 
-        # Get residue embeddings
+        # Get embeddings
         embeddings = self.pdb_id_to_embeddings[pdb_id]
-
-        # If protein concept, aggregate residue embeddings to protein embedding
-        if self.concept_level == 'protein':
-            if self.protein_embedding_method == 'sum':
-                embeddings = embeddings.sum(dim=0)
-            elif self.protein_embedding_method == 'mean':
-                embeddings = embeddings.mean(dim=0)
-            else:
-                raise ValueError(f'Invalid protein embedding method: {self.protein_embedding_method}')
 
         # Get concept value
         concept_value = self.pdb_id_to_concept_value[pdb_id]
@@ -138,6 +130,7 @@ class ProteinConceptDataModule(pl.LightningDataModule):
             concepts_dir: Path,
             concept: str,
             protein_embedding_method: str,
+            plm_residue_to_protein_method: str,
             batch_size: int,
             num_workers: int = 8,
             split_seed: int = 0
@@ -150,6 +143,7 @@ class ProteinConceptDataModule(pl.LightningDataModule):
         :param concept: The concept to learn.
         :param batch_size: The batch size.
         :param protein_embedding_method: The method to use to compute the protein embedding from the residue embeddings.
+        :param plm_residue_to_protein_method: The method to use to compute the PLM protein embedding from the residue embeddings for protein concepts.
         :param num_workers: The number of workers to use for data loading.
         :param split_seed: The random seed to use for the train/val/test split.
         """
@@ -160,11 +154,58 @@ class ProteinConceptDataModule(pl.LightningDataModule):
         self.concept = concept
         self.concept_level = get_concept_level(concept)
         self.protein_embedding_method = protein_embedding_method
+        self.plm_residue_to_protein_method = plm_residue_to_protein_method
         self.batch_size = batch_size
         self.train_dataset = self.val_dataset = self.test_dataset = None
         self.is_setup = False
         self.num_workers = num_workers
         self.split_seed = split_seed
+
+    def get_embeddings(self, pdb_id_to_proteins: dict[str, dict[str, torch.Tensor | str]]) -> dict[str, torch.Tensor]:
+        """Load or compute embeddings for proteins or residues.
+
+        :param pdb_id_to_proteins: A dictionary mapping PDB ID to protein dictionary with sequence and structure
+        :return: A dictionary mapping PDB ID to embeddings.
+        """
+        # PLM embeddings
+        if self.protein_embedding_method == 'plm':
+            # Load PDB ID to PLM embeddings dictionary
+            pdb_id_to_embeddings = torch.load(self.embeddings_path)
+
+            # If concept is protein level, aggregate residue embeddings to protein embeddings
+            if self.concept_level == 'protein':
+                # Set up aggregation function
+                aggregate_fn = getattr(torch, self.plm_residue_to_protein_method)
+
+                # Aggregate residue embeddings to protein embeddings
+                pdb_id_to_embeddings = {
+                    pdb_id: aggregate_fn(embeddings, dim=0)
+                    for pdb_id, embeddings in pdb_id_to_embeddings.items()
+                }
+            elif self.protein_embedding_method != 'residue':
+                raise ValueError(f'Invalid concept level: {self.concept_level}')
+
+        # Baseline embeddings
+        elif self.protein_embedding_method == 'baseline':
+            # Get appropriate baseline embedding method for concept level
+            if self.concept_level == 'protein':
+                baseline_embedding_fn = get_baseline_protein_embedding
+            elif self.concept_level == 'residue':
+                baseline_embedding_fn = get_baseline_residue_embedding
+            else:
+                raise ValueError(f'Invalid concept level: {self.concept_level}')
+
+            # Compute baseline embeddings
+            pdb_id_to_embeddings = {
+                pdb_id: baseline_embedding_fn(protein['sequence'])
+                for pdb_id, protein in pdb_id_to_proteins.items()
+            }
+
+        # Other embedding methods
+        else:
+            raise ValueError(f'Invalid protein embedding method: {self.protein_embedding_method}')
+
+        return pdb_id_to_embeddings
 
     def setup(self, stage: Optional[str] = None) -> None:
         """Prepare the data module by loading the data and splitting into train, val, and test."""
@@ -173,14 +214,14 @@ class ProteinConceptDataModule(pl.LightningDataModule):
 
         print('Loading data')
 
-        # Load PDB ID to proteins dictionary
-        pdb_id_to_proteins = torch.load(self.proteins_path)
+        # Load PDB ID to protein dictionary with sequence and structure
+        pdb_id_to_proteins: dict[str, dict[str, torch.Tensor | str]] = torch.load(self.proteins_path)
 
-        # Load PDB ID to embeddings dictionary
-        pdb_id_to_embeddings = torch.load(self.embeddings_path)
+        # Load or compute embeddings for proteins or residues
+        pdb_id_to_embeddings = self.get_embeddings(pdb_id_to_proteins)
 
         # Load PDB ID to concept value dictionary
-        pdb_id_to_concept_value = torch.load(self.concepts_dir / f'{self.concept}.pt')
+        pdb_id_to_concept_value: dict[str, torch.Tensor] = torch.load(self.concepts_dir / f'{self.concept}.pt')
 
         # Ensure that the PDB IDs are the same across dictionaries
         assert set(pdb_id_to_proteins) == set(pdb_id_to_embeddings) == set(pdb_id_to_concept_value)

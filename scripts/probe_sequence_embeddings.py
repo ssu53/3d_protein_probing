@@ -16,7 +16,8 @@ def probe_sequence_embeddings(
         save_dir: Path,
         concepts_dir: Path,
         concept: str,
-        protein_embedding_method: Literal['sum', 'mean'],
+        protein_embedding_method: Literal['plm', 'baseline'],
+        plm_residue_to_protein_method: Literal['mean', 'max', 'sum'],
         hidden_dim: int,
         num_layers: int,
         batch_size: int,
@@ -33,7 +34,8 @@ def probe_sequence_embeddings(
     :param save_dir: Path to directory where results and predictions will be saved.
     :param concepts_dir: Path to a directory containing PT files with dictionaries mapping PDB ID to concept values.
     :param concept: The concept to learn.
-    :param protein_embedding_method: The method to use to compute the protein embedding from the residue embeddings
+    :param protein_embedding_method: The method to use to compute the protein or residue embeddings.
+    :param plm_residue_to_protein_method: The method to use to compute the PLM protein embedding from the residue embeddings for protein concepts.
     :param hidden_dim: The hidden dimension of the MLP.
     :param num_layers: The number of layers in the MLP.
     :param batch_size: The batch size.
@@ -58,6 +60,7 @@ def probe_sequence_embeddings(
         concepts_dir=concepts_dir,
         concept=concept,
         protein_embedding_method=protein_embedding_method,
+        plm_residue_to_protein_method=plm_residue_to_protein_method,
         batch_size=batch_size,
         split_seed=split_seed
     )
@@ -78,19 +81,19 @@ def probe_sequence_embeddings(
 
     print(mlp)
 
-    if logger_type == "wandb":
+    if logger_type == 'wandb':
         from pytorch_lightning.loggers import WandbLogger
-        logger = WandbLogger(project=f"Probing", save_dir=str(save_dir), name=run_name)
+        logger = WandbLogger(project=f'Probing', save_dir=str(save_dir), name=run_name)
         logger.experiment.config.update({
-            "concept": concept,
-            "hidden_dim": hidden_dim,
-            "num_layers": num_layers,
-            "batch_size": batch_size,
-            "loss_fn": loss_fn,
-            "learning_rate": learning_rate,
-            "split_seed": split_seed
+            'concept': concept,
+            'hidden_dim': hidden_dim,
+            'num_layers': num_layers,
+            'batch_size': batch_size,
+            'loss_fn': loss_fn,
+            'learning_rate': learning_rate,
+            'split_seed': split_seed
         })
-    elif logger_type == "tensorboard":
+    elif logger_type == 'tensorboard':
         from pytorch_lightning.loggers import TensorBoardLogger
         logger = TensorBoardLogger(save_dir=str(save_dir), name=run_name)
     else:
@@ -101,7 +104,7 @@ def probe_sequence_embeddings(
     ckpt_callback = ModelCheckpoint(
         dirpath=save_dir,
         save_top_k=2,
-        monitor="val_loss",
+        monitor='val_loss',
         every_n_epochs=ckpt_every_k_epochs
     )
 
@@ -151,15 +154,17 @@ if __name__ == '__main__':
         """Path to a directory containing PT files with dictionaries mapping PDB ID to concept values."""
         concept: str
         """The concept to learn."""
-        protein_embedding_method: Literal['sum', 'mean'] = 'sum'
-        """The method to use to compute the protein embedding from the residue embeddings."""
+        protein_embedding_method: Literal['plm', 'baseline'] = 'plm'
+        """The method to use to compute the protein or residue embeddings."""
+        plm_residue_to_protein_method: Literal['mean', 'max', 'sum'] = 'sum'
+        """The method to use to compute the PLM protein embedding from the residue embeddings for protein concepts."""
         hidden_dim: int = 100
         """Hidden dimension of the MLP."""
         num_layers: int = 1
         """The number of layers in the MLP."""
         batch_size: int = 100
         """The batch size."""
-        logger_type: Literal['wandb', 'tensorboard'] = "wandb"
+        logger_type: Literal['wandb', 'tensorboard'] = 'wandb'
         """The logger_type to use."""
         loss_fn: Literal['mse', 'mae', 'huber', 'ce'] = 'huber'
         """The loss function to use."""

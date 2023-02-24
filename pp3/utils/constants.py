@@ -10,6 +10,12 @@ AA_3_TO_1 = {
     'SEC': 'U', 'PYL': 'O'
 }
 
+# Set of canonical three letter amino acid codes
+AA_3 = sorted(AA_3_TO_1)
+
+# Set of canonical one letter amino acid codes
+AA_1 = sorted(AA_3_TO_1.values())
+
 # Mapping from secondary structure letters to indices
 SS_LETTER_TO_INDEX = {
     'a': 0,  # alpha helix
