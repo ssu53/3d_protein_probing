@@ -66,7 +66,7 @@ def get_baseline_residue_embedding(sequence: str) -> torch.Tensor:
     :return: A tensor of residue embeddings.
     """
     # Get the residue embeddings
-    residue_embeddings = torch.cat([
+    residue_embeddings = torch.stack([
         get_baseline_residue_embedding_index(sequence=sequence, index=index)
         for index in range(len(sequence))
     ])
