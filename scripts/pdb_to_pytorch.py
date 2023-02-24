@@ -3,7 +3,6 @@ from collections import Counter
 from functools import partial
 from multiprocessing import Pool
 from pathlib import Path
-from typing import Optional
 
 import pandas as pd
 import torch
@@ -21,7 +20,7 @@ from pp3.utils.pdb import (
 def convert_pdb_to_pytorch(
         pdb_id: str,
         pdb_dir: Path
-) -> Optional[dict[str, torch.Tensor | str]]:
+) -> dict[str, torch.Tensor | str] | None:
     """Parses PDB file and converts structure and sequence to PyTorch format while removing invalid structures.
 
     :param pdb_id: The PDB ID of the protein structure.

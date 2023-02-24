@@ -1,6 +1,5 @@
 """Data classes and functions."""
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 import pytorch_lightning as pl
@@ -156,7 +155,9 @@ class ProteinConceptDataModule(pl.LightningDataModule):
         self.protein_embedding_method = protein_embedding_method
         self.plm_residue_to_protein_method = plm_residue_to_protein_method
         self.batch_size = batch_size
-        self.train_dataset = self.val_dataset = self.test_dataset = None
+        self.train_dataset: ProteinConceptDataset | None = None
+        self.val_dataset: ProteinConceptDataset | None = None
+        self.test_dataset: ProteinConceptDataset | None = None
         self.is_setup = False
         self.num_workers = num_workers
         self.split_seed = split_seed
@@ -207,7 +208,7 @@ class ProteinConceptDataModule(pl.LightningDataModule):
 
         return pdb_id_to_embeddings
 
-    def setup(self, stage: Optional[str] = None) -> None:
+    def setup(self, stage: str | None = None) -> None:
         """Prepare the data module by loading the data and splitting into train, val, and test."""
         if self.is_setup:
             return

@@ -2,7 +2,7 @@
 from functools import partial
 from multiprocessing import Pool
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import pandas as pd
 import torch
@@ -15,7 +15,7 @@ from pp3.utils.pdb import load_structure
 def compute_concepts_for_structure(
         pdb_id: str,
         pdb_dir: Path,
-        concepts: Optional[list[str]] = None
+        concepts: list[str] | None = None
 ) -> dict[str, Any]:
     """Computes 3D geometric concepts from a protein structure.
 
@@ -43,7 +43,7 @@ def compute_concepts(
         ids_path: Path,
         pdb_dir: Path,
         save_dir: Path,
-        concepts: Optional[list[str]] = None
+        concepts: list[str] | None = None
 ) -> None:
     """Compute 3D geometric concepts from protein structures.
 
@@ -94,7 +94,7 @@ if __name__ == '__main__':
         """Path to a directory containing PDB structures."""
         save_dir: Path
         """Path to a directory where PyTorch files with dictionaries mapping PDB ID to concept values will be saved."""
-        concepts: Optional[list[str]] = None
+        concepts: list[str] | None = None
         """List of concepts to compute. If None, all concepts will be computed."""
 
         def configure(self) -> None:
