@@ -92,7 +92,10 @@ class ProteinConceptDataset(Dataset):
         if target_type == float:
             target_array = torch.Tensor(target_array)
         elif target_type == torch.Tensor:
-            target_array = torch.cat(target_array.flatten())
+            target_array = torch.cat([
+                targets.flatten()
+                for targets in target_array
+            ])
         else:
             raise ValueError(f'Invalid concept value type: {target_type}')
 
