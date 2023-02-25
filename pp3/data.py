@@ -41,7 +41,7 @@ class ProteinConceptDataset(Dataset):
             pdb_ids: list[str],
             pdb_id_to_protein: dict[str, dict[str, torch.Tensor | str]],
             pdb_id_to_embeddings: dict[str, torch.Tensor],
-            pdb_id_to_concept_value: dict[str, torch.Tensor],
+            pdb_id_to_concept_value: dict[str, torch.Tensor | float],
             concept_level: str,
             protein_embedding_method: str,
     ) -> None:
@@ -71,33 +71,45 @@ class ProteinConceptDataset(Dataset):
     @property
     def embedding_dim(self) -> int:
         """Get the embedding size."""
-        return self.pdb_id_to_embeddings[self.pdb_ids[0]].shape[-1]
+        embeddings, concept_value = self[0]
+        embedding_dim = embeddings.shape[-1]
+
+        return embedding_dim
 
     @property
-    def targets(self) -> np.ndarray:
-        """Get the concept values across the entire dataset."""
-        target_array = [self.pdb_id_to_concept_value[pdb_id] for pdb_id in self.pdb_ids]
+    def targets(self) -> torch.Tensor:
+        """Get the concept values across the entire dataset, leaving out NaN values."""
+        # Get target array
+        target_array = [
+            self.pdb_id_to_concept_value[pdb_id]
+            for pdb_id in self.pdb_ids
+        ]
 
-        if self.concept_level == 'protein':
-            target_array = np.array(target_array)
-        elif self.concept_level.startswith('residue'):
-            target_array = np.concatenate(target_array)
+        # Get target type
+        target_type = type(target_array[0])
+
+        # Convert to PyTorch Tensor
+        if target_type == float:
+            target_array = torch.Tensor(target_array)
+        elif target_type == torch.Tensor:
+            target_array = torch.cat(target_array)
         else:
-            raise ValueError(f'Invalid concept level: {self.concept_level}')
+            raise ValueError(f'Invalid concept value type: {target_type}')
+
+        # Remove NaN values
+        target_array = target_array[~torch.isnan(target_array)]
 
         return target_array
 
     @property
     def target_mean(self) -> float:
         """Get the mean of the concept values."""
-        # TODO: enable for non-scalar values
-        return float(np.nanmean(self.targets))
+        return float(torch.mean(self.targets))
 
     @property
     def target_std(self) -> float:
         """Get the standard deviation of the concept values."""
-        # TODO: enable for non-scalar values
-        return float(np.nanstd(self.targets))
+        return float(torch.std(self.targets))
 
     def __len__(self) -> int:
         """Get the number of items in the dataset."""
@@ -248,7 +260,7 @@ class ProteinConceptDataModule(pl.LightningDataModule):
         pdb_id_to_embeddings = self.get_embeddings(pdb_id_to_proteins)
 
         # Load PDB ID to concept value dictionary
-        pdb_id_to_concept_value: dict[str, torch.Tensor] = torch.load(self.concepts_dir / f'{self.concept}.pt')
+        pdb_id_to_concept_value: dict[str, torch.Tensor | float] = torch.load(self.concepts_dir / f'{self.concept}.pt')
 
         # Ensure that the PDB IDs are the same across dictionaries
         assert set(pdb_id_to_proteins) == set(pdb_id_to_embeddings) == set(pdb_id_to_concept_value)
