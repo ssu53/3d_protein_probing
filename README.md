@@ -85,7 +85,7 @@ python scripts/compute_esm_embeddings.py \
 
 ## Probe ESM2 embeddings for concepts
 
-Probe sequence embeddings for protein SASA concept.
+Probe sequence embeddings for concepts.
 ```bash
 #!/bin/bash
 

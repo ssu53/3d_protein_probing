@@ -151,9 +151,10 @@ class ProteinConceptDataset(Dataset):
                 pair_indices = self.rng.choice(pair_indices, size=num_pairs_to_sample, replace=False)
 
             # Create pair embeddings
-            embeddings = torch.zeros((len(pair_indices), 2 * self.embedding_dim))  # (num_pairs, 2 * embedding_dim)
-            embeddings[:, :self.embedding_dim] = embeddings[pair_indices[:, 0]]  # (num_pairs, embedding_dim)
-            embeddings[:, self.embedding_dim:] = embeddings[pair_indices[:, 1]]  # (num_pairs, embedding_dim)
+            embedding_dim = embeddings.shape[-1]
+            embeddings = torch.zeros((len(pair_indices), 2 * embedding_dim))  # (num_pairs, 2 * embedding_dim)
+            embeddings[:, :embedding_dim] = embeddings[pair_indices[:, 0]]  # (num_pairs, embedding_dim)
+            embeddings[:, embedding_dim:] = embeddings[pair_indices[:, 1]]  # (num_pairs, embedding_dim)
 
             # Get concept values
             concept_value = concept_value[pair_indices[:, 0], pair_indices[:, 1]]  # (num_pairs,)
