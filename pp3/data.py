@@ -1,4 +1,5 @@
 """Data classes and functions."""
+from itertools import product
 from pathlib import Path
 
 import numpy as np
@@ -60,6 +61,9 @@ class ProteinConceptDataset(Dataset):
         self.pdb_id_to_concept_value = pdb_id_to_concept_value
         self.concept_level = concept_level
         self.protein_embedding_method = protein_embedding_method
+
+        self.max_residues_for_pairs = 100
+        self.rng = np.random.default_rng(seed=0)
 
         if self.concept_level == 'protein':
             self.collate_fn = collate_protein
@@ -138,14 +142,21 @@ class ProteinConceptDataset(Dataset):
             # Get number of residues
             num_residues = len(embeddings)
 
-            # Create all pairs of embeddings
-            embeddings = torch.cat([
-                torch.repeat_interleave(embeddings, num_residues, dim=0),  # (num_residues * num_residues, embedding_dim)
-                torch.tile(embeddings, (num_residues, 1))  # (num_residues * num_residues, embedding_dim)
-            ], dim=1)  # (num_residues * num_residues, 2 * embedding_dim)
+            # Get residue pair indices
+            pair_indices = np.array(list(product(range(num_residues), repeat=2)))  # (num_residues * num_residues, 2)
 
-            # Flatten concept values
-            concept_value = concept_value.flatten()  # (num_residues * num_residues,)
+            # Randomly sample pairs of residues (too much memory to use all of them)
+            if num_residues > self.max_residues_for_pairs:
+                num_pairs_to_sample = self.max_residues_for_pairs ** 2
+                pair_indices = self.rng.choice(pair_indices, size=num_pairs_to_sample, replace=False)
+
+            # Create pair embeddings
+            embeddings = torch.zeros((len(pair_indices), 2 * self.embedding_dim))  # (num_pairs, 2 * embedding_dim)
+            embeddings[:, :self.embedding_dim] = embeddings[pair_indices[:, 0]]  # (num_pairs, embedding_dim)
+            embeddings[:, self.embedding_dim:] = embeddings[pair_indices[:, 1]]  # (num_pairs, embedding_dim)
+
+            # Get concept values
+            concept_value = concept_value[pair_indices[:, 0], pair_indices[:, 1]]  # (num_pairs,)
         elif self.concept_level == 'residue_triplet':
             # Create adjacent triples of residue embeddings
             embeddings = torch.cat([
