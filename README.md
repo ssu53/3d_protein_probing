@@ -89,7 +89,7 @@ Probe sequence embeddings for concepts.
 ```bash
 #!/bin/bash
 
-for CONCEPT in protein_sasa protein_sasa_normalized residue_sasa bond_angles secondary_structure
+for CONCEPT in protein_sasa protein_sasa_normalized residue_sasa bond_angles secondary_structure residue_distances
 do
     for PROTEIN_EMBEDDING_METHOD in plm baseline
     do

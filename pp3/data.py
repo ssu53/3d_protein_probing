@@ -62,7 +62,7 @@ class ProteinConceptDataset(Dataset):
         self.concept_level = concept_level
         self.protein_embedding_method = protein_embedding_method
 
-        self.max_residues_for_pairs = 100
+        self.max_residues_for_pairs = 25
         self.rng = np.random.default_rng(seed=0)
 
         if self.concept_level == 'protein':
