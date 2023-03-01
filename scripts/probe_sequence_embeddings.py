@@ -137,7 +137,7 @@ def probe_sequence_embeddings(
 
     # Save test targets and predictions
     torch.save({
-        'target': torch.from_numpy(data_module.test_dataset.targets),
+        'target': data_module.test_dataset.targets,
         'prediction': test_preds
     }, save_dir / 'target_and_prediction.pt')
 

@@ -23,8 +23,8 @@ class MLP(pl.LightningModule):
             hidden_dim: int,
             num_layers: int,
             target_type: str,
-            target_mean: float,
-            target_std: float,
+            target_mean: float | None,
+            target_std: float | None,
             learning_rate: float = 1e-4,
             loss_fn: str = 'huber'
     ) -> None:

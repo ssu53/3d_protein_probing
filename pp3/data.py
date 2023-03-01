@@ -9,7 +9,7 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset
 
 from pp3.baseline_embeddings import get_baseline_protein_embedding, get_baseline_residue_embedding
-from pp3.concepts import get_concept_level
+from pp3.concepts import get_concept_level, get_concept_type
 
 
 def collate_protein(batch: list[tuple[torch.Tensor, float]]) -> tuple[torch.Tensor, torch.Tensor]:
@@ -44,6 +44,7 @@ class ProteinConceptDataset(Dataset):
             pdb_id_to_embeddings: dict[str, torch.Tensor],
             pdb_id_to_concept_value: dict[str, torch.Tensor | float],
             concept_level: str,
+            concept_type: str,
             protein_embedding_method: str,
     ) -> None:
         """Initialize the dataset.
@@ -52,7 +53,8 @@ class ProteinConceptDataset(Dataset):
         :param pdb_id_to_protein: A dictionary mapping PDB ID  to protein dictionary with sequence and structure.
         :param pdb_id_to_embeddings: A dictionary mapping PDB ID to sequence embeddings.
         :param pdb_id_to_concept_value: A dictionary mapping PDB ID to concept values.
-        :param concept_level: The level of the concept.
+        :param concept_level: The level of the concept (e.g., protein or residue).
+        :param concept_type: The type of the concept (e.g., regression or classification).
         :param protein_embedding_method: The method to use to compute the protein embedding from the residue embeddings.
         """
         self.pdb_ids = pdb_ids
@@ -60,6 +62,7 @@ class ProteinConceptDataset(Dataset):
         self.pdb_id_to_embeddings = pdb_id_to_embeddings
         self.pdb_id_to_concept_value = pdb_id_to_concept_value
         self.concept_level = concept_level
+        self.concept_type = concept_type
         self.protein_embedding_method = protein_embedding_method
 
         self.max_residues_for_pairs = 25
@@ -109,14 +112,14 @@ class ProteinConceptDataset(Dataset):
         return target_array
 
     @property
-    def target_mean(self) -> float:
-        """Get the mean of the concept values."""
-        return float(torch.mean(self.targets))
+    def target_mean(self) -> float | None:
+        """Get the mean of the concept values if regression, None otherwise."""
+        return float(torch.mean(self.targets)) if self.concept_type == 'regression' else None
 
     @property
-    def target_std(self) -> float:
-        """Get the standard deviation of the concept values."""
-        return float(torch.std(self.targets))
+    def target_std(self) -> float | None:
+        """Get the standard deviation of the concept values if regression, None otherwise."""
+        return float(torch.std(self.targets)) if self.concept_type == 'regression' else None
 
     def __len__(self) -> int:
         """Get the number of items in the dataset."""
@@ -206,6 +209,7 @@ class ProteinConceptDataModule(pl.LightningDataModule):
         self.concepts_dir = concepts_dir
         self.concept = concept
         self.concept_level = get_concept_level(concept)
+        self.concept_type = get_concept_type(concept)
         self.protein_embedding_method = protein_embedding_method
         self.plm_residue_to_protein_method = plm_residue_to_protein_method
         self.batch_size = batch_size
@@ -293,6 +297,7 @@ class ProteinConceptDataModule(pl.LightningDataModule):
             pdb_id_to_embeddings=pdb_id_to_embeddings,
             pdb_id_to_concept_value=pdb_id_to_concept_value,
             concept_level=self.concept_level,
+            concept_type=self.concept_type,
             protein_embedding_method=self.protein_embedding_method
         )
         print(f'Train dataset size: {len(self.train_dataset):,}')
@@ -304,6 +309,7 @@ class ProteinConceptDataModule(pl.LightningDataModule):
             pdb_id_to_embeddings=pdb_id_to_embeddings,
             pdb_id_to_concept_value=pdb_id_to_concept_value,
             concept_level=self.concept_level,
+            concept_type=self.concept_type,
             protein_embedding_method=self.protein_embedding_method
         )
         print(f'Val dataset size: {len(self.val_dataset):,}')
@@ -315,6 +321,7 @@ class ProteinConceptDataModule(pl.LightningDataModule):
             pdb_id_to_embeddings=pdb_id_to_embeddings,
             pdb_id_to_concept_value=pdb_id_to_concept_value,
             concept_level=self.concept_level,
+            concept_type=self.concept_type,
             protein_embedding_method=self.protein_embedding_method
         )
         print(f'Test dataset size: {len(self.test_dataset):,}')
