@@ -32,14 +32,12 @@ def get_baseline_protein_embedding(sequence: str) -> torch.Tensor:
         protein_analysis.molecular_weight(),
         protein_analysis.aromaticity(),
         protein_analysis.instability_index(),
-        protein_analysis.flexibility(),
+        *protein_analysis.flexibility(),
         protein_analysis.gravy(),
         protein_analysis.isoelectric_point(),
         protein_analysis.charge_at_pH(7.4),
-        protein_analysis.secondary_structure_fraction()[0],
-        protein_analysis.secondary_structure_fraction()[1],
-        protein_analysis.secondary_structure_fraction()[2],
-        protein_analysis.molar_extinction_coefficient()
+        *protein_analysis.secondary_structure_fraction(),
+        *protein_analysis.molar_extinction_coefficient()
     ])
 
     return protein_embedding
