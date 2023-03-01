@@ -1,4 +1,5 @@
 """Constant values used across multiple modules."""
+from biotite.sequence.align import SubstitutionMatrix
 from biotite.structure.info import residue
 
 # Mapping from amino acid three-letter codes to one-letter codes
@@ -31,3 +32,10 @@ AA_ATOM_NAMES = {
 
 # Backbone atom names
 BACKBONE_ATOM_NAMES = {'N', 'CA', 'C'}
+
+# BLOSUM62 AA to vector
+BLOSUM62 = SubstitutionMatrix.std_protein_matrix()
+BLOSUM62_AA_TO_VECTOR = {
+    aa1: [BLOSUM62.get_score(aa1, aa2) for aa2 in BLOSUM62.get_alphabet2()]
+    for aa1 in BLOSUM62.get_alphabet1()
+}
