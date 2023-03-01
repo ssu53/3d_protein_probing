@@ -32,7 +32,6 @@ def get_baseline_protein_embedding(sequence: str) -> torch.Tensor:
         protein_analysis.molecular_weight(),
         protein_analysis.aromaticity(),
         protein_analysis.instability_index(),
-        *protein_analysis.flexibility(),
         protein_analysis.gravy(),
         protein_analysis.isoelectric_point(),
         protein_analysis.charge_at_pH(7.4),
