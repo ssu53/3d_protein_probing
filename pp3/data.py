@@ -213,12 +213,16 @@ class ProteinConceptDataModule(pl.LightningDataModule):
         self.protein_embedding_method = protein_embedding_method
         self.plm_residue_to_protein_method = plm_residue_to_protein_method
         self.batch_size = batch_size
+        self.num_workers = num_workers
+        self.split_seed = split_seed
+
+        self.train_pdb_ids: list[str] | None = None
+        self.val_pdb_ids: list[str] | None = None
+        self.test_pdb_ids: list[str] | None = None
         self.train_dataset: ProteinConceptDataset | None = None
         self.val_dataset: ProteinConceptDataset | None = None
         self.test_dataset: ProteinConceptDataset | None = None
         self.is_setup = False
-        self.num_workers = num_workers
-        self.split_seed = split_seed
 
     def get_embeddings(self, pdb_id_to_proteins: dict[str, dict[str, torch.Tensor | str]]) -> dict[str, torch.Tensor]:
         """Load or compute embeddings for proteins or residues.
@@ -260,6 +264,20 @@ class ProteinConceptDataModule(pl.LightningDataModule):
                 for pdb_id, protein in pdb_id_to_proteins.items()
             }
 
+            # Normalize baseline embeddings using mean/std fit on train embeddings
+            scaler_embeddings = torch.stack([
+                pdb_id_to_embeddings[pdb_id]
+                for pdb_id in self.train_pdb_ids
+            ])  # (num_train, embedding_dim)
+
+            mean = scaler_embeddings.mean(dim=0, keepdim=True)  # (1, embedding_dim)
+            std = scaler_embeddings.std(dim=0, keepdim=True, unbiased=False)  # (1, embedding_dim)
+
+            pdb_id_to_embeddings = {
+                pdb_id: (embedding - mean) / std
+                for pdb_id, embedding in pdb_id_to_embeddings.items()
+            }
+
         # Other embedding methods
         else:
             raise ValueError(f'Invalid protein embedding method: {self.protein_embedding_method}')
@@ -276,6 +294,19 @@ class ProteinConceptDataModule(pl.LightningDataModule):
         # Load PDB ID to protein dictionary with sequence and structure
         pdb_id_to_proteins: dict[str, dict[str, torch.Tensor | str]] = torch.load(self.proteins_path)
 
+        # Split PDB IDs into train and test sets
+        pdb_ids = sorted(pdb_id_to_proteins)
+        self.train_pdb_ids, val_test_pdb_ids = train_test_split(
+            pdb_ids,
+            test_size=0.2,
+            random_state=self.split_seed
+        )
+        self.val_pdb_ids, self.test_pdb_ids = train_test_split(
+            val_test_pdb_ids,
+            test_size=0.5,
+            random_state=self.split_seed
+        )
+
         # Load or compute embeddings for proteins or residues
         pdb_id_to_embeddings = self.get_embeddings(pdb_id_to_proteins)
 
@@ -285,14 +316,9 @@ class ProteinConceptDataModule(pl.LightningDataModule):
         # Ensure that the PDB IDs are the same across dictionaries
         assert set(pdb_id_to_proteins) == set(pdb_id_to_embeddings) == set(pdb_id_to_concept_value)
 
-        # Split PDB IDs into train and test sets
-        pdb_ids = sorted(pdb_id_to_proteins)
-        train_pdb_ids, test_pdb_ids = train_test_split(pdb_ids, test_size=0.2, random_state=self.split_seed)
-        val_pdb_ids, test_pdb_ids = train_test_split(test_pdb_ids, test_size=0.5, random_state=self.split_seed)
-
         # Create train dataset
         self.train_dataset = ProteinConceptDataset(
-            pdb_ids=train_pdb_ids,
+            pdb_ids=self.train_pdb_ids,
             pdb_id_to_protein=pdb_id_to_proteins,
             pdb_id_to_embeddings=pdb_id_to_embeddings,
             pdb_id_to_concept_value=pdb_id_to_concept_value,
@@ -304,7 +330,7 @@ class ProteinConceptDataModule(pl.LightningDataModule):
 
         # Create val dataset
         self.val_dataset = ProteinConceptDataset(
-            pdb_ids=val_pdb_ids,
+            pdb_ids=self.val_pdb_ids,
             pdb_id_to_protein=pdb_id_to_proteins,
             pdb_id_to_embeddings=pdb_id_to_embeddings,
             pdb_id_to_concept_value=pdb_id_to_concept_value,
@@ -316,7 +342,7 @@ class ProteinConceptDataModule(pl.LightningDataModule):
 
         # Create test dataset
         self.test_dataset = ProteinConceptDataset(
-            pdb_ids=test_pdb_ids,
+            pdb_ids=self.test_pdb_ids,
             pdb_id_to_protein=pdb_id_to_proteins,
             pdb_id_to_embeddings=pdb_id_to_embeddings,
             pdb_id_to_concept_value=pdb_id_to_concept_value,

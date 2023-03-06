@@ -6,7 +6,7 @@ import torch
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint
 
-from pp3.concepts import get_concept_names, get_concept_output_dim, get_concept_type
+from pp3.concepts import get_concept_output_dim, get_concept_type
 from pp3.models.mlp import MLP
 from pp3.data import ProteinConceptDataModule
 
