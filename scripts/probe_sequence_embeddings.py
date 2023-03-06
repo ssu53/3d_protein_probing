@@ -17,6 +17,7 @@ def probe_sequence_embeddings(
         save_dir: Path,
         concepts_dir: Path,
         concept: str,
+        project_name: str = 'Probing',
         protein_embedding_method: Literal['plm', 'baseline'] = 'plm',
         plm_residue_to_protein_method: Literal['mean', 'max', 'sum'] = 'sum',
         hidden_dim: int = 100,
@@ -37,6 +38,7 @@ def probe_sequence_embeddings(
     :param save_dir: Path to directory where results and predictions will be saved.
     :param concepts_dir: Path to a directory containing PT files with dictionaries mapping PDB ID to concept values.
     :param concept: The concept to learn.
+    :param project_name: The name of the project to use for WandB logging.
     :param protein_embedding_method: The method to use to compute the protein or residue embeddings.
     :param plm_residue_to_protein_method: The method to use to compute the PLM protein embedding from the residue embeddings for protein concepts.
     :param hidden_dim: The hidden dimension of the MLP.
@@ -89,7 +91,7 @@ def probe_sequence_embeddings(
 
     if logger_type == 'wandb':
         from pytorch_lightning.loggers import WandbLogger
-        logger = WandbLogger(project=f'Probing', save_dir=str(save_dir), name=run_name)
+        logger = WandbLogger(project=project_name, save_dir=str(save_dir), name=run_name)
         logger.experiment.config.update({
             'concept': concept,
             'hidden_dim': hidden_dim,
