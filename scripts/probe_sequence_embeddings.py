@@ -4,7 +4,7 @@ from typing import Literal
 
 import torch
 import pytorch_lightning as pl
-from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 
 from pp3.concepts import get_concept_output_dim, get_concept_type
 from pp3.models.mlp import MLP
@@ -107,13 +107,22 @@ def probe_sequence_embeddings(
     else:
         raise ValueError(f'Invalid logger type {logger_type}')
 
-    # Build model checkpoint
+    # Build model checkpoint callback
     # TODO: how to split metrics by data, maybe in the model
     ckpt_callback = ModelCheckpoint(
         dirpath=save_dir,
         save_top_k=2,
         monitor='val_loss',
         every_n_epochs=ckpt_every_k_epochs
+    )
+
+    # Build early stopping callback
+    early_stopping = EarlyStopping(
+        monitor='val_r2',
+        min_delta=0.001,
+        patience=5,
+        verbose=True,
+        mode='max'
     )
 
     # Build trainer
@@ -124,7 +133,7 @@ def probe_sequence_embeddings(
         deterministic=True,
         max_epochs=max_epochs,
         log_every_n_steps=25,
-        callbacks=[ckpt_callback]
+        callbacks=[ckpt_callback, early_stopping]
     )
 
     # Train model
