@@ -24,4 +24,4 @@ dependencies:
   - wandb
   - pip:
     - fair-esm
-    - typed-argument-parser
+    - typed-argument-parser>=1.8.0

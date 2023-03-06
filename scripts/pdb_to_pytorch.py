@@ -102,16 +102,6 @@ def pdb_to_pytorch(
 
 
 if __name__ == '__main__':
-    from tap import Tap
+    from tap import tapify
 
-    class Args(Tap):
-        ids_path: Path
-        """Path to a TXT file containing PDB IDs."""
-        pdb_dir: Path
-        """Path to a directory containing PDB structures."""
-        proteins_save_path: Path
-        """Path to PT file where a dictionary mapping PDB ID to structure and sequence will be saved."""
-        ids_save_path: Path
-        """Path to CSV file where PDB IDs of converted structures will be saved."""
-
-    pdb_to_pytorch(**Args().parse_args().as_dict())
+    tapify(pdb_to_pytorch)

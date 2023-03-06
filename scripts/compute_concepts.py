@@ -8,7 +8,7 @@ import pandas as pd
 import torch
 from tqdm import tqdm
 
-from pp3.concepts import compute_all_concepts, get_concept_names, get_concept_function
+from pp3.concepts import compute_all_concepts, get_concept_function
 from pp3.utils.pdb import load_structure
 
 
@@ -85,19 +85,6 @@ def compute_concepts(
 
 
 if __name__ == '__main__':
-    from tap import Tap
+    from tap import tapify
 
-    class Args(Tap):
-        ids_path: Path
-        """Path to a CSV file containing PDB IDs."""
-        pdb_dir: Path
-        """Path to a directory containing PDB structures."""
-        save_dir: Path
-        """Path to a directory where PyTorch files with dictionaries mapping PDB ID to concept values will be saved."""
-        concepts: list[str] | None = None
-        """List of concepts to compute. If None, all concepts will be computed."""
-
-        def configure(self) -> None:
-            self.add_argument('--concepts', choices=get_concept_names())
-
-    compute_concepts(**Args().parse_args().as_dict())
+    tapify(compute_concepts)

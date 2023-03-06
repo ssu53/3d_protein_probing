@@ -95,20 +95,6 @@ def compute_esm_embeddings(
 
 
 if __name__ == '__main__':
-    from tap import Tap
+    from tap import tapify
 
-    class Args(Tap):
-        proteins_path: Path
-        """"Path to PT file containing a dictionary mapping PDB ID to structure and sequence."""
-        hub_dir: Path
-        """Path to directory where torch hub models are saved."""
-        esm_model: str
-        """Pretrained ESM2 model to use. See options at https://github.com/facebookresearch/esm."""
-        last_layer: int
-        """Last layer of the ESM2 model, which will be used to extract embeddings."""
-        save_path: Path
-        """Path to PT file where a dictionary mapping PDB ID to embeddings will be saved."""
-        batch_size: int = 2
-        """The number of sequences to process at once."""
-
-    compute_esm_embeddings(**Args().parse_args().as_dict())
+    tapify(compute_esm_embeddings)

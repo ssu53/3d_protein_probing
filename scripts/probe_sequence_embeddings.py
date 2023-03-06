@@ -17,12 +17,12 @@ def probe_sequence_embeddings(
         save_dir: Path,
         concepts_dir: Path,
         concept: str,
-        protein_embedding_method: Literal['plm', 'baseline'],
-        plm_residue_to_protein_method: Literal['mean', 'max', 'sum'],
-        hidden_dim: int,
-        num_layers: int,
-        batch_size: int,
-        logger_type: str,
+        protein_embedding_method: Literal['plm', 'baseline'] = 'plm',
+        plm_residue_to_protein_method: Literal['mean', 'max', 'sum'] = 'sum',
+        hidden_dim: int = 100,
+        num_layers: int = 1,
+        batch_size: int = 100,
+        logger_type: str = 'wandb',
         loss_fn: str = 'huber',
         learning_rate: float = 1e-4,
         max_epochs: int = 1000,
@@ -143,43 +143,6 @@ def probe_sequence_embeddings(
 
 
 if __name__ == '__main__':
-    from tap import Tap
+    from tap import tapify
 
-    class Args(Tap):
-        proteins_path: Path
-        """Path to PT file containing a dictionary mapping PDB ID to structure and sequence."""
-        embeddings_path: Path
-        """"Path to PT file containing a dictionary mapping PDB ID to embeddings."""
-        save_dir: Path
-        """Path to directory where results and predictions will be saved."""
-        concepts_dir: Path
-        """Path to a directory containing PT files with dictionaries mapping PDB ID to concept values."""
-        concept: str
-        """The concept to learn."""
-        protein_embedding_method: Literal['plm', 'baseline'] = 'plm'
-        """The method to use to compute the protein or residue embeddings."""
-        plm_residue_to_protein_method: Literal['mean', 'max', 'sum'] = 'sum'
-        """The method to use to compute the PLM protein embedding from the residue embeddings for protein concepts."""
-        hidden_dim: int = 100
-        """Hidden dimension of the MLP."""
-        num_layers: int = 1
-        """The number of layers in the MLP."""
-        batch_size: int = 100
-        """The batch size."""
-        logger_type: Literal['wandb', 'tensorboard'] = 'wandb'
-        """The logger_type to use."""
-        loss_fn: Literal['mse', 'mae', 'huber', 'ce'] = 'huber'
-        """The loss function to use."""
-        learning_rate: float = 1e-4
-        """The learning rate for the optimizer."""
-        max_epochs: int = 1000
-        """The maximum number of epochs to train for."""
-        ckpt_every_k_epochs: int = 10
-        """Checkpoint every k epochs."""
-        split_seed: int = 0
-        """The random seed to use for the train/val/test split."""
-
-        def configure(self) -> None:
-            self.add_argument('--concept', choices=get_concept_names())
-
-    probe_sequence_embeddings(**Args().parse_args().as_dict())
+    tapify(probe_sequence_embeddings)
