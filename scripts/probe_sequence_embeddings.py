@@ -26,7 +26,7 @@ def probe_sequence_embeddings(
         logger_type: str = 'wandb',
         loss_fn: str = 'huber',
         learning_rate: float = 1e-4,
-        weight_decay: float = 0.01,
+        weight_decay: float = 1.0,
         max_epochs: int = 1000,
         ckpt_every_k_epochs: int = 10,
         split_seed: int = 0
