@@ -26,6 +26,7 @@ class MLP(pl.LightningModule):
             target_mean: float | None,
             target_std: float | None,
             learning_rate: float = 1e-4,
+            weight_decay: float = 0.01,
             loss_fn: str = 'huber'
     ) -> None:
         """Initialize the model.
@@ -38,6 +39,7 @@ class MLP(pl.LightningModule):
         :param target_mean: The mean target value across the training set.
         :param target_std: The standard deviation of the target values across the training set.
         :param learning_rate: The learning rate.
+        :param weight_decay: The weight decay.
         :param loss_fn: The loss function to use.
         """
         super(MLP, self).__init__()
@@ -50,6 +52,7 @@ class MLP(pl.LightningModule):
         self.target_mean = target_mean
         self.target_std = target_std
         self.learning_rate = learning_rate
+        self.weight_decay = weight_decay
 
         self.layer_dims = [self.input_dim] + [hidden_dim] * (self.num_layers - 1) + [self.output_dim]
 
@@ -228,7 +231,11 @@ class MLP(pl.LightningModule):
 
     def configure_optimizers(self) -> torch.optim.Optimizer:
         """Configures the optimizer."""
-        return torch.optim.Adam(self.parameters(), lr=self.learning_rate)
+        return torch.optim.Adam(
+            self.parameters(),
+            lr=self.learning_rate,
+            weight_decay=self.weight_decay
+        )
 
     @staticmethod
     def _get_loss_fn(loss_fn: str) -> nn.Module:
