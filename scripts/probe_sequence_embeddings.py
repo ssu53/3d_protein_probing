@@ -120,7 +120,7 @@ def probe_sequence_embeddings(
     early_stopping = EarlyStopping(
         monitor='val_r2',
         min_delta=0.001,
-        patience=5,
+        patience=25,
         verbose=True,
         mode='max'
     )
