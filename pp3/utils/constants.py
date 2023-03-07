@@ -17,6 +17,9 @@ AA_3 = sorted(AA_3_TO_1)
 # Set of canonical one letter amino acid codes
 AA_1 = sorted(AA_3_TO_1.values())
 
+# Get mapping from one letter amino acid code to index
+AA_1_TO_INDEX = {aa: i for i, aa in enumerate(AA_1)}
+
 # Mapping from secondary structure letters to indices
 SS_LETTER_TO_INDEX = {
     'a': 0,  # alpha helix

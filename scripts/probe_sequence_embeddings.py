@@ -23,10 +23,10 @@ def probe_sequence_embeddings(
         hidden_dim: int = 100,
         num_layers: int = 1,
         batch_size: int = 100,
-        logger_type: str = 'wandb',
+        logger_type: Literal['wandb', 'tensorboard'] = 'wandb',
         loss_fn: str = 'huber',
         learning_rate: float = 1e-4,
-        weight_decay: float = 1.0,
+        weight_decay: float = 0.1,
         max_epochs: int = 1000,
         ckpt_every_k_epochs: int = 10,
         split_seed: int = 0
@@ -118,11 +118,9 @@ def probe_sequence_embeddings(
 
     # Build early stopping callback
     early_stopping = EarlyStopping(
-        monitor='val_r2',
-        min_delta=0.001,
+        monitor='val_loss',
         patience=25,
-        verbose=True,
-        mode='max'
+        mode='min'
     )
 
     # Build trainer

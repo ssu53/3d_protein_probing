@@ -8,7 +8,12 @@ import torch
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset
 
-from pp3.baseline_embeddings import get_baseline_protein_embedding, get_baseline_residue_embedding
+from pp3.baseline_embeddings import (
+    get_baseline_protein_embedding,
+    get_baseline_protein_one_hot_mask,
+    get_baseline_residue_embedding,
+    get_baseline_residue_one_hot_mask
+)
 from pp3.concepts import get_concept_level, get_concept_type
 
 
@@ -253,8 +258,10 @@ class ProteinConceptDataModule(pl.LightningDataModule):
             # Get appropriate baseline embedding method for concept level
             if self.concept_level == 'protein':
                 baseline_embedding_fn = get_baseline_protein_embedding
+                one_hot_mask = get_baseline_protein_one_hot_mask()
             elif self.concept_level.startswith('residue'):
                 baseline_embedding_fn = get_baseline_residue_embedding
+                one_hot_mask = get_baseline_residue_one_hot_mask()
             else:
                 raise ValueError(f'Invalid concept level: {self.concept_level}')
 
@@ -264,15 +271,22 @@ class ProteinConceptDataModule(pl.LightningDataModule):
                 for pdb_id, protein in pdb_id_to_proteins.items()
             }
 
-            # Normalize baseline embeddings using mean/std fit on train embeddings
+            # Get tensor with all train embeddings
             scaler_embeddings = torch.stack([
                 pdb_id_to_embeddings[pdb_id]
                 for pdb_id in self.train_pdb_ids
             ])  # (num_train, embedding_dim)
 
+            # Compute mean and std of train embeddings
             mean = scaler_embeddings.mean(dim=0, keepdim=True)  # (1, embedding_dim)
             std = scaler_embeddings.std(dim=0, keepdim=True, unbiased=False)  # (1, embedding_dim)
+            std[std == 0] = 1  # Avoid dividing by zero
 
+            # Set mean and std of one-hot embeddings to zero and one to avoid normalizing them
+            mean[:, one_hot_mask] = 0
+            std[:, one_hot_mask] = 1
+
+            # Normalize baseline embeddings that are not one-hot using mean/std fit on train embeddings
             pdb_id_to_embeddings = {
                 pdb_id: (embedding - mean) / std
                 for pdb_id, embedding in pdb_id_to_embeddings.items()

@@ -26,7 +26,7 @@ class MLP(pl.LightningModule):
             target_mean: float | None,
             target_std: float | None,
             learning_rate: float = 1e-4,
-            weight_decay: float = 1.0,
+            weight_decay: float = 0.1,
             loss_fn: str = 'huber'
     ) -> None:
         """Initialize the model.
