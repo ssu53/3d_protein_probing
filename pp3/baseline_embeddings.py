@@ -14,7 +14,7 @@ def get_baseline_protein_embedding(sequence: str) -> torch.Tensor:
         - Protein features from the ProteinAnalysis module
 
     :param sequence: The amino acid sequence of a protein.
-    :return: The embedding of the protein.
+    :return: The embedding of the protein. (1, embedding_size)
     """
     # Analyze protein with biopython ProteinAnalysis module
     protein_analysis = ProteinAnalysis(sequence)
@@ -26,7 +26,7 @@ def get_baseline_protein_embedding(sequence: str) -> torch.Tensor:
     aa_frequencies = [aa_frequencies.get(aa, 0) for aa in AA_1]
 
     # Combine features to create the protein embedding
-    protein_embedding = torch.FloatTensor([
+    protein_embedding = torch.FloatTensor([[
         len(sequence),
         *aa_frequencies,  # length 22
         protein_analysis.molecular_weight(),
@@ -37,15 +37,15 @@ def get_baseline_protein_embedding(sequence: str) -> torch.Tensor:
         protein_analysis.charge_at_pH(7.4),
         *protein_analysis.secondary_structure_fraction(),  # length 3
         *protein_analysis.molar_extinction_coefficient()  # length 2
-    ])
+    ]])
 
     return protein_embedding
 
 
 def get_baseline_protein_one_hot_mask() -> torch.Tensor:
     """Get a binary mask indicating which features in the protein baseline embedding are one-hot encoded."""
-    length = get_baseline_residue_embedding_index(sequence='A', index=0).shape[0]
-    one_hot_mask = torch.zeros(length, dtype=torch.bool)
+    embedding_size = get_baseline_protein_embedding(sequence='A').shape[-1]
+    one_hot_mask = torch.zeros(embedding_size, dtype=torch.bool)
 
     return one_hot_mask
 
@@ -88,7 +88,7 @@ def get_baseline_residue_embedding(sequence: str) -> torch.Tensor:
     """Get the baseline residue embeddings from a protein sequence.
 
     :param sequence: The amino acid sequence of a protein.
-    :return: A tensor of residue embeddings.
+    :return: A tensor of residue embeddings. (num_residues, embedding_size
     """
     # Get the residue embeddings
     residue_embeddings = torch.stack([
@@ -101,8 +101,8 @@ def get_baseline_residue_embedding(sequence: str) -> torch.Tensor:
 
 def get_baseline_residue_one_hot_mask() -> torch.Tensor:
     """Get a binary mask indicating which features in the residue baseline embedding are one-hot encoded."""
-    length = get_baseline_residue_embedding_index(sequence='A', index=0).shape[0]
-    one_hot_mask = torch.zeros(length, dtype=torch.bool)
+    embedding_size = get_baseline_residue_embedding_index(sequence='A', index=0).shape[-1]
+    one_hot_mask = torch.zeros(embedding_size, dtype=torch.bool)
     one_hot_mask[:len(AA_1)] = 1
 
     return one_hot_mask
