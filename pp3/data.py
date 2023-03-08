@@ -272,10 +272,10 @@ class ProteinConceptDataModule(pl.LightningDataModule):
             }
 
             # Get tensor with all train embeddings
-            scaler_embeddings = torch.stack([
+            scaler_embeddings = torch.cat([
                 pdb_id_to_embeddings[pdb_id]
                 for pdb_id in self.train_pdb_ids
-            ])  # (num_train, embedding_dim)
+            ], dim=0)  # (num_train, embedding_dim)
 
             # Compute mean and std of train embeddings
             mean = scaler_embeddings.mean(dim=0, keepdim=True)  # (1, embedding_dim)
