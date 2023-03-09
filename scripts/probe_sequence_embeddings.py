@@ -26,7 +26,8 @@ def probe_sequence_embeddings(
         logger_type: Literal['wandb', 'tensorboard'] = 'wandb',
         loss_fn: str = 'huber',
         learning_rate: float = 1e-4,
-        weight_decay: float = 0.1,
+        weight_decay: float = 0.0,
+        dropout: float = 0.0,
         max_epochs: int = 1000,
         ckpt_every_k_epochs: int = 10,
         split_seed: int = 0
@@ -48,6 +49,7 @@ def probe_sequence_embeddings(
     :param loss_fn: The loss function to use.
     :param learning_rate: The learning rate for the optimizer.
     :param weight_decay: The weight decay for the optimizer.
+    :param dropout: The dropout rate.
     :param max_epochs: The maximum number of epochs to train for.
     :param ckpt_every_k_epochs: Save a checkpoint every k epochs.
     :param split_seed: The random seed to use for the train/val/test split.
@@ -84,7 +86,8 @@ def probe_sequence_embeddings(
         target_std=data_module.train_dataset.target_std,
         loss_fn=loss_fn,
         learning_rate=learning_rate,
-        weight_decay=weight_decay
+        weight_decay=weight_decay,
+        dropout=dropout
     )
 
     print(mlp)

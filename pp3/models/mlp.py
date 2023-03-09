@@ -26,7 +26,8 @@ class MLP(pl.LightningModule):
             target_mean: float | None,
             target_std: float | None,
             learning_rate: float = 1e-4,
-            weight_decay: float = 0.1,
+            weight_decay: float = 0.0,
+            dropout: float = 0.0,
             loss_fn: str = 'huber'
     ) -> None:
         """Initialize the model.
@@ -40,6 +41,7 @@ class MLP(pl.LightningModule):
         :param target_std: The standard deviation of the target values across the training set.
         :param learning_rate: The learning rate.
         :param weight_decay: The weight decay.
+        :param dropout: The dropout rate.
         :param loss_fn: The loss function to use.
         """
         super(MLP, self).__init__()
@@ -65,6 +67,9 @@ class MLP(pl.LightningModule):
         # Create activation function
         self.activation = nn.ReLU()
 
+        # Create dropout
+        self.dropout = nn.Dropout(p=dropout)
+
         # Create loss function
         self.loss = self._get_loss_fn(loss_fn)
 
@@ -76,6 +81,7 @@ class MLP(pl.LightningModule):
         """
         # Apply layers
         for i, layer in enumerate(self.layers):
+            x = self.dropout(x)
             x = layer(x)
 
             if i != len(self.layers) - 1:
