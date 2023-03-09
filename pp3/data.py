@@ -10,9 +10,7 @@ from torch.utils.data import DataLoader, Dataset
 
 from pp3.baseline_embeddings import (
     get_baseline_protein_embedding,
-    get_baseline_protein_one_hot_mask,
-    get_baseline_residue_embedding,
-    get_baseline_residue_one_hot_mask
+    get_baseline_residue_embedding
 )
 from pp3.concepts import get_concept_level, get_concept_type
 
@@ -258,10 +256,8 @@ class ProteinConceptDataModule(pl.LightningDataModule):
             # Get appropriate baseline embedding method for concept level
             if self.concept_level == 'protein':
                 baseline_embedding_fn = get_baseline_protein_embedding
-                one_hot_mask = get_baseline_protein_one_hot_mask()
             elif self.concept_level.startswith('residue'):
                 baseline_embedding_fn = get_baseline_residue_embedding
-                one_hot_mask = get_baseline_residue_one_hot_mask()
             else:
                 raise ValueError(f'Invalid concept level: {self.concept_level}')
 
