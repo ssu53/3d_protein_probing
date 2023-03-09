@@ -271,27 +271,6 @@ class ProteinConceptDataModule(pl.LightningDataModule):
                 for pdb_id, protein in pdb_id_to_proteins.items()
             }
 
-            # Get tensor with all train embeddings
-            scaler_embeddings = torch.cat([
-                pdb_id_to_embeddings[pdb_id]
-                for pdb_id in self.train_pdb_ids
-            ], dim=0)  # (num_train, embedding_dim)
-
-            # Compute mean and std of train embeddings
-            mean = scaler_embeddings.mean(dim=0, keepdim=True)  # (1, embedding_dim)
-            std = scaler_embeddings.std(dim=0, keepdim=True, unbiased=False)  # (1, embedding_dim)
-            std[std == 0] = 1  # Avoid dividing by zero
-
-            # Set mean and std of one-hot embeddings to zero and one to avoid normalizing them
-            mean[:, one_hot_mask] = 0
-            std[:, one_hot_mask] = 1
-
-            # Normalize baseline embeddings that are not one-hot using mean/std fit on train embeddings
-            pdb_id_to_embeddings = {
-                pdb_id: (embedding - mean) / std
-                for pdb_id, embedding in pdb_id_to_embeddings.items()
-            }
-
         # Other embedding methods
         else:
             raise ValueError(f'Invalid protein embedding method: {self.protein_embedding_method}')

@@ -1,9 +1,9 @@
 """Contains baseline embeddings for proteins and residues."""
+from collections import Counter
+
 import torch
-from Bio.SeqUtils.ProtParam import ProteinAnalysis
 
 from pp3.utils.constants import AA_1, AA_1_TO_INDEX
-from pp3.utils.constants import BLOSUM62_AA_TO_VECTOR
 
 
 def get_baseline_protein_embedding(sequence: str) -> torch.Tensor:
@@ -16,38 +16,22 @@ def get_baseline_protein_embedding(sequence: str) -> torch.Tensor:
     :param sequence: The amino acid sequence of a protein.
     :return: The embedding of the protein. (1, embedding_size)
     """
-    # Analyze protein with biopython ProteinAnalysis module
-    protein_analysis = ProteinAnalysis(sequence)
+    # Get the length of the protein sequence
+    protein_length = len(sequence)
 
-    # Get the amino acid composition of the protein
-    aa_frequencies = protein_analysis.get_amino_acids_percent()
+    # Get amino acid counts
+    aa_counts = Counter(sequence)
 
-    # Create an amino acid frequency vector as the protein embedding
-    aa_frequencies = [aa_frequencies.get(aa, 0) for aa in AA_1]
+    # Get the amino acid frequencies of the protein
+    aa_frequencies = [aa_counts[aa] / protein_length for aa in AA_1]
 
     # Combine features to create the protein embedding
-    protein_embedding = torch.FloatTensor([[
-        len(sequence),
+    protein_embedding = torch.FloatTensor([
+        protein_length,
         *aa_frequencies,  # length 22
-        protein_analysis.molecular_weight(),
-        protein_analysis.aromaticity(),
-        protein_analysis.instability_index(),
-        protein_analysis.gravy(),
-        protein_analysis.isoelectric_point(),
-        protein_analysis.charge_at_pH(7.4),
-        *protein_analysis.secondary_structure_fraction(),  # length 3
-        *protein_analysis.molar_extinction_coefficient()  # length 2
-    ]])
+    ])
 
     return protein_embedding
-
-
-def get_baseline_protein_one_hot_mask() -> torch.Tensor:
-    """Get a binary mask indicating which features in the protein baseline embedding are one-hot encoded."""
-    embedding_size = get_baseline_protein_embedding(sequence='A').shape[-1]
-    one_hot_mask = torch.zeros(embedding_size, dtype=torch.bool)
-
-    return one_hot_mask
 
 
 def get_baseline_residue_embedding_index(sequence: str, index: int) -> torch.Tensor:
@@ -63,6 +47,9 @@ def get_baseline_residue_embedding_index(sequence: str, index: int) -> torch.Ten
     :param index: The index of the residue in the protein sequence.
     :return: The embedding of the residue.
     """
+    # Get the length of the protein sequence
+    protein_length = len(sequence)
+
     # Create a one-hot vector for the residue
     residue_one_hot = [0] * len(AA_1)
     residue_one_hot[AA_1_TO_INDEX[sequence[index]]] = 1
@@ -70,15 +57,11 @@ def get_baseline_residue_embedding_index(sequence: str, index: int) -> torch.Ten
     # Compute the residue's relative position in the protein sequence
     residue_position = index / len(sequence)
 
-    # Get the length of the protein sequence
-    protein_length = len(sequence)
-
     # Combine features to create the residue embedding
     residue_embedding = torch.FloatTensor([
         *residue_one_hot,  # length 22
         residue_position,
-        protein_length,
-        *BLOSUM62_AA_TO_VECTOR[sequence[index]]  # length 24
+        protein_length
     ])
 
     return residue_embedding
@@ -97,12 +80,3 @@ def get_baseline_residue_embedding(sequence: str) -> torch.Tensor:
     ])
 
     return residue_embeddings
-
-
-def get_baseline_residue_one_hot_mask() -> torch.Tensor:
-    """Get a binary mask indicating which features in the residue baseline embedding are one-hot encoded."""
-    embedding_size = get_baseline_residue_embedding_index(sequence='A', index=0).shape[-1]
-    one_hot_mask = torch.zeros(embedding_size, dtype=torch.bool)
-    one_hot_mask[:len(AA_1)] = 1
-
-    return one_hot_mask
