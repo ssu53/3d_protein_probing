@@ -88,7 +88,7 @@ class ProteinConceptDataset(Dataset):
 
     @property
     def targets(self) -> torch.Tensor:
-        """Get the concept values across the entire dataset, leaving out NaN values."""
+        """Get the concept values across the entire dataset."""
         # Get target array
         target_array = [
             self.pdb_id_to_concept_value[pdb_id]

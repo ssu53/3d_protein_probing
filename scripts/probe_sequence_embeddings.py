@@ -9,6 +9,7 @@ from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from pp3.concepts import get_concept_output_dim, get_concept_type
 from pp3.models.mlp import MLP
 from pp3.data import ProteinConceptDataModule
+from pp3.utils.plot import plot_preds_vs_targets
 
 
 def probe_sequence_embeddings(
@@ -149,6 +150,15 @@ def probe_sequence_embeddings(
     test_preds, test_targets = zip(*trainer.predict(datamodule=data_module, ckpt_path='best'))
     test_preds = torch.cat(test_preds)
     test_targets = torch.cat(test_targets)
+
+    # Plot predictions vs targets
+    plot_preds_vs_targets(
+        preds=test_preds,
+        targets=test_targets,
+        target_type=get_concept_type(concept),
+        concept=concept,
+        save_path=save_dir / 'target_vs_prediction.pdf',
+    )
 
     # Save test targets and predictions
     torch.save({
