@@ -137,7 +137,7 @@ def residue_distances_bins(structure: AtomArray) -> torch.Tensor:
     :return: A PyTorch tensor with the distance bins between residue pairs.
     """
     # Get residue distances
-    angles = residue_distances(structure=structure)
+    angles = residue_distances(structure)
 
     # Get bin indices
     bin_indices = np.digitize(angles, RESIDUE_DISTANCES_BIN_EDGES)
@@ -215,7 +215,7 @@ def bond_angles(structure: AtomArray) -> torch.Tensor:
 
 
 @register_concept(concept_level='residue_triplet', concept_type='multi_classification', output_dim=len(BOND_ANGLES_BIN_EDGES) + 1)
-def bond_angles_bins(structure: AtomArray, first_last_nan: bool = True) -> torch.Tensor:
+def bond_angles_bins(structure: AtomArray) -> torch.Tensor:
     """Get the angle bin between residue triplets.
 
     Bins were determined using evenly spaced percentiles from 0 to 100 by 10.
@@ -224,7 +224,7 @@ def bond_angles_bins(structure: AtomArray, first_last_nan: bool = True) -> torch
     :return: A PyTorch tensor with the angle bins between residue triplets (length N - 2).
     """
     # Get bond angles
-    angles = bond_angles(structure=structure, first_last_nan=first_last_nan)
+    angles = bond_angles(structure)
 
     # Get bin indices
     bin_indices = np.digitize(angles, BOND_ANGLES_BIN_EDGES)
