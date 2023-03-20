@@ -114,8 +114,10 @@ class MLP(pl.LightningModule):
             y_hat = y_hat_scaled * self.target_std + self.target_mean
         elif self.target_type == 'binary_classification':
             y_scaled = y.float()
+            y_hat = y_hat_scaled
         elif self.target_type == 'multi_classification':
             y_scaled = F.one_hot(y, num_classes=self.output_dim).float()
+            y_hat = y_hat_scaled
         else:
             raise ValueError(f'Invalid target type: {self.target_type}')
 
