@@ -15,7 +15,11 @@ from biotite.structure import (
 )
 from biotite.structure.info import standardize_order
 
-from pp3.utils.constants import SS_LETTER_TO_INDEX
+from pp3.utils.constants import (
+    BOND_ANGLES_BIN_EDGES,
+    RESIDUE_DISTANCES_BIN_EDGES,
+    SS_LETTER_TO_INDEX
+)
 from pp3.utils.pdb import get_residue_coordinates
 
 
@@ -26,7 +30,11 @@ CONCEPT_TO_TYPE = {}
 CONCEPT_TO_OUTPUT_DIM = {}
 
 
-def register_concept(concept_level: str, concept_type: str, output_dim: int) -> Callable[[CONCEPT_FUNCTION_TYPE], CONCEPT_FUNCTION_TYPE]:
+def register_concept(
+        concept_level: str,
+        concept_type: str,
+        output_dim: int
+) -> Callable[[CONCEPT_FUNCTION_TYPE], CONCEPT_FUNCTION_TYPE]:
     """Register a concept function with associated characteristics."""
 
     def _register_concept(concept: CONCEPT_FUNCTION_TYPE) -> CONCEPT_FUNCTION_TYPE:
@@ -119,6 +127,24 @@ def residue_distances(structure: AtomArray) -> torch.Tensor:
     return torch.cdist(residue_coordinates, residue_coordinates, p=2)
 
 
+@register_concept(concept_level='residue_pair', concept_type='classification', output_dim=len(RESIDUE_DISTANCES_BIN_EDGES) - 1)
+def residue_distances_bins(structure: AtomArray) -> torch.Tensor:
+    """Get the distance bin between residue pairs.
+
+    Bins were determined using evenly spaced percentiles from 0 to 100 by 10.
+
+    :param structure: The protein structure.
+    :return: A PyTorch tensor with the distance bins between residue pairs.
+    """
+    # Get residue distances
+    angles = residue_distances(structure=structure)
+
+    # Get bin indices
+    bin_indices = np.digitize(angles, RESIDUE_DISTANCES_BIN_EDGES)
+
+    return torch.from_numpy(bin_indices)
+
+
 @register_concept(concept_level='protein', concept_type='regression', output_dim=1)
 def protein_sasa(structure: AtomArray) -> float:
     """Get the solvent accessible surface area of a protein.
@@ -191,3 +217,22 @@ def bond_angles(structure: AtomArray, first_last_nan: bool = True) -> torch.Tens
         angles = np.concatenate([np.full(1, np.nan), angles, np.full(1, np.nan)])
 
     return torch.from_numpy(angles)
+
+
+@register_concept(concept_level='residue_triplet', concept_type='classification', output_dim=len(BOND_ANGLES_BIN_EDGES) - 1)
+def bond_angles_bins(structure: AtomArray, first_last_nan: bool = True) -> torch.Tensor:
+    """Get the angle bin between residue triplets.
+
+    Bins were determined using evenly spaced percentiles from 0 to 100 by 10.
+
+    :param structure: The protein structure.
+    :param first_last_nan: If True, set the first and last angle bins to NaN. Otherwise, exclude them (length = N - 2).
+    :return: A PyTorch tensor with the angle bins between residue triplets.
+    """
+    # Get bond angles
+    angles = bond_angles(structure=structure, first_last_nan=first_last_nan)
+
+    # Get bin indices
+    bin_indices = np.digitize(angles, BOND_ANGLES_BIN_EDGES)
+
+    return torch.from_numpy(bin_indices)

@@ -1,4 +1,5 @@
 """Constant values used across multiple modules."""
+import numpy as np
 from biotite.sequence.align import SubstitutionMatrix
 from biotite.structure.info import residue
 
@@ -42,3 +43,13 @@ BLOSUM62_AA_TO_VECTOR = {
     aa1: [BLOSUM62.get_score(aa1, aa2) for aa2 in BLOSUM62.get_alphabet2()]
     for aa1 in BLOSUM62.get_alphabet1()
 }
+
+# Bin edges for concept bins
+BOND_ANGLES_BIN_EDGES = np.array([
+    0., 1.5593998, 1.58759913, 1.61384892, 1.65087821, 1.72894681,
+    1.8985893, 2.02765794, 2.14942942, 2.3076684, np.inf
+])
+RESIDUE_DISTANCES_BIN_EDGES = np.array([
+    0., 12.50019188, 16.81407547, 20.51698112, 23.9828434, 27.51251411,
+    31.36509705, 35.86526489, 41.76608276, 51.56431198, np.inf
+])
