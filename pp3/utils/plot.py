@@ -30,7 +30,7 @@ def plot_preds_vs_targets(
         plt.title(f'Predicted vs. Target {concept}')
         plt.savefig(save_path, bbox_inches='tight')
     elif target_type in {'binary_classification', 'multi_classification'}:
-        ConfusionMatrixDisplay.from_predictions(targets, preds)
+        ConfusionMatrixDisplay.from_predictions(targets, torch.argmax(preds, dim=1))
         plt.savefig(save_path, bbox_inches='tight')
     else:
         raise ValueError(f'Invalid target type: {target_type}')
