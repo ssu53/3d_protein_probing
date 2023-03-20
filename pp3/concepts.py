@@ -127,7 +127,7 @@ def residue_distances(structure: AtomArray) -> torch.Tensor:
     return torch.cdist(residue_coordinates, residue_coordinates, p=2)
 
 
-@register_concept(concept_level='residue_pair', concept_type='multi_classification', output_dim=len(RESIDUE_DISTANCES_BIN_EDGES) - 1)
+@register_concept(concept_level='residue_pair', concept_type='multi_classification', output_dim=len(RESIDUE_DISTANCES_BIN_EDGES) + 1)
 def residue_distances_bins(structure: AtomArray) -> torch.Tensor:
     """Get the distance bin between residue pairs.
 
@@ -219,7 +219,7 @@ def bond_angles(structure: AtomArray, first_last_nan: bool = True) -> torch.Tens
     return torch.from_numpy(angles)
 
 
-@register_concept(concept_level='residue_triplet', concept_type='multi_classification', output_dim=len(BOND_ANGLES_BIN_EDGES) - 1)
+@register_concept(concept_level='residue_triplet', concept_type='multi_classification', output_dim=len(BOND_ANGLES_BIN_EDGES) + 1)
 def bond_angles_bins(structure: AtomArray, first_last_nan: bool = True) -> torch.Tensor:
     """Get the angle bin between residue triplets.
 

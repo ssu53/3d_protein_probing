@@ -27,8 +27,7 @@ class MLP(pl.LightningModule):
             target_std: float | None,
             learning_rate: float = 1e-4,
             weight_decay: float = 0.0,
-            dropout: float = 0.0,
-            loss_fn: str = 'huber'
+            dropout: float = 0.0
     ) -> None:
         """Initialize the model.
 
@@ -71,7 +70,7 @@ class MLP(pl.LightningModule):
         self.dropout = nn.Dropout(p=dropout)
 
         # Create loss function
-        self.loss = self._get_loss_fn(loss_fn)
+        self.loss = self._get_loss_fn()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Runs the model on the data.
@@ -115,10 +114,8 @@ class MLP(pl.LightningModule):
             y_hat = y_hat_scaled * self.target_std + self.target_mean
         elif self.target_type == 'binary_classification':
             y_scaled = y.float()
-            y_hat = F.sigmoid(y_hat_scaled)
         elif self.target_type == 'multi_classification':
-            y_scaled = F.one_hot(y).float()
-            y_hat = F.softmax(y_hat_scaled, dim=-1)
+            y_scaled = F.one_hot(y, num_classes=self.output_dim).float()
         else:
             raise ValueError(f'Invalid target type: {self.target_type}')
 
@@ -243,20 +240,13 @@ class MLP(pl.LightningModule):
             weight_decay=self.weight_decay
         )
 
-    @staticmethod
-    def _get_loss_fn(loss_fn: str) -> nn.Module:
-        """Returns the loss function.
-
-        :param loss_fn: The name of the loss function.
-        :return: The loss function.
-        """
-        if loss_fn == "mse":
-            return nn.MSELoss()
-        elif loss_fn == "mae":
-            return nn.L1Loss()
-        elif loss_fn == "huber":
+    def _get_loss_fn(self) -> nn.Module:
+        """Gets the loss function."""
+        if self.target_type == 'regression':
             return nn.HuberLoss()
-        elif loss_fn == "ce":
+        elif self.target_type == 'binary_classification':
+            return nn.BCEWithLogitsLoss()
+        elif self.target_type == 'multi_classification':
             return nn.CrossEntropyLoss()
         else:
-            raise ValueError(f"Loss function {loss_fn} not recognized.")
+            raise ValueError(f'Invalid target type: {self.target_type}')
