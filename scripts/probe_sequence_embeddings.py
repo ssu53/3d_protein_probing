@@ -146,13 +146,14 @@ def probe_sequence_embeddings(
     trainer.test(datamodule=data_module, ckpt_path='best')
 
     # Make test predictions
-    test_preds = trainer.predict(datamodule=data_module, ckpt_path='best')
+    test_preds, test_targets = zip(*trainer.predict(datamodule=data_module, ckpt_path='best'))
     test_preds = torch.cat(test_preds)
+    test_targets = torch.cat(test_targets)
 
     # Save test targets and predictions
     torch.save({
-        'target': data_module.test_dataset.targets,
-        'prediction': test_preds
+        'prediction': test_preds,
+        'target': test_targets
     }, save_dir / 'target_and_prediction.pt')
 
 

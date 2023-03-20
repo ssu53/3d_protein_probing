@@ -109,9 +109,6 @@ class ProteinConceptDataset(Dataset):
         else:
             raise ValueError(f'Invalid concept value type: {target_type}')
 
-        # Remove NaN values
-        target_array = target_array[~torch.isnan(target_array)]
-
         return target_array
 
     @property
@@ -172,9 +169,6 @@ class ProteinConceptDataset(Dataset):
                 embeddings[1:-1],  # (num_residues - 2, embedding_dim)
                 embeddings[2:]  # (num_residues - 2, embedding_dim)
             ], dim=1)
-
-            # Select corresponding concept values
-            concept_value = concept_value[1:-1]  # (num_residues - 2,)
 
         return embeddings, concept_value
 

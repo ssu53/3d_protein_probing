@@ -196,12 +196,11 @@ def secondary_structure(structure: AtomArray) -> torch.Tensor:
 
 
 @register_concept(concept_level='residue_triplet', concept_type='regression', output_dim=1)
-def bond_angles(structure: AtomArray, first_last_nan: bool = True) -> torch.Tensor:
+def bond_angles(structure: AtomArray) -> torch.Tensor:
     """Get the angle between residue triplets.
 
     :param structure: The protein structure.
-    :param first_last_nan: If True, set the first and last angles to NaN. Otherwise, exclude them (length = N - 2).
-    :return: A PyTorch tensor with the angles between residue triplets.
+    :return: A PyTorch tensor with the angles between residue triplets (length N - 2).
     """
     # Get CA indices
     indices = np.arange(0, len(structure))[structure.atom_name == 'CA']
@@ -211,10 +210,6 @@ def bond_angles(structure: AtomArray, first_last_nan: bool = True) -> torch.Tens
 
     # Get bond angles
     angles = index_angle(structure, index)
-
-    # Optionally, set first and last angles to NaN
-    if first_last_nan:
-        angles = np.concatenate([np.full(1, np.nan), angles, np.full(1, np.nan)])
 
     return torch.from_numpy(angles)
 
@@ -226,8 +221,7 @@ def bond_angles_bins(structure: AtomArray, first_last_nan: bool = True) -> torch
     Bins were determined using evenly spaced percentiles from 0 to 100 by 10.
 
     :param structure: The protein structure.
-    :param first_last_nan: If True, set the first and last angle bins to NaN. Otherwise, exclude them (length = N - 2).
-    :return: A PyTorch tensor with the angle bins between residue triplets.
+    :return: A PyTorch tensor with the angle bins between residue triplets (length N - 2).
     """
     # Get bond angles
     angles = bond_angles(structure=structure, first_last_nan=first_last_nan)
