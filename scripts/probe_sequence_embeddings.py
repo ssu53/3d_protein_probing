@@ -84,7 +84,6 @@ def probe_sequence_embeddings(
         target_type=get_concept_type(concept),
         target_mean=data_module.train_dataset.target_mean,
         target_std=data_module.train_dataset.target_std,
-        loss_fn=loss_fn,
         learning_rate=learning_rate,
         weight_decay=weight_decay,
         dropout=dropout
