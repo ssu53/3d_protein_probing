@@ -230,3 +230,19 @@ def bond_angles_bins(structure: AtomArray) -> torch.Tensor:
     bin_indices = np.digitize(angles, BOND_ANGLES_BIN_EDGES)
 
     return torch.from_numpy(bin_indices)
+
+@register_concept(concept_level='residue_pair', concept_type='binary_classification', output_dim=1)
+def residue_contacts(structure: AtomArray) -> torch.Tensor:
+    """Get the contacts between residue pairs (i.e., determine if the distance between two residues is less than 8 Angstroms).
+
+    :param structure: The protein structure.
+    :return: A PyTorch tensor with the contacts between residue pairs (type: bool).
+    """
+    # Get residue distances using the residue_distances concept function above
+    distances = residue_distances(structure)
+
+    # Get contacts
+    contacts = distances < 8.0
+
+    return contacts
+
