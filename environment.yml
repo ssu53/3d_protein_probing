@@ -21,6 +21,7 @@ dependencies:
   - scipy
   - tqdm
   - wandb
+  - einops
   - pip:
     - fair-esm
     - typed-argument-parser>=1.8.0
