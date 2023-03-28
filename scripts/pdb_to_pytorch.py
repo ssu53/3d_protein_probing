@@ -19,12 +19,14 @@ from pp3.utils.pdb import (
 
 def convert_pdb_to_pytorch(
         pdb_id: str,
-        pdb_dir: Path
+        pdb_dir: Path,
+        max_protein_length: int | None = None
 ) -> dict[str, torch.Tensor | str] | None:
     """Parses PDB file and converts structure and sequence to PyTorch format while removing invalid structures.
 
     :param pdb_id: The PDB ID of the protein structure.
     :param pdb_dir: The directory containing the PDB structures.
+    :param max_protein_length: The maximum length of a protein structure.
     :return: A dictionary containing the structure and sequence or an error message if the structure is invalid.
     """
     # Load PDB structure
@@ -32,6 +34,10 @@ def convert_pdb_to_pytorch(
         structure = load_structure(pdb_id=pdb_id, pdb_dir=pdb_dir)
     except (BadStructureError, FileNotFoundError, InvalidFileError, ValueError, TypeError) as e:
         return {'error': repr(e)}
+
+    # Check if structure is too long
+    if max_protein_length is not None and len(structure) > max_protein_length:
+        return {'error': f'Structure is too long (> {max_protein_length} residues)'}
 
     # Get residue coordinates
     try:
@@ -53,7 +59,8 @@ def pdb_to_pytorch(
         ids_path: Path,
         pdb_dir: Path,
         proteins_save_path: Path,
-        ids_save_path: Path
+        ids_save_path: Path,
+        max_protein_length: int | None = None
 ) -> None:
     """Parses PDB files and saves coordinates and sequence in PyTorch format while removing invalid structures.
 
@@ -61,6 +68,7 @@ def pdb_to_pytorch(
     :param pdb_dir: Path to a directory containing PDB structures.
     :param proteins_save_path: Path to a directory where PyTorch files with coordinates and sequences will be saved.
     :param ids_save_path: Path to CSV file where PDB IDs of converted structures will be saved.
+    :param max_protein_length: The maximum length of a protein structure.
     """
     # Load PDB IDs
     with open(ids_path) as f:
@@ -71,7 +79,8 @@ def pdb_to_pytorch(
     # Set up conversion function
     convert_pdb_to_pytorch_fn = partial(
         convert_pdb_to_pytorch,
-        pdb_dir=pdb_dir
+        pdb_dir=pdb_dir,
+        max_protein_length=max_protein_length
     )
 
     # Convert PDB files to PyTorch format
