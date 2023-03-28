@@ -15,11 +15,7 @@ from biotite.structure import (
 )
 from biotite.structure.info import standardize_order
 
-from pp3.utils.constants import (
-    BOND_ANGLES_BIN_EDGES,
-    RESIDUE_DISTANCES_BIN_EDGES,
-    SS_LETTER_TO_INDEX
-)
+from pp3.utils.constants import SS_LETTER_TO_INDEX
 from pp3.utils.pdb import get_residue_coordinates
 
 
