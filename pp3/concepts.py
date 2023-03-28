@@ -113,38 +113,6 @@ def get_backbone_residues(structure: AtomArray) -> AtomArray:
     return structure
 
 
-@register_concept(concept_level='residue_pair', concept_type='regression', output_dim=1)
-def residue_distances(structure: AtomArray) -> torch.Tensor:
-    """Get the distances between residue pairs.
-
-    :param structure: The protein structure.
-    :return: A PyTorch tensor with the distances between residue pairs.
-    """
-    # Get residue coordinates
-    residue_coordinates = get_residue_coordinates(structure=structure)
-
-    # Compute pairwise distances
-    return torch.cdist(residue_coordinates, residue_coordinates, p=2)
-
-
-@register_concept(concept_level='residue_pair', concept_type='multi_classification', output_dim=len(RESIDUE_DISTANCES_BIN_EDGES) + 1)
-def residue_distances_bins(structure: AtomArray) -> torch.Tensor:
-    """Get the distance bin between residue pairs.
-
-    Bins were determined using evenly spaced percentiles from 0 to 100 by 10.
-
-    :param structure: The protein structure.
-    :return: A PyTorch tensor with the distance bins between residue pairs.
-    """
-    # Get residue distances
-    angles = residue_distances(structure)
-
-    # Get bin indices
-    bin_indices = np.digitize(angles, RESIDUE_DISTANCES_BIN_EDGES)
-
-    return torch.from_numpy(bin_indices)
-
-
 @register_concept(concept_level='protein', concept_type='regression', output_dim=1)
 def protein_sasa(structure: AtomArray) -> float:
     """Get the solvent accessible surface area of a protein.
@@ -178,7 +146,6 @@ def residue_sasa(structure: AtomArray) -> torch.Tensor:
     return torch.from_numpy(res_sasa)
 
 
-# TODO: need to handle multi-class classification concepts
 @register_concept(concept_level='residue', concept_type='multi_classification', output_dim=3)
 def secondary_structure(structure: AtomArray) -> torch.Tensor:
     """Get the secondary structure of all residues.
@@ -214,35 +181,55 @@ def bond_angles(structure: AtomArray) -> torch.Tensor:
     return torch.from_numpy(angles)
 
 
-@register_concept(concept_level='residue_triplet', concept_type='multi_classification', output_dim=len(BOND_ANGLES_BIN_EDGES) + 1)
-def bond_angles_bins(structure: AtomArray) -> torch.Tensor:
-    """Get the angle bin between residue triplets.
-
-    Bins were determined using evenly spaced percentiles from 0 to 100 by 10.
+@register_concept(concept_level='residue_pair', concept_type='regression', output_dim=1)
+def residue_distances(
+        structure: AtomArray,
+        max_distance: float = 25.0
+) -> torch.Tensor:
+    """Get the distances between residue pairs within a maximum distance window.
 
     :param structure: The protein structure.
-    :return: A PyTorch tensor with the angle bins between residue triplets (length N - 2).
+    :param max_distance: The maximum distance between residue pairs (in Angstroms) to include (NaN otherwise).
+    :return: A PyTorch tensor with the distances between residue pairs.
     """
-    # Get bond angles
-    angles = bond_angles(structure)
+    # Get residue coordinates
+    residue_coordinates = get_residue_coordinates(structure=structure)
 
-    # Get bin indices
-    bin_indices = np.digitize(angles, BOND_ANGLES_BIN_EDGES)
+    # Compute pairwise distances
+    distances = torch.cdist(residue_coordinates, residue_coordinates, p=2)
 
-    return torch.from_numpy(bin_indices)
+    # Set distances above max_distance to NaN
+    distances[distances > max_distance] = torch.nan
+
+    return distances
+
 
 @register_concept(concept_level='residue_pair', concept_type='binary_classification', output_dim=1)
-def residue_contacts(structure: AtomArray) -> torch.Tensor:
-    """Get the contacts between residue pairs (i.e., determine if the distance between two residues is less than 8 Angstroms).
+def residue_contacts(
+        structure: AtomArray,
+        contact_threshold: float = 8.0,
+        long_range_threshold: int = 24
+) -> torch.Tensor:
+    """Get the long-range contacts between residue pairs.
+
+    Note: Sets residue pairs within long_range_threshold residues of each other as NaN so only long-range contacts are used.
 
     :param structure: The protein structure.
+    :param contact_threshold: The distance threshold for a contact (below this threshold is a contact).
+    :param long_range_threshold: The distance threshold for a long-range contact (below this threshold is short-range).
     :return: A PyTorch tensor with the contacts between residue pairs (type: bool).
     """
     # Get residue distances using the residue_distances concept function above
     distances = residue_distances(structure)
 
     # Get contacts
-    contacts = distances < 8.0
+    contacts = distances < contact_threshold
+
+    # Get short-range mask (all residues less than long_range_threshold of each other)
+    ones = torch.ones_like(contacts)
+    short_range_mask = ~(ones.triu(diagonal=long_range_threshold) + ones.tril(diagonal=-long_range_threshold)).bool()
+
+    # Set short-range contacts to NaN
+    contacts[short_range_mask] = torch.nan
 
     return contacts
-

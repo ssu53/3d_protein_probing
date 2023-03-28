@@ -88,7 +88,7 @@ class ProteinConceptDataset(Dataset):
 
     @property
     def targets(self) -> torch.Tensor:
-        """Get the concept values across the entire dataset."""
+        """Get the concept values across the entire dataset, removing NaNs."""
         # Get target array
         target_array = [
             self.pdb_id_to_concept_value[pdb_id]
@@ -108,6 +108,9 @@ class ProteinConceptDataset(Dataset):
             ])
         else:
             raise ValueError(f'Invalid concept value type: {target_type}')
+
+        # Remove NaNs
+        target_array = target_array[~torch.isnan(target_array)]
 
         return target_array
 
@@ -169,6 +172,11 @@ class ProteinConceptDataset(Dataset):
                 embeddings[1:-1],  # (num_residues - 2, embedding_dim)
                 embeddings[2:]  # (num_residues - 2, embedding_dim)
             ], dim=1)
+
+        # Remove NaNs
+        nan_mask = torch.isnan(concept_value)
+        embeddings = embeddings[~nan_mask]
+        concept_value = concept_value[~nan_mask]
 
         return embeddings, concept_value
 
