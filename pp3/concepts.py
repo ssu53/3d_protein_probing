@@ -220,7 +220,7 @@ def residue_contacts(
     distances = residue_distances(structure, max_distance=None)
 
     # Get contacts
-    contacts = distances < contact_threshold
+    contacts = (distances < contact_threshold).float()
 
     # Get short-range mask (all residues less than long_range_threshold of each other)
     ones = torch.ones_like(contacts)
