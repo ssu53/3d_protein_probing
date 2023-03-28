@@ -7,7 +7,7 @@ from pathlib import Path
 import pandas as pd
 import torch
 from biotite import InvalidFileError
-from biotite.structure import BadStructureError
+from biotite.structure import BadStructureError, get_residue_count
 from tqdm import tqdm
 
 from pp3.utils.pdb import (
@@ -36,7 +36,7 @@ def convert_pdb_to_pytorch(
         return {'error': repr(e)}
 
     # Check if structure is too long
-    if max_protein_length is not None and len(structure) > max_protein_length:
+    if max_protein_length is not None and get_residue_count(structure) > max_protein_length:
         return {'error': f'Structure is too long (> {max_protein_length} residues)'}
 
     # Get residue coordinates
