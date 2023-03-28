@@ -180,7 +180,7 @@ def bond_angles(structure: AtomArray) -> torch.Tensor:
 @register_concept(concept_level='residue_pair', concept_type='regression', output_dim=1)
 def residue_distances(
         structure: AtomArray,
-        max_distance: float = 25.0
+        max_distance: float | None = 25.0
 ) -> torch.Tensor:
     """Get the distances between residue pairs within a maximum distance window.
 
@@ -195,7 +195,8 @@ def residue_distances(
     distances = torch.cdist(residue_coordinates, residue_coordinates, p=2)
 
     # Set distances above max_distance to NaN
-    distances[distances > max_distance] = torch.nan
+    if max_distance is not None:
+        distances[distances > max_distance] = torch.nan
 
     return distances
 
@@ -216,7 +217,7 @@ def residue_contacts(
     :return: A PyTorch tensor with the contacts between residue pairs (type: bool).
     """
     # Get residue distances using the residue_distances concept function above
-    distances = residue_distances(structure)
+    distances = residue_distances(structure, max_distance=None)
 
     # Get contacts
     contacts = distances < contact_threshold

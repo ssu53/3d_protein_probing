@@ -57,7 +57,7 @@ python scripts/pdb_to_pytorch.py \
     --max_protein_length 512
 ```
 
-This successfully converts 5,119 structures.
+This successfully converts 4,871 structures.
 
 
 ### Compute concepts from PDB structures
@@ -80,7 +80,8 @@ python scripts/compute_esm_embeddings.py \
     --hub_dir pretrained_models \
     --esm_model esm2_t33_650M_UR50D \
     --last_layer 33 \
-    --save_path data/pdb_single_chain_protein_30_identity/embeddings/esm2_t33_650M_UR50D.pt
+    --save_path data/pdb_single_chain_protein_30_identity/embeddings/esm2_t33_650M_UR50D.pt \
+    --batch_size 5
 ```
 
 
