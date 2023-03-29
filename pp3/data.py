@@ -68,7 +68,7 @@ class ProteinConceptDataset(Dataset):
         self.concept_type = concept_type
         self.protein_embedding_method = protein_embedding_method
 
-        self.max_residues_for_pairs = 25
+        self.max_pairs = 25 ** 2
         self.rng = np.random.default_rng(seed=0)
 
         if self.concept_level == 'protein':
@@ -145,16 +145,12 @@ class ProteinConceptDataset(Dataset):
 
         # If needed, modify embedding structure based on concept level
         if self.concept_level == 'residue_pair':
-            # Get number of residues
-            num_residues = len(embeddings)
-
-            # Get residue pair indices
-            pair_indices = np.array(list(product(range(num_residues), repeat=2)))  # (num_residues * num_residues, 2)
+            # Get residue pair indices (not NaN)
+            pair_indices = (1 - np.isnan(concept_value)).nonzero()  # (num_notna_residues * num_notna_residues, 2)
 
             # Randomly sample pairs of residues (too much memory to use all of them)
-            if num_residues > self.max_residues_for_pairs:
-                num_pairs_to_sample = self.max_residues_for_pairs ** 2
-                pair_indices = self.rng.choice(pair_indices, size=num_pairs_to_sample, replace=False)
+            if len(pair_indices) > self.max_pairs:
+                pair_indices = self.rng.choice(pair_indices, size=self.max_pairs, replace=False)
 
             # Create pair embeddings
             embedding_dim = embeddings.shape[-1]
