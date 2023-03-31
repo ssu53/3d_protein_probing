@@ -55,16 +55,17 @@ Search for single chain proteins with 30% sequence clustering on 2/4/23.
 
 ### Convert PDB to PyTorch
 
-Parse PDB files and save coordinates and sequence in PyTorch format while removing invalid structures.
+Parse PDB files and save coordinates and sequence in PyTorch format while removing invalid and large structures.
 ```bash
 python scripts/pdb_to_pytorch.py \
     --ids_path data/pdb_single_chain_protein_30_identity/pdb_ids.txt \
     --pdb_dir pdb \
     --proteins_save_path data/pdb_single_chain_protein_30_identity/proteins.pt \
-    --ids_save_path data/pdb_single_chain_protein_30_identity/valid_pdb_ids.csv
+    --ids_save_path data/pdb_single_chain_protein_30_identity/valid_pdb_ids.csv \
+    --max_protein_length 512
 ```
 
-This successfully converts 5,119 structures.
+This successfully converts 4,871 structures.
 
 
 ### Compute concepts from PDB structures
@@ -87,7 +88,8 @@ python scripts/compute_esm_embeddings.py \
     --hub_dir pretrained_models \
     --esm_model esm2_t33_650M_UR50D \
     --last_layer 33 \
-    --save_path data/pdb_single_chain_protein_30_identity/embeddings/esm2_t33_650M_UR50D.pt
+    --save_path data/pdb_single_chain_protein_30_identity/embeddings/esm2_t33_650M_UR50D.pt \
+    --batch_size 5
 ```
 
 

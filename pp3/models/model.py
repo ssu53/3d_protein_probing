@@ -130,6 +130,11 @@ class Model(pl.LightningModule):
         # Make predictions
         y_hat_scaled = self(x, c, pad).squeeze(dim=1)
 
+        # Remove NaNs
+        nan_mask = torch.isnan(y)
+        y_hat_scaled = y_hat_scaled[~nan_mask]
+        y = y[~nan_mask]
+
         # Scale/unscale target and predictions
         if self.target_type == 'regression':
             y = y.float()

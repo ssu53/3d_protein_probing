@@ -65,7 +65,7 @@ class ProteinConceptDataset(Dataset):
         self.protein_embedding_method = protein_embedding_method
         self.pdb_id_to_coordinates = pdb_id_to_coordinates
 
-        self.max_residues_for_pairs = 25
+        self.max_pairs = 25 ** 2
         self.rng = np.random.default_rng(seed=0)
 
     @property
@@ -78,7 +78,7 @@ class ProteinConceptDataset(Dataset):
 
     @property
     def targets(self) -> torch.Tensor:
-        """Get the concept values across the entire dataset."""
+        """Get the concept values across the entire dataset, removing NaNs."""
         # Get target array
         target_array = [
             self.pdb_id_to_concept_value[pdb_id]
@@ -98,6 +98,9 @@ class ProteinConceptDataset(Dataset):
             ])
         else:
             raise ValueError(f'Invalid concept value type: {target_type}')
+
+        # Remove NaNs
+        target_array = target_array[~torch.isnan(target_array)]
 
         return target_array
 
@@ -133,7 +136,38 @@ class ProteinConceptDataset(Dataset):
         # Get concept value
         concept_value = self.pdb_id_to_concept_value[pdb_id]
 
-        return embeddings, coordinates, concept_value
+        # If needed, modify embedding structure based on concept level
+        if self.concept_level == 'residue_pair':
+            # Get residue pair indices (not NaN)
+            pair_indices = (1 - np.isnan(concept_value)).nonzero()  # (num_notna_residues * num_notna_residues, 2)
+
+            # Randomly sample pairs of residues (too much memory to use all of them)
+            if len(pair_indices) > self.max_pairs:
+                pair_indices = self.rng.choice(pair_indices, size=self.max_pairs, replace=False)
+
+            # Create pair embeddings
+            embedding_dim = embeddings.shape[-1]
+            pair_embeddings = torch.zeros((len(pair_indices), 2 * embedding_dim))  # (num_pairs, 2 * embedding_dim)
+            pair_embeddings[:, :embedding_dim] = embeddings[pair_indices[:, 0]]  # (num_pairs, embedding_dim)
+            pair_embeddings[:, embedding_dim:] = embeddings[pair_indices[:, 1]]  # (num_pairs, embedding_dim)
+            embeddings = pair_embeddings
+
+            # Get concept values
+            concept_value = concept_value[pair_indices[:, 0], pair_indices[:, 1]]  # (num_pairs,)
+        elif self.concept_level == 'residue_triplet':
+            # Create adjacent triples of residue embeddings
+            embeddings = torch.cat([
+                embeddings[:-2],  # (num_residues - 2, embedding_dim)
+                embeddings[1:-1],  # (num_residues - 2, embedding_dim)
+                embeddings[2:]  # (num_residues - 2, embedding_dim)
+            ], dim=1)
+
+        # Remove NaNs
+        nan_mask = torch.isnan(concept_value)
+        embeddings = embeddings[~nan_mask]
+        concept_value = concept_value[~nan_mask]
+
+        return embeddings, concept_value
 
 
 class ProteinConceptDataModule(pl.LightningDataModule):
