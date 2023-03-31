@@ -82,7 +82,7 @@ class EGNN_Layer(nn.Module):
         # Compute pairwise distances
         B, N = feats.shape[:2]
         rel_coors = coors.unsqueeze(2) - coors.unsqueeze(1)
-        rel_dist = (rel_coors ** 2).sum(dim=-1)
+        rel_dist = (rel_coors**2).sum(dim=-1)
         dists = self.dist_embedding(rearrange(rel_dist, "b i j -> (b i j)"))
         dists = rearrange(dists, "(b i j) d -> b i j d", b=B, i=N, j=N)
 
@@ -96,17 +96,16 @@ class EGNN_Layer(nn.Module):
 
         # Compute messages
         m_ij = self.phi_e(feats_pair)
+        self_mask = 1.0 - torch.eye(N).view(1, N, N, 1).to(m_ij)
+        pad_mask_sum = (mask.sum(dim=1, keepdim=True) - 1).unsqueeze(-1)
 
         # Compute coordinate update
         if self.update_coors:
             rel_coors = torch.nan_to_num(rel_coors / rel_dist.unsqueeze(-1)).detach()
             delta = rel_coors * self.phi_x(m_ij)
             delta = delta * mask.view(-1, N, 1, 1)
-
-            self_mask = 1.0 - torch.eye(N).view(1, N, N, 1).to(delta)
             delta = delta * self_mask
 
-            pad_mask_sum = (mask.sum(dim=1, keepdim=True) - 1).unsqueeze(-1)
             delta = delta.sum(dim=2) / pad_mask_sum
             coors = coors + self.gate_x * delta
 
@@ -128,10 +127,10 @@ class EGNN(nn.Module):
         self,
         num_layers: int,
         node_dim: int,
-        edge_dim: int,
         dist_dim: int,
         message_dim: int,
         proj_dim: int,
+        edge_dim: int = 0,
         dropout: float = 0,
     ):
         super().__init__()
@@ -145,28 +144,25 @@ class EGNN(nn.Module):
                 message_dim=message_dim,
                 proj_dim=proj_dim,
                 dropout=dropout,
-                update_coors=True,
+                update_coors=i < (num_layers - 1),
                 update_feats=True,
             )
             for i in range(num_layers)
         ]
         self.layers = nn.ModuleList(layers)
 
-    def forward(self, feats, coors, mask, edges=None):
+    def forward(self, x, c, pad):
         # Compute pairwise distances in original coordinates
-        B, N = feats.shape[:2]
-        rel_coors = coors.unsqueeze(2) - coors.unsqueeze(1)
-        rel_dist = (rel_coors ** 2).sum(dim=-1)
+        B, N = x.shape[:2]
+        rel_coors = c.unsqueeze(2) - c.unsqueeze(1)
+        rel_dist = (rel_coors**2).sum(dim=-1)
         dists = self.dist_embedding(rearrange(rel_dist, "b i j -> (b i j)"))
         dists = rearrange(dists, "(b i j) d -> b i j d", b=B, i=N, j=N)
 
         # Add to edges so we always keep the original distances
-        if edges is not None:
-            edges = torch.cat((edges, dists), dim=-1)
-        else:
-            edges = dists
+        edges = dists
 
         # Run layers, updating both features and coordinates
         for layer in self.layers:
-            feats, coors = layer(feats, coors, mask, edges)
-        return feats, coors
+            x, c = layer(x, c, pad, edges)
+        return x, c

@@ -18,14 +18,18 @@ from biotite.structure.io.pdb import PDBFile
 from pp3.utils.constants import AA_3_TO_1, AA_ATOM_NAMES, BACKBONE_ATOM_NAMES
 
 
-def get_pdb_path(pdb_id: str, pdb_dir: Path) -> Path:
+def get_pdb_path(pdb_id: str, pdb_dir: Path, simple_format: bool = False) -> Path:
     """Get the path of a PDB file.
 
     :param pdb_id: The PDB ID of the protein structure.
     :param pdb_dir: The directory containing the PDB structures.
     :return: The path of the PDB file.
     """
-    return pdb_dir / pdb_id[1:3].lower() / f'pdb{pdb_id.lower()}.ent'
+    if simple_format:
+        path = pdb_dir / f"{pdb_id}.pdb"
+    else:
+        path = pdb_dir / pdb_id[1:3].lower() / f'pdb{pdb_id.lower()}.ent'
+    return path
 
 
 def verify_residues(structure: AtomArray) -> None:

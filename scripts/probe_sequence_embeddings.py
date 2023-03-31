@@ -6,32 +6,33 @@ import torch
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 
-from pp3.concepts import get_concept_output_dim, get_concept_type
-from pp3.models.mlp import MLP
+from pp3.concepts import get_concept_output_dim, get_concept_type, get_concept_level
+from pp3.models.model import Model
 from pp3.data import ProteinConceptDataModule
 from pp3.utils.plot import plot_preds_vs_targets
 
 
 def probe_sequence_embeddings(
-        proteins_path: Path,
-        embeddings_path: Path,
-        save_dir: Path,
-        concepts_dir: Path,
-        concept: str,
-        project_name: str = 'Probing',
-        protein_embedding_method: Literal['plm', 'baseline'] = 'plm',
-        plm_residue_to_protein_method: Literal['mean', 'max', 'sum'] = 'sum',
-        hidden_dim: int = 100,
-        num_layers: int = 1,
-        batch_size: int = 100,
-        logger_type: Literal['wandb', 'tensorboard'] = 'wandb',
-        loss_fn: str = 'huber',
-        learning_rate: float = 1e-4,
-        weight_decay: float = 0.0,
-        dropout: float = 0.0,
-        max_epochs: int = 1000,
-        ckpt_every_k_epochs: int = 10,
-        split_seed: int = 0
+    proteins_path: Path,
+    embeddings_path: Path,
+    save_dir: Path,
+    concepts_dir: Path,
+    concept: str,
+    project_name: str = 'Probing',
+    protein_embedding_method: Literal['plm', 'baseline'] = 'plm',
+    plm_residue_to_protein_method: Literal['mean', 'max', 'sum'] = 'sum',
+    hidden_dim: int = 100,
+    num_layers: int = 1,
+    batch_size: int = 100,
+    logger_type: Literal['wandb', 'tensorboard'] = 'wandb',
+    loss_fn: str = 'huber',
+    learning_rate: float = 1e-4,
+    weight_decay: float = 0.0,
+    dropout: float = 0.0,
+    max_epochs: int = 1000,
+    ckpt_every_k_epochs: int = 10,
+    split_seed: int = 0,
+    **kwargs
 ) -> None:
     """Probe sequence embeddings for a 3D geometric concept.
 
@@ -77,7 +78,7 @@ def probe_sequence_embeddings(
     data_module.setup()
 
     # Build MLP
-    mlp = MLP(
+    mlp = Model(
         input_dim=data_module.embedding_dim,
         output_dim=get_concept_output_dim(concept),
         hidden_dim=hidden_dim,
@@ -87,7 +88,9 @@ def probe_sequence_embeddings(
         target_std=data_module.train_dataset.target_std,
         learning_rate=learning_rate,
         weight_decay=weight_decay,
-        dropout=dropout
+        dropout=dropout,
+        concept_level=get_concept_level(concept),
+        **kwargs
     )
 
     print(mlp)

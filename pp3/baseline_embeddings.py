@@ -6,34 +6,6 @@ import torch
 from pp3.utils.constants import AA_1, AA_1_TO_INDEX, BLOSUM62_AA_TO_VECTOR
 
 
-def get_baseline_protein_embedding(sequence: str) -> torch.Tensor:
-    """Get the baseline protein embedding from a protein sequence.
-
-    Baseline protein embedding includes:
-        - Protein length
-        - Amino acid frequencies
-
-    :param sequence: The amino acid sequence of a protein.
-    :return: The embedding of the protein. (1, embedding_size)
-    """
-    # Get the length of the protein sequence
-    protein_length = len(sequence)
-
-    # Get amino acid counts
-    aa_counts = Counter(sequence)
-
-    # Get the amino acid frequencies of the protein
-    aa_frequencies = [aa_counts[aa] / protein_length for aa in AA_1]
-
-    # Combine features to create the protein embedding
-    protein_embedding = torch.FloatTensor([
-        protein_length,
-        *aa_frequencies,  # length 22
-    ])
-
-    return protein_embedding
-
-
 def get_baseline_residue_embedding_index(sequence: str, index: int) -> torch.Tensor:
     """Get the baseline residue embedding from a protein sequence and residue index.
 

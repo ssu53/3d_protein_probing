@@ -8,33 +8,28 @@ import torch
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset
 
-from pp3.baseline_embeddings import (
-    get_baseline_protein_embedding,
-    get_baseline_residue_embedding
-)
+from pp3.baseline_embeddings import get_baseline_residue_embedding
 from pp3.concepts import get_concept_level, get_concept_type
+from pp3.utils.constants import MAX_SEQ_LEN
 
 
-def collate_protein(batch: list[tuple[torch.Tensor, float]]) -> tuple[torch.Tensor, torch.Tensor]:
-    """Collate a batch of items at the protein level.
-
-    :param batch: A batch of items at the protein level, where embeddings are 1D tensors and concepts are floats.
-    :return: A collated batch.
-    """
-    embeddings, concept_values = zip(*batch)
-
-    return torch.stack(embeddings), torch.Tensor(concept_values)
-
-
-def collate_residue(batch: list[tuple[torch.Tensor, torch.Tensor]]) -> tuple[torch.Tensor, torch.Tensor]:
+def collate_fn(batch: list[tuple[torch.Tensor, torch.Tensor]]) -> tuple[torch.Tensor, torch.Tensor]:
     """Collate a batch of items at the residue level.
 
     :param batch: A batch of items at the residue level, where embeddings are 2D tensors and concepts are 1D tensors.
     :return: A collated batch.
     """
-    embeddings, concept_values = zip(*batch)
+    embeddings, coords, concept_values = zip(*batch)
 
-    return torch.cat(embeddings), torch.cat(concept_values)
+    # Apply padding
+    lengths = [embeddings[i].shape[0] for i in range(embeddings.shape[0])]
+    padding_mask = torch.tensor([[1] * x + [0] * (MAX_SEQ_LEN - x) for x in lengths])
+    embeddings = torch.nn.utils.rnn.pad_sequence(embeddings, batch_first=True)
+    coords = torch.nn.utils.rnn.pad_sequence(coords, batch_first=True)
+    concept_values = torch.nn.utils.rnn.pad_sequence(concept_values.unsqueeze(1), batch_first=True)
+    concept_values = concept_values.squeeze(1)
+
+    return torch.stack(embeddings), torch.stack(coords), torch.stack(concept_values), padding_mask
 
 
 class ProteinConceptDataset(Dataset):
@@ -49,6 +44,7 @@ class ProteinConceptDataset(Dataset):
             concept_level: str,
             concept_type: str,
             protein_embedding_method: str,
+            pdb_id_to_coordinates: dict[str, torch.Tensor],
     ) -> None:
         """Initialize the dataset.
 
@@ -67,16 +63,10 @@ class ProteinConceptDataset(Dataset):
         self.concept_level = concept_level
         self.concept_type = concept_type
         self.protein_embedding_method = protein_embedding_method
+        self.pdb_id_to_coordinates = pdb_id_to_coordinates
 
         self.max_residues_for_pairs = 25
         self.rng = np.random.default_rng(seed=0)
-
-        if self.concept_level == 'protein':
-            self.collate_fn = collate_protein
-        elif self.concept_level.startswith('residue'):
-            self.collate_fn = collate_residue
-        else:
-            raise ValueError(f'Invalid concept level: {self.concept_level}')
 
     @property
     def embedding_dim(self) -> int:
@@ -137,40 +127,13 @@ class ProteinConceptDataset(Dataset):
         # Get embeddings
         embeddings = self.pdb_id_to_embeddings[pdb_id]
 
+        # Get coordinates
+        coordinates = self.pdb_id_to_coordinates[pdb_id]
+
         # Get concept value
         concept_value = self.pdb_id_to_concept_value[pdb_id]
 
-        # If needed, modify embedding structure based on concept level
-        if self.concept_level == 'residue_pair':
-            # Get number of residues
-            num_residues = len(embeddings)
-
-            # Get residue pair indices
-            pair_indices = np.array(list(product(range(num_residues), repeat=2)))  # (num_residues * num_residues, 2)
-
-            # Randomly sample pairs of residues (too much memory to use all of them)
-            if num_residues > self.max_residues_for_pairs:
-                num_pairs_to_sample = self.max_residues_for_pairs ** 2
-                pair_indices = self.rng.choice(pair_indices, size=num_pairs_to_sample, replace=False)
-
-            # Create pair embeddings
-            embedding_dim = embeddings.shape[-1]
-            pair_embeddings = torch.zeros((len(pair_indices), 2 * embedding_dim))  # (num_pairs, 2 * embedding_dim)
-            pair_embeddings[:, :embedding_dim] = embeddings[pair_indices[:, 0]]  # (num_pairs, embedding_dim)
-            pair_embeddings[:, embedding_dim:] = embeddings[pair_indices[:, 1]]  # (num_pairs, embedding_dim)
-            embeddings = pair_embeddings
-
-            # Get concept values
-            concept_value = concept_value[pair_indices[:, 0], pair_indices[:, 1]]  # (num_pairs,)
-        elif self.concept_level == 'residue_triplet':
-            # Create adjacent triples of residue embeddings
-            embeddings = torch.cat([
-                embeddings[:-2],  # (num_residues - 2, embedding_dim)
-                embeddings[1:-1],  # (num_residues - 2, embedding_dim)
-                embeddings[2:]  # (num_residues - 2, embedding_dim)
-            ], dim=1)
-
-        return embeddings, concept_value
+        return embeddings, coordinates, concept_value
 
 
 class ProteinConceptDataModule(pl.LightningDataModule):
@@ -232,35 +195,13 @@ class ProteinConceptDataModule(pl.LightningDataModule):
             # Load PDB ID to PLM embeddings dictionary
             pdb_id_to_embeddings = torch.load(self.embeddings_path)
 
-            # If concept is protein level, aggregate residue embeddings to protein embeddings
-            if self.concept_level == 'protein':
-                # Set up aggregation function
-                aggregate_fn = getattr(torch, self.plm_residue_to_protein_method)
-
-                # Aggregate residue embeddings to protein embeddings
-                pdb_id_to_embeddings = {
-                    pdb_id: aggregate_fn(embeddings, dim=0)
-                    for pdb_id, embeddings in pdb_id_to_embeddings.items()
-                }
-            elif not self.concept_level.startswith('residue'):
-                raise ValueError(f'Invalid concept level: {self.concept_level}')
-
         # Baseline embeddings
         elif self.protein_embedding_method == 'baseline':
-            # Get appropriate baseline embedding method for concept level
-            if self.concept_level == 'protein':
-                baseline_embedding_fn = get_baseline_protein_embedding
-            elif self.concept_level.startswith('residue'):
-                baseline_embedding_fn = get_baseline_residue_embedding
-            else:
-                raise ValueError(f'Invalid concept level: {self.concept_level}')
-
             # Compute baseline embeddings
             pdb_id_to_embeddings = {
-                pdb_id: baseline_embedding_fn(protein['sequence'])
+                pdb_id: get_baseline_residue_embedding(protein['sequence'])
                 for pdb_id, protein in pdb_id_to_proteins.items()
             }
-
         # Other embedding methods
         else:
             raise ValueError(f'Invalid protein embedding method: {self.protein_embedding_method}')
@@ -293,6 +234,9 @@ class ProteinConceptDataModule(pl.LightningDataModule):
         # Load or compute embeddings for proteins or residues
         pdb_id_to_embeddings = self.get_embeddings(pdb_id_to_proteins)
 
+        # Load id to coordinate dictionary
+        pdb_id_to_coordinates = {k: v["structure"] for k, v in pdb_id_to_proteins.items()}
+
         # Load PDB ID to concept value dictionary
         pdb_id_to_concept_value: dict[str, torch.Tensor | float] = torch.load(self.concepts_dir / f'{self.concept}.pt')
 
@@ -307,7 +251,8 @@ class ProteinConceptDataModule(pl.LightningDataModule):
             pdb_id_to_concept_value=pdb_id_to_concept_value,
             concept_level=self.concept_level,
             concept_type=self.concept_type,
-            protein_embedding_method=self.protein_embedding_method
+            protein_embedding_method=self.protein_embedding_method,
+            pdb_id_to_coordinates=pdb_id_to_coordinates
         )
         print(f'Train dataset size: {len(self.train_dataset):,}')
 
@@ -319,7 +264,8 @@ class ProteinConceptDataModule(pl.LightningDataModule):
             pdb_id_to_concept_value=pdb_id_to_concept_value,
             concept_level=self.concept_level,
             concept_type=self.concept_type,
-            protein_embedding_method=self.protein_embedding_method
+            protein_embedding_method=self.protein_embedding_method,
+            pdb_id_to_coordinates=pdb_id_to_coordinates
         )
         print(f'Val dataset size: {len(self.val_dataset):,}')
 
@@ -331,7 +277,8 @@ class ProteinConceptDataModule(pl.LightningDataModule):
             pdb_id_to_concept_value=pdb_id_to_concept_value,
             concept_level=self.concept_level,
             concept_type=self.concept_type,
-            protein_embedding_method=self.protein_embedding_method
+            protein_embedding_method=self.protein_embedding_method,
+            pdb_id_to_coordinates=pdb_id_to_coordinates
         )
         print(f'Test dataset size: {len(self.test_dataset):,}')
 
@@ -344,7 +291,7 @@ class ProteinConceptDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=True,
             num_workers=self.num_workers,
-            collate_fn=self.train_dataset.collate_fn
+            collate_fn=collate_fn
         )
 
     def val_dataloader(self) -> DataLoader:
@@ -354,7 +301,7 @@ class ProteinConceptDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=False,
             num_workers=self.num_workers,
-            collate_fn=self.val_dataset.collate_fn
+            collate_fn=collate_fn
         )
 
     def test_dataloader(self) -> DataLoader:
@@ -364,7 +311,7 @@ class ProteinConceptDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=False,
             num_workers=self.num_workers,
-            collate_fn=self.test_dataset.collate_fn
+            collate_fn=collate_fn
         )
 
     predict_dataloader = test_dataloader
