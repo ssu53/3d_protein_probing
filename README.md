@@ -4,15 +4,7 @@
 
 Install the conda environment. If using a GPU, first open `environment.yml` and uncomment the line with `cudatoolkit=11.3`.
 ```bash
-
-
-
-
-
-
-
-
-
+conda env create -f environment.yml
 ```
 
 Activate the conda environment.
