@@ -32,8 +32,7 @@ class Model(pl.LightningModule):
         weight_decay: float = 0.0,
         dropout: float = 0.0,
         model_type: Literal['mlp', 'egnn', 'tfn'] = 'mlp',
-        concept_level: str = False,
-        **kwargs
+        concept_level: str = False
     ) -> None:
         """Initialize the model.
 
