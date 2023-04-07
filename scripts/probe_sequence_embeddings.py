@@ -31,8 +31,7 @@ def probe_sequence_embeddings(
     dropout: float = 0.0,
     max_epochs: int = 1000,
     ckpt_every_k_epochs: int = 10,
-    split_seed: int = 0,
-    **kwargs
+    split_seed: int = 0
 ) -> None:
     """Probe sequence embeddings for a 3D geometric concept.
 
@@ -89,8 +88,7 @@ def probe_sequence_embeddings(
         learning_rate=learning_rate,
         weight_decay=weight_decay,
         dropout=dropout,
-        concept_level=get_concept_level(concept),
-        **kwargs
+        concept_level=get_concept_level(concept)
     )
 
     print(mlp)

@@ -31,8 +31,8 @@ class Model(pl.LightningModule):
         learning_rate: float = 1e-4,
         weight_decay: float = 0.0,
         dropout: float = 0.0,
-        model_type: Literal["mlp", "egnn", "tfn"] = 'mlp',
-        concept_level: Literal["residue", "protein", "residue_pair", "residue_triplets"] = False,
+        model_type: Literal['mlp', 'egnn', 'tfn'] = 'mlp',
+        concept_level: str = False,
         **kwargs
     ) -> None:
         """Initialize the model.
@@ -68,13 +68,12 @@ class Model(pl.LightningModule):
                 input_dim=self.input_dim,
                 hidden_dim=self.hidden_dim,
                 num_layers=self.num_layers,
-                dropout=dropout,
-                **kwargs
+                dropout=dropout
             )
         elif model_type == 'egnn':
-            pass
+            raise NotImplementedError
         elif model_type == 'tfn':
-            pass
+            raise NotImplementedError
         else:
             raise ValueError(f'Invalid model type: {model_type}')
 
