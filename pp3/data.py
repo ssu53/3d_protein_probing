@@ -13,7 +13,9 @@ from pp3.concepts import get_concept_level, get_concept_type
 from pp3.utils.constants import MAX_SEQ_LEN
 
 
-def collate_fn(batch: list[tuple[torch.Tensor, torch.Tensor]]) -> tuple[torch.Tensor, torch.Tensor]:
+def collate_fn(
+        batch: list[tuple[torch.Tensor, torch.Tensor]]
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     """Collate a batch of items at the residue level.
 
     :param batch: A batch of items at the residue level, where embeddings are 2D tensors and concepts are 1D tensors.

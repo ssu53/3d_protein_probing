@@ -10,6 +10,7 @@ from biotite import InvalidFileError
 from biotite.structure import BadStructureError, get_residue_count
 from tqdm import tqdm
 
+from pp3.utils.constants import MAX_SEQ_LEN
 from pp3.utils.pdb import (
     get_residue_coordinates,
     get_sequence_from_structure,
@@ -20,7 +21,7 @@ from pp3.utils.pdb import (
 def convert_pdb_to_pytorch(
         pdb_id: str,
         pdb_dir: Path,
-        max_protein_length: int | None = None
+        max_protein_length: int = MAX_SEQ_LEN
 ) -> dict[str, torch.Tensor | str] | None:
     """Parses PDB file and converts structure and sequence to PyTorch format while removing invalid structures.
 

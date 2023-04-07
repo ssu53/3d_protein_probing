@@ -53,8 +53,7 @@ python scripts/pdb_to_pytorch.py \
     --ids_path data/pdb_single_chain_protein_30_identity/pdb_ids.txt \
     --pdb_dir pdb \
     --proteins_save_path data/pdb_single_chain_protein_30_identity/proteins.pt \
-    --ids_save_path data/pdb_single_chain_protein_30_identity/valid_pdb_ids.csv \
-    --max_protein_length 512
+    --ids_save_path data/pdb_single_chain_protein_30_identity/valid_pdb_ids.csv
 ```
 
 This successfully converts 4,871 structures.

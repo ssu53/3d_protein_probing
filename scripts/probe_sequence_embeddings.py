@@ -31,6 +31,7 @@ def probe_sequence_embeddings(
     dropout: float = 0.0,
     max_epochs: int = 1000,
     ckpt_every_k_epochs: int = 10,
+    num_workers: int = 8,
     split_seed: int = 0
 ) -> None:
     """Probe sequence embeddings for a 3D geometric concept.
@@ -53,6 +54,7 @@ def probe_sequence_embeddings(
     :param dropout: The dropout rate.
     :param max_epochs: The maximum number of epochs to train for.
     :param ckpt_every_k_epochs: Save a checkpoint every k epochs.
+    :param num_workers: The number of workers to use for data loading.
     :param split_seed: The random seed to use for the train/val/test split.
     """
     # Create save directory
@@ -72,6 +74,7 @@ def probe_sequence_embeddings(
         protein_embedding_method=protein_embedding_method,
         plm_residue_to_protein_method=plm_residue_to_protein_method,
         batch_size=batch_size,
+        num_workers=num_workers,
         split_seed=split_seed
     )
     data_module.setup()
