@@ -71,7 +71,7 @@ class ProteinConceptDataset(Dataset):
     @property
     def embedding_dim(self) -> int:
         """Get the embedding size."""
-        embeddings, concept_value = self[0]
+        embeddings = next(iter(self.pdb_id_to_embeddings.values()))
         embedding_dim = embeddings.shape[-1]
 
         return embedding_dim
@@ -118,7 +118,7 @@ class ProteinConceptDataset(Dataset):
         """Get the number of items in the dataset."""
         return len(self.pdb_ids)
 
-    def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor | float]:
+    def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor | float]:
         """Get an item from the dataset.
 
         :param index: The index of the item.
