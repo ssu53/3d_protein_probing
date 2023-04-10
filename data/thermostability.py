@@ -243,9 +243,11 @@ def search_pdb(args):
     if found_experimental is not None:
         # Attempt searching for experimental data
         item = extract_item(found_experimental["result_set"], melting_point, seq)
-        if item is None:
-            # if not found, check computational data
-            found_computational = search_pdb_computational(seq)
+    
+    if item is None:
+        # if not found, check computational data
+        found_computational = search_pdb_computational(seq)
+        if found_computational is not None:
             item = extract_item(found_computational["result_set"], melting_point, seq)
     return item
 
