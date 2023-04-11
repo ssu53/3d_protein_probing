@@ -70,6 +70,7 @@ class Model(pl.LightningModule):
                 num_layers=self.num_layers,
                 dropout=dropout
             )
+            last_hidden_dim = self.hidden_dim
         elif model_type == 'egnn':
             self.module = EGNN(
                 node_dim=self.input_dim,
@@ -79,6 +80,7 @@ class Model(pl.LightningModule):
                 num_layers=self.num_layers,
                 dropout=dropout
             )
+            last_hidden_dim = self.input_dim
         elif model_type == 'tfn':
             raise NotImplementedError
         else:
@@ -86,15 +88,15 @@ class Model(pl.LightningModule):
 
         # Create final layer
         if self.concept_level in {'protein', 'residue'}:
-            self.last_hidden_dim = self.hidden_dim
+            last_dim_multiplier = 1
         elif self.concept_level == 'residue_pair':
-            self.last_hidden_dim = self.hidden_dim * 2
+            last_dim_multiplier = 2
         elif self.concept_level == 'residue_triplet':
-            self.last_hidden_dim = self.hidden_dim * 3
+            last_dim_multiplier = 3
         else:
             raise ValueError(f'Invalid concept level: {self.concept_level}')
 
-        self.fc = nn.Linear(self.last_hidden_dim, self.output_dim)
+        self.fc = nn.Linear(last_hidden_dim * last_dim_multiplier, self.output_dim)
 
         # Create loss function
         self.loss = self._get_loss_fn()

@@ -39,7 +39,7 @@ class EGNN_Layer(nn.Module):
         activation: Callable = nn.ReLU,
         update_feats: bool = True,
         update_coors: bool = True,
-    ):
+    ) -> None:
         super().__init__()
         self.update_feats = update_feats
         self.update_coors = update_coors
