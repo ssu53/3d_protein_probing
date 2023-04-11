@@ -161,37 +161,46 @@ class Model(pl.LightningModule):
         # Compute y mask
         y_mask = ~torch.isnan(y)
 
-        # Random sampling of residue pairs (to avoid memory issues)
-        if self.concept_level == 'residue_pair':
-            y_mask_indices = torch.nonzero(y_mask)
-            y_mask_indices = y_mask_indices[torch.randperm(y_mask_indices.shape[0])[:self.max_residue_pairs_per_protein]]
+        # Set up masks
+        if self.concept_level == 'residue':
+            # Padding mask
+            padding_sum = padding_mask.sum(dim=1, keepdim=True).repeat(1, padding_mask.shape[1])
+
+            # Keep mask
+            keep_mask = (y_mask * padding_mask).bool()
+        elif self.concept_level == 'residue_pair':
+            breakpoint()
+
+            # Padding mask (TODO: check this)
+            pair_padding_mask = padding_mask[:, None, :] * padding_mask[:, :, None]
+            padding_sum = pair_padding_mask.sum(dim=(1, 2), keepdim=True)
+
+            # Random sampling of residue pairs (to avoid memory issues)
+            pair_indices = torch.nonzero(y_mask * pair_padding_mask)
+            pair_indices = pair_indices[torch.randperm(pair_indices.shape[0])[:self.max_residue_pairs_per_protein]]
+
             y_mask = torch.zeros_like(y_mask)
-            y_mask[y_mask_indices[:, 0], y_mask_indices[:, 1]] = True
+            y_mask[pair_indices[:, 0], pair_indices[:, 1]] = True
+
+            # Keep mask
+            keep_mask = (y_mask * pair_padding_mask).bool()
+        elif self.concept_level == 'residue_triplet':
+            # Padding mask
+            triplet_padding_mask = padding_mask[:, :-2] * padding_mask[:, 1:-1] * padding_mask[:, 2:]
+            padding_sum = triplet_padding_mask.sum(dim=1, keepdim=True).repeat(1, triplet_padding_mask.shape[1])
+
+            # Keep mask
+            keep_mask = (y_mask * triplet_padding_mask).bool()
+        else:
+            raise ValueError(f'Invalid concept level: {self.concept_level}')
 
         # Make predictions
         y_hat_scaled = self(embeddings, coords, padding_mask, y_mask).squeeze(dim=-1)
 
-        # Set up padding
-        if self.concept_level == 'residue':
-            keep_mask = y_mask * padding_mask
-            pad_sum = padding_mask.sum(dim=1, keepdim=True).repeat(1, padding_mask.shape[1])
-        elif self.concept_level == 'residue_pair':
-            # TODO: keep mask
-            breakpoint()
-            padding_mask = padding_mask[:, None, :] * padding_mask[:, :, None]
-            pad_sum = padding_mask.sum(dim=(1, 2), keepdim=True)  # TODO: Check this
-        elif self.concept_level == 'residue_triplet':
-            padding_mask = padding_mask[:, :-2] * padding_mask[:, 1:-1] * padding_mask[:, 2:]
-            keep_mask = y_mask * padding_mask
-            pad_sum = padding_mask.sum(dim=1, keepdim=True).repeat(1, padding_mask.shape[1])
-        else:
-            raise ValueError(f'Invalid concept level: {self.concept_level}')
-
         # Flatten and remove padding and NaN
-        keep_mask = keep_mask.bool()
         y = y[keep_mask]
         y_hat_scaled = y_hat_scaled[keep_mask]
-        pad_sum = pad_sum[keep_mask]
+        padding_sum = padding_sum[keep_mask]
 
         # Scale/unscale target and predictions
         if self.target_type == 'regression':
@@ -209,7 +218,7 @@ class Model(pl.LightningModule):
 
         # Compute loss
         loss = self.loss(y_hat_scaled, y_scaled)
-        loss = (loss / pad_sum).mean()
+        loss = (loss / padding_sum).mean()
 
         # Convert target and predictions to NumPy
         y_np = y.detach().cpu().numpy()
