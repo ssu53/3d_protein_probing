@@ -63,6 +63,8 @@ class Model(pl.LightningModule):
         self.dropout = dropout
         self.concept_level = concept_level
 
+        self.max_residue_pairs_per_protein = 1000
+
         if model_type == 'mlp':
             self.module = MLP(
                 input_dim=self.input_dim,
@@ -101,23 +103,32 @@ class Model(pl.LightningModule):
         # Create loss function
         self.loss = self._get_loss_fn()
 
-    def forward(self, x: torch.Tensor, c: torch.Tensor, pad: torch.Tensor) -> torch.Tensor:
+    def forward(
+            self,
+            embeddings: torch.Tensor,
+            coords: torch.Tensor,
+            padding_mask: torch.Tensor,
+            y_mask: torch.Tensor
+    ) -> torch.Tensor:
         """Runs the model on the data.
 
-        :param x: A tensor containing an embedding.
-        :param c: A tensor containing the coordinates.
-        :param pad: A tensor containing the padding mask.
+        :param embeddings: A tensor containing an embedding.
+        :param coords: A tensor containing the coordinates.
+        :param padding_mask: A tensor containing the padding mask.
+        :param y_mask: A tensor containing the target mask.
         :return: A tensor containing the model's prediction.
         """
-        encodings = self.module(x, c, pad)
+        encodings = self.module(embeddings, coords, padding_mask)
 
         if self.concept_level == 'protein':
-            pad_sum = pad.sum(dim=1)
+            pad_sum = padding_mask.sum(dim=1)
             pad_sum[pad_sum == 0] = 1
-            encodings = (encodings * pad).sum(dim=1) / pad_sum
+            encodings = (encodings * padding_mask).sum(dim=1) / pad_sum
+            encodings = encodings[y_mask]
             # If needed, modify embedding structure based on concept level
         elif self.concept_level == 'residue_pair':
             # Create pair embeddings
+            y_mask_indices = torch.nonzero(y_mask)
             breakpoint()  # TODO: check this and fix memory issues / random sampling
             left = encodings[:, None, :, :].expand(-1, encodings.shape[1], -1, -1)
             right = encodings[:, :, None, :].expand(-1, -1, encodings.shape[1], -1)
@@ -125,6 +136,7 @@ class Model(pl.LightningModule):
         elif self.concept_level == 'residue_triplet':
             # Create adjacent triples of residue embeddings
             encodings = torch.cat([encodings[:, :-2], encodings[:, 1:-1], encodings[:, 2:]], dim=-1)
+            encodings = encodings[y_mask]
 
         encodings = self.fc(encodings)
 
@@ -146,15 +158,22 @@ class Model(pl.LightningModule):
         # Unpack batch
         embeddings, coords, y, padding_mask = batch
 
-        # Make predictions
-        y_hat_scaled = self(embeddings, coords, padding_mask).squeeze(dim=-1)
+        # Compute y mask
+        y_mask = ~torch.isnan(y)
 
-        # Compute not NaN mask
-        not_nan_mask = ~torch.isnan(y)
+        # Random sampling of residue pairs (to avoid memory issues)
+        if self.concept_level == 'residue_pair':
+            y_mask_indices = torch.nonzero(y_mask)
+            y_mask_indices = y_mask_indices[torch.randperm(y_mask_indices.shape[0])[:self.max_residue_pairs_per_protein]]
+            y_mask = torch.zeros_like(y_mask)
+            y_mask[y_mask_indices[:, 0], y_mask_indices[:, 1]] = True
+
+        # Make predictions
+        y_hat_scaled = self(embeddings, coords, padding_mask, y_mask).squeeze(dim=-1)
 
         # Set up padding
         if self.concept_level == 'residue':
-            keep_mask = not_nan_mask * padding_mask
+            keep_mask = y_mask * padding_mask
             pad_sum = padding_mask.sum(dim=1, keepdim=True).repeat(1, padding_mask.shape[1])
         elif self.concept_level == 'residue_pair':
             # TODO: keep mask
@@ -163,7 +182,7 @@ class Model(pl.LightningModule):
             pad_sum = padding_mask.sum(dim=(1, 2), keepdim=True)  # TODO: Check this
         elif self.concept_level == 'residue_triplet':
             padding_mask = padding_mask[:, :-2] * padding_mask[:, 1:-1] * padding_mask[:, 2:]
-            keep_mask = not_nan_mask * padding_mask
+            keep_mask = y_mask * padding_mask
             pad_sum = padding_mask.sum(dim=1, keepdim=True).repeat(1, padding_mask.shape[1])
         else:
             raise ValueError(f'Invalid concept level: {self.concept_level}')
