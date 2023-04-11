@@ -9,17 +9,18 @@ from einops import rearrange
 class SinusoidalEmbeddings(nn.Module):
     """A simple sinusoidal embedding layer."""
 
-    def __init__(self, dim, theta: float = 10000):
+    def __init__(self, dim, theta: float = 10000.0) -> None:
         super().__init__()
         self.dim = dim
         self.theta = theta
 
-    def forward(self, time):
+    def forward(self, time: torch.Tensor) -> torch.Tensor:
         half_dim = self.dim // 2
         embeddings = math.log(self.theta) / (half_dim - 1)
         embeddings = torch.exp(torch.arange(half_dim, device=time.device) * -embeddings)
         embeddings = time[:, None] * embeddings[None, :]
         embeddings = torch.cat((embeddings.sin(), embeddings.cos()), dim=-1)
+
         return embeddings
 
 
@@ -32,8 +33,8 @@ class EGNN_Layer(nn.Module):
         dist_dim: int,
         proj_dim: int,
         message_dim: int,
-        edge_dim: int = 0,
-        dropout: float = 0,
+        edge_dim: int,
+        dropout: float = 0.0,
         use_sinusoidal: bool = True,
         activation: Callable = nn.ReLU,
         update_feats: bool = True,
@@ -45,7 +46,7 @@ class EGNN_Layer(nn.Module):
 
         if not update_feats and not update_coors:
             raise ValueError(
-                "At least one of update_feats or update_coors must be True"
+                "At least one of update_feats or update_coors must be True."
             )
 
         if use_sinusoidal:
@@ -78,17 +79,24 @@ class EGNN_Layer(nn.Module):
                 nn.Linear(proj_dim, node_dim),
             )
 
-    def forward(self, feats, coors, mask, edges=None):
+    def forward(
+            self,
+            embeddings: torch.Tensor,
+            coords: torch.Tensor,
+            padding_mask: torch.Tensor,
+            edges: torch.Tensor = None
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         # Compute pairwise distances
-        B, N = feats.shape[:2]
-        rel_coors = coors.unsqueeze(2) - coors.unsqueeze(1)
-        rel_dist = (rel_coors**2).sum(dim=-1)
-        dists = self.dist_embedding(rearrange(rel_dist, "b i j -> (b i j)"))
-        dists = rearrange(dists, "(b i j) d -> b i j d", b=B, i=N, j=N)
+        B, N = embeddings.shape[:2]
+        rel_coors = coords.unsqueeze(2) - coords.unsqueeze(1)
+        rel_dist = (rel_coors ** 2).sum(dim=-1)
+        dists = self.dist_embedding(rearrange(rel_dist, 'b i j -> (b i j)'))
+        dists = rearrange(dists, '(b i j) d -> b i j d', b=B, i=N, j=N)
 
         # Compute pairwise features
-        feats1 = feats.unsqueeze(1).expand(-1, N, -1, -1)
-        feats2 = feats.unsqueeze(2).expand(-1, -1, N, -1)
+        feats1 = embeddings.unsqueeze(1).expand(-1, N, -1, -1)
+        feats2 = embeddings.unsqueeze(2).expand(-1, -1, N, -1)
+
         if edges is not None:
             feats_pair = torch.cat((feats1, feats2, dists, edges), dim=-1)
         else:
@@ -97,49 +105,49 @@ class EGNN_Layer(nn.Module):
         # Compute messages
         m_ij = self.phi_e(feats_pair)
         self_mask = 1.0 - torch.eye(N).view(1, N, N, 1).to(m_ij)
-        pad_mask_sum = (mask.sum(dim=1, keepdim=True) - 1).unsqueeze(-1)
+        pad_mask_sum = (padding_mask.sum(dim=1, keepdim=True) - 1).unsqueeze(-1)
 
         # Compute coordinate update
         if self.update_coors:
             rel_coors = torch.nan_to_num(rel_coors / rel_dist.unsqueeze(-1)).detach()
             delta = rel_coors * self.phi_x(m_ij)
-            delta = delta * mask.view(-1, N, 1, 1)
+            delta = delta * padding_mask.view(-1, N, 1, 1)
             delta = delta * self_mask
 
             delta = delta.sum(dim=2) / pad_mask_sum
-            coors = coors + self.gate_x * delta
+            coords = coords + self.gate_x * delta
 
         # Compute feature update
         if self.update_feats:
-            m_ij = m_ij * mask.view(-1, N, 1, 1)
+            m_ij = m_ij * padding_mask.view(-1, N, 1, 1)
             m_ij = m_ij * self_mask
 
             m_i = m_ij.sum(dim=2) / pad_mask_sum
-            feats = feats + self.gate_h * self.phi_h(torch.cat((feats, m_i), dim=-1))
+            embeddings = embeddings + self.gate_h * self.phi_h(torch.cat((embeddings, m_i), dim=-1))
 
-        return feats, coors
+        return embeddings, coords
 
 
 class EGNN(nn.Module):
     """A simple fully connected EGNN."""
 
+    # TODO: check these defaults
     def __init__(
         self,
-        num_layers: int,
         node_dim: int,
         dist_dim: int,
         message_dim: int,
         proj_dim: int,
-        edge_dim: int = 0,
-        dropout: float = 0,
-    ):
+        num_layers: int,
+        dropout: float = 0.0,
+    ) -> None:
         super().__init__()
 
         self.dist_embedding = SinusoidalEmbeddings(dist_dim)
         layers = [
             EGNN_Layer(
                 node_dim=node_dim,
-                edge_dim=edge_dim + dist_dim,
+                edge_dim=dist_dim,
                 dist_dim=dist_dim,
                 message_dim=message_dim,
                 proj_dim=proj_dim,
@@ -151,18 +159,24 @@ class EGNN(nn.Module):
         ]
         self.layers = nn.ModuleList(layers)
 
-    def forward(self, x, c, pad):
+    def forward(
+            self,
+            embeddings: torch.Tensor,
+            coords: torch.Tensor,
+            padding_mask: torch.Tensor
+    ) -> torch.Tensor:
         # Compute pairwise distances in original coordinates
-        B, N = x.shape[:2]
-        rel_coors = c.unsqueeze(2) - c.unsqueeze(1)
+        B, N = embeddings.shape[:2]
+        rel_coors = coords.unsqueeze(2) - coords.unsqueeze(1)
         rel_dist = (rel_coors**2).sum(dim=-1)
-        dists = self.dist_embedding(rearrange(rel_dist, "b i j -> (b i j)"))
-        dists = rearrange(dists, "(b i j) d -> b i j d", b=B, i=N, j=N)
+        dists = self.dist_embedding(rearrange(rel_dist, 'b i j -> (b i j)'))
+        dists = rearrange(dists, '(b i j) d -> b i j d', b=B, i=N, j=N)
 
         # Add to edges so we always keep the original distances
         edges = dists
 
         # Run layers, updating both features and coordinates
         for layer in self.layers:
-            x, c = layer(x, c, pad, edges)
-        return x, c
+            embeddings, coords = layer(embeddings, coords, padding_mask, edges)
+
+        return embeddings

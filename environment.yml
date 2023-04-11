@@ -9,6 +9,7 @@ dependencies:
   - python=3.10
   - biotite
   - cudatoolkit=11.3
+  - einops
   - ipdb  # for debugging
   - ipython  # for debugging
   - matplotlib

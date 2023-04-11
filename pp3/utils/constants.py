@@ -1,7 +1,10 @@
 """Constant values used across multiple modules."""
-import numpy as np
+from typing import Literal
+
+import torch
 from biotite.sequence.align import SubstitutionMatrix
 from biotite.structure.info import residue
+
 
 # Mapping from amino acid three-letter codes to one-letter codes
 AA_3_TO_1 = {
@@ -46,3 +49,7 @@ BLOSUM62_AA_TO_VECTOR = {
 
 # Maximum sequence length
 MAX_SEQ_LEN = 512
+
+# Types
+MODEL_TYPES = Literal['mlp', 'egnn', 'tfn']
+BATCH_TYPE = tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]

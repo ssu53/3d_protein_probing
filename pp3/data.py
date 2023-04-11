@@ -1,5 +1,4 @@
 """Data classes and functions."""
-from itertools import product
 from pathlib import Path
 
 import numpy as np
@@ -10,11 +9,12 @@ from torch.utils.data import DataLoader, Dataset
 
 from pp3.baseline_embeddings import get_baseline_residue_embedding
 from pp3.concepts import get_concept_level, get_concept_type
+from pp3.utils.constants import BATCH_TYPE
 
 
 def collate_fn(
         batch: list[tuple[torch.Tensor, torch.Tensor, torch.Tensor]]
-) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+) -> BATCH_TYPE:
     """Collate a batch of items at the residue level.
 
     :param batch: A batch of items at the residue level, where each element of the batch is a tuple containing:

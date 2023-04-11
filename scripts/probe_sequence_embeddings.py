@@ -9,6 +9,7 @@ from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from pp3.concepts import get_concept_output_dim, get_concept_type, get_concept_level
 from pp3.models.model import Model
 from pp3.data import ProteinConceptDataModule
+from pp3.utils.constants import MODEL_TYPES
 from pp3.utils.plot import plot_preds_vs_targets
 
 
@@ -18,6 +19,7 @@ def probe_sequence_embeddings(
     save_dir: Path,
     concepts_dir: Path,
     concept: str,
+    model_type: MODEL_TYPES = 'mlp',
     project_name: str = 'Probing',
     protein_embedding_method: Literal['plm', 'baseline'] = 'plm',
     plm_residue_to_protein_method: Literal['mean', 'max', 'sum'] = 'sum',
@@ -41,6 +43,7 @@ def probe_sequence_embeddings(
     :param save_dir: Path to directory where results and predictions will be saved.
     :param concepts_dir: Path to a directory containing PT files with dictionaries mapping PDB ID to concept values.
     :param concept: The concept to learn.
+    :param model_type: The model type to use.
     :param project_name: The name of the project to use for WandB logging.
     :param protein_embedding_method: The method to use to compute the protein or residue embeddings.
     :param plm_residue_to_protein_method: The method to use to compute the PLM protein embedding from the residue embeddings for protein concepts.
@@ -79,22 +82,23 @@ def probe_sequence_embeddings(
     )
     data_module.setup()
 
-    # Build MLP
-    mlp = Model(
+    # Build model
+    model = Model(
+        model_type=model_type,
         input_dim=data_module.embedding_dim,
         output_dim=get_concept_output_dim(concept),
         hidden_dim=hidden_dim,
         num_layers=num_layers,
+        concept_level=get_concept_level(concept),
         target_type=get_concept_type(concept),
         target_mean=data_module.train_dataset.target_mean,
         target_std=data_module.train_dataset.target_std,
         learning_rate=learning_rate,
         weight_decay=weight_decay,
-        dropout=dropout,
-        concept_level=get_concept_level(concept)
+        dropout=dropout
     )
 
-    print(mlp)
+    print(model)
 
     if logger_type == 'wandb':
         from pytorch_lightning.loggers import WandbLogger
@@ -143,7 +147,7 @@ def probe_sequence_embeddings(
 
     # Train model
     trainer.fit(
-        model=mlp,
+        model=model,
         datamodule=data_module
     )
 

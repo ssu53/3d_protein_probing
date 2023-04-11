@@ -1,6 +1,4 @@
 """A class for a multilayer perceptron model."""
-from typing import Literal
-
 import numpy as np
 import pytorch_lightning as pl
 import torch
@@ -13,7 +11,9 @@ from sklearn.metrics import (
     r2_score,
     roc_auc_score
 )
+from pp3.models.egnn import EGNN
 from pp3.models.mlp import MLP
+from pp3.utils.constants import BATCH_TYPE, MODEL_TYPES
 
 
 class Model(pl.LightningModule):
@@ -21,32 +21,33 @@ class Model(pl.LightningModule):
 
     def __init__(
         self,
+        model_type: MODEL_TYPES,
         input_dim: int,
         output_dim: int,
         hidden_dim: int,
         num_layers: int,
+        concept_level: str,
         target_type: str,
         target_mean: float | None,
         target_std: float | None,
         learning_rate: float = 1e-4,
         weight_decay: float = 0.0,
-        dropout: float = 0.0,
-        model_type: Literal['mlp', 'egnn', 'tfn'] = 'mlp',
-        concept_level: str = False
+        dropout: float = 0.0
     ) -> None:
         """Initialize the model.
 
+        :param model_type: The model type to use.
         :param input_dim: The dimensionality of the input to the model.
         :param output_dim: The dimensionality of the output of the model.
         :param hidden_dim: The dimensionality of the hidden layers.
         :param num_layers: The number of layers.
+        :param concept_level: The concept level (e.g., protein, residue, residue_pair, residue_triplet).
         :param target_type: The type of the target values (e.g., regression or classification)
         :param target_mean: The mean target value across the training set.
         :param target_std: The standard deviation of the target values across the training set.
         :param learning_rate: The learning rate.
         :param weight_decay: The weight decay.
         :param dropout: The dropout rate.
-        :param loss_fn: The loss function to use.
         """
         super(Model, self).__init__()
 
@@ -70,7 +71,14 @@ class Model(pl.LightningModule):
                 dropout=dropout
             )
         elif model_type == 'egnn':
-            raise NotImplementedError
+            self.module = EGNN(
+                node_dim=self.input_dim,
+                dist_dim=self.hidden_dim,
+                message_dim=self.hidden_dim,
+                proj_dim=self.hidden_dim,
+                num_layers=self.num_layers,
+                dropout=dropout
+            )
         elif model_type == 'tfn':
             raise NotImplementedError
         else:
@@ -122,7 +130,7 @@ class Model(pl.LightningModule):
 
     def step(
             self,
-            batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
+            batch: BATCH_TYPE,
             batch_idx: int,
             step_type: str
     ) -> float:
@@ -206,7 +214,7 @@ class Model(pl.LightningModule):
 
     def training_step(
             self,
-            batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
+            batch: BATCH_TYPE,
             batch_idx: int
     ) -> float:
         """Runs a training step.
@@ -223,7 +231,7 @@ class Model(pl.LightningModule):
 
     def validation_step(
             self,
-            batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
+            batch: BATCH_TYPE,
             batch_idx: int
     ) -> float:
         """Runs a validation step.
@@ -240,7 +248,7 @@ class Model(pl.LightningModule):
 
     def test_step(
             self,
-            batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
+            batch: BATCH_TYPE,
             batch_idx: int
     ) -> float:
         """Runs a test step.
@@ -257,7 +265,7 @@ class Model(pl.LightningModule):
 
     def predict_step(
             self,
-            batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
+            batch: BATCH_TYPE,
             batch_idx: int,
             dataloader_idx: int = 0
     ) -> tuple[torch.Tensor, torch.Tensor]:
