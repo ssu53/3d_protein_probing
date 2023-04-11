@@ -108,14 +108,14 @@ class Model(pl.LightningModule):
             embeddings: torch.Tensor,
             coords: torch.Tensor,
             padding_mask: torch.Tensor,
-            y_mask: torch.Tensor
+            keep_mask: torch.Tensor
     ) -> torch.Tensor:
         """Runs the model on the data.
 
         :param embeddings: A tensor containing an embedding.
         :param coords: A tensor containing the coordinates.
         :param padding_mask: A tensor containing the padding mask.
-        :param y_mask: A tensor containing the target mask.
+        :param keep_mask: A tensor containing the target mask.
         :return: A tensor containing the model's prediction.
         """
         encodings = self.module(embeddings, coords, padding_mask)
@@ -124,11 +124,12 @@ class Model(pl.LightningModule):
             pad_sum = padding_mask.sum(dim=1)
             pad_sum[pad_sum == 0] = 1
             encodings = (encodings * padding_mask).sum(dim=1) / pad_sum
-            encodings = encodings[y_mask]
+            encodings = encodings[keep_mask]
             # If needed, modify embedding structure based on concept level
         elif self.concept_level == 'residue_pair':
             # Create pair embeddings
-            y_mask_indices = torch.nonzero(y_mask)
+            y_mask_indices = torch.nonzero(keep_mask)
+
             breakpoint()  # TODO: check this and fix memory issues / random sampling
             left = encodings[:, None, :, :].expand(-1, encodings.shape[1], -1, -1)
             right = encodings[:, :, None, :].expand(-1, -1, encodings.shape[1], -1)
@@ -136,7 +137,7 @@ class Model(pl.LightningModule):
         elif self.concept_level == 'residue_triplet':
             # Create adjacent triples of residue embeddings
             encodings = torch.cat([encodings[:, :-2], encodings[:, 1:-1], encodings[:, 2:]], dim=-1)
-            encodings = encodings[y_mask]
+            encodings = encodings[keep_mask]
 
         encodings = self.fc(encodings)
 
@@ -173,17 +174,18 @@ class Model(pl.LightningModule):
 
             # Padding mask (TODO: check this)
             pair_padding_mask = padding_mask[:, None, :] * padding_mask[:, :, None]
-            padding_sum = pair_padding_mask.sum(dim=(1, 2), keepdim=True)
+            padding_sum = pair_padding_mask.sum(dim=(1, 2), keepdim=True).squeeze(dim=-1).repeat(1, padding_mask.shape[1])
 
             # Random sampling of residue pairs (to avoid memory issues)
-            pair_indices = torch.nonzero(y_mask * pair_padding_mask)
+            pair_padding_mask_flat = pair_padding_mask.view(pair_padding_mask.shape[0], -1)
+            pair_indices = torch.nonzero(y_mask * pair_padding_mask_flat)
             pair_indices = pair_indices[torch.randperm(pair_indices.shape[0])[:self.max_residue_pairs_per_protein]]
 
             y_mask = torch.zeros_like(y_mask)
-            y_mask[pair_indices[:, 0], pair_indices[:, 1]] = True
+            y_mask[pair_indices[:, 0], pair_indices[:, 1]] = 1
 
             # Keep mask
-            keep_mask = (y_mask * pair_padding_mask).bool()
+            keep_mask = y_mask.bool()
         elif self.concept_level == 'residue_triplet':
             # Padding mask
             triplet_padding_mask = padding_mask[:, :-2] * padding_mask[:, 1:-1] * padding_mask[:, 2:]
@@ -194,13 +196,12 @@ class Model(pl.LightningModule):
         else:
             raise ValueError(f'Invalid concept level: {self.concept_level}')
 
-        # Make predictions
-        y_hat_scaled = self(embeddings, coords, padding_mask, y_mask).squeeze(dim=-1)
-
-        # Flatten and remove padding and NaN
+        # Select target and padding sum using keep mask
         y = y[keep_mask]
-        y_hat_scaled = y_hat_scaled[keep_mask]
         padding_sum = padding_sum[keep_mask]
+
+        # Make predictions
+        y_hat_scaled = self(embeddings, coords, padding_mask, keep_mask).squeeze(dim=-1)
 
         # Scale/unscale target and predictions
         if self.target_type == 'regression':
