@@ -26,7 +26,7 @@ class MLP(nn.Module):
         self.input_dim = input_dim
         self.num_layers = num_layers
         self.layer_dims = (
-            [self.input_dim] + [hidden_dim] * (self.num_layers)
+            [self.input_dim] + [hidden_dim] * self.num_layers
         )
 
         # Create layers
@@ -43,17 +43,23 @@ class MLP(nn.Module):
         # Create dropout
         self.dropout = nn.Dropout(p=dropout)
 
-    def forward(self, x: torch.Tensor, c: torch.Tensor) -> torch.Tensor:
+    def forward(
+            self,
+            embeddings: torch.Tensor,
+            coords: torch.Tensor,
+            padding_mask: torch.Tensor
+    ) -> torch.Tensor:
         """Runs the model on the data.
 
-        :param x: A tensor containing an embedding.
-        :param c: A tensor containing the coordinates.
+        :param embeddings: A tensor containing an embedding.
+        :param coords: A tensor containing the coordinates.
+        :param padding_mask: A tensor containing the padding mask.
         :return: A tensor containing the model's prediction.
         """
         # Apply layers
         for layer in self.layers:
-            x = self.dropout(x)
-            x = layer(x)
-            x = self.activation(x)
+            embeddings = self.dropout(embeddings)
+            embeddings = layer(embeddings)
+            embeddings = self.activation(embeddings)
 
-        return x
+        return embeddings

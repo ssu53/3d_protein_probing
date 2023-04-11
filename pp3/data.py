@@ -10,28 +10,38 @@ from torch.utils.data import DataLoader, Dataset
 
 from pp3.baseline_embeddings import get_baseline_residue_embedding
 from pp3.concepts import get_concept_level, get_concept_type
-from pp3.utils.constants import MAX_SEQ_LEN
 
 
 def collate_fn(
-        batch: list[tuple[torch.Tensor, torch.Tensor]]
+        batch: list[tuple[torch.Tensor, torch.Tensor, torch.Tensor]]
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     """Collate a batch of items at the residue level.
 
-    :param batch: A batch of items at the residue level, where embeddings are 2D tensors and concepts are 1D tensors.
-    :return: A collated batch.
+    :param batch: A batch of items at the residue level, where each element of the batch is a tuple containing:
+                    - Embeddings (num_residues, embedding_dim)
+                    - Coordinates (num_residues, 3)
+                    - Y value (num_residues,)
+    :return: A collated batch with:
+                - Embeddings (batch_size, max_num_residues, embedding_dim)
+                - Coordinates (batch_size, max_num_residues, 3)
+                - Y value (batch_size, max_num_residues)
+                - Padding mask (batch_size, max_num_residues)
     """
-    embeddings, coords, concept_values = zip(*batch)
+    embeddings, coords, y = zip(*batch)
+
+    # Flatten y if needed
+    if isinstance(y[0], torch.Tensor) and y[0].ndim > 1:
+        y = [y_i.flatten() for y_i in y]
 
     # Apply padding
-    lengths = [embeddings[i].shape[0] for i in range(embeddings.shape[0])]
-    padding_mask = torch.tensor([[1] * x + [0] * (MAX_SEQ_LEN - x) for x in lengths])
+    lengths = [embedding.shape[0] for embedding in embeddings]
+    max_seq_len = max(lengths)
+    padding_mask = torch.tensor([[1] * length + [0] * (max_seq_len - length) for length in lengths])
     embeddings = torch.nn.utils.rnn.pad_sequence(embeddings, batch_first=True)
     coords = torch.nn.utils.rnn.pad_sequence(coords, batch_first=True)
-    concept_values = torch.nn.utils.rnn.pad_sequence(concept_values.unsqueeze(1), batch_first=True)
-    concept_values = concept_values.squeeze(1)
+    y = torch.nn.utils.rnn.pad_sequence(y, batch_first=True)
 
-    return torch.stack(embeddings), torch.stack(coords), torch.stack(concept_values), padding_mask
+    return embeddings, coords, y, padding_mask
 
 
 class ProteinConceptDataset(Dataset):

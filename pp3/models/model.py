@@ -77,7 +77,16 @@ class Model(pl.LightningModule):
             raise ValueError(f'Invalid model type: {model_type}')
 
         # Create final layer
-        self.fc = nn.Linear(self.hidden_dim, self.output_dim)
+        if self.concept_level in {'protein', 'residue'}:
+            self.last_hidden_dim = self.hidden_dim
+        elif self.concept_level == 'residue_pair':
+            self.last_hidden_dim = self.hidden_dim * 2
+        elif self.concept_level == 'residue_triplet':
+            self.last_hidden_dim = self.hidden_dim * 3
+        else:
+            raise ValueError(f'Invalid concept level: {self.concept_level}')
+
+        self.fc = nn.Linear(self.last_hidden_dim, self.output_dim)
 
         # Create loss function
         self.loss = self._get_loss_fn()
@@ -92,46 +101,68 @@ class Model(pl.LightningModule):
         """
         encodings = self.module(x, c, pad)
 
-        if self.concept_level == "protein":
+        if self.concept_level == 'protein':
             pad_sum = pad.sum(dim=1)
             pad_sum[pad_sum == 0] = 1
             encodings = (encodings * pad).sum(dim=1) / pad_sum
             # If needed, modify embedding structure based on concept level
         elif self.concept_level == 'residue_pair':
             # Create pair embeddings
+            breakpoint()  # TODO: check this and fix memory issues / random sampling
             left = encodings[:, None, :, :].expand(-1, encodings.shape[1], -1, -1)
             right = encodings[:, :, None, :].expand(-1, -1, encodings.shape[1], -1)
             encodings = torch.cat([left, right], dim=-1)
         elif self.concept_level == 'residue_triplet':
             # Create adjacent triples of residue embeddings
-            encodings = torch.cat([encodings[:, :-2], encodings[:, 1:-1], encodings[:, 2:]], dim=1)
+            encodings = torch.cat([encodings[:, :-2], encodings[:, 1:-1], encodings[:, 2:]], dim=-1)
 
         encodings = self.fc(encodings)
+
         return encodings
 
     def step(
             self,
-            batch: tuple[torch.Tensor, torch.Tensor],
+            batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
             batch_idx: int,
             step_type: str
     ) -> float:
         """Runs a training, validation, or test step.
 
-        :param batch: A tuple containing the input and target.
+        :param batch: A tuple containing the inputs and target.
         :param batch_idx: The index of the batch.
         :param step_type: The type of step (train, val, or test).
         :return: The loss.
         """
         # Unpack batch
-        x, c, y, pad = batch
+        embeddings, coords, y, padding_mask = batch
 
         # Make predictions
-        y_hat_scaled = self(x, c, pad).squeeze(dim=1)
+        y_hat_scaled = self(embeddings, coords, padding_mask).squeeze(dim=-1)
 
-        # Remove NaNs
-        nan_mask = torch.isnan(y)
-        y_hat_scaled = y_hat_scaled[~nan_mask]
-        y = y[~nan_mask]
+        # Compute not NaN mask
+        not_nan_mask = ~torch.isnan(y)
+
+        # Set up padding
+        if self.concept_level == 'residue':
+            keep_mask = not_nan_mask * padding_mask
+            pad_sum = padding_mask.sum(dim=1, keepdim=True).repeat(1, padding_mask.shape[1])
+        elif self.concept_level == 'residue_pair':
+            # TODO: keep mask
+            breakpoint()
+            padding_mask = padding_mask[:, None, :] * padding_mask[:, :, None]
+            pad_sum = padding_mask.sum(dim=(1, 2), keepdim=True)  # TODO: Check this
+        elif self.concept_level == 'residue_triplet':
+            padding_mask = padding_mask[:, :-2] * padding_mask[:, 1:-1] * padding_mask[:, 2:]
+            keep_mask = not_nan_mask * padding_mask
+            pad_sum = padding_mask.sum(dim=1, keepdim=True).repeat(1, padding_mask.shape[1])
+        else:
+            raise ValueError(f'Invalid concept level: {self.concept_level}')
+
+        # Flatten and remove padding and NaN
+        keep_mask = keep_mask.bool()
+        y = y[keep_mask]
+        y_hat_scaled = y_hat_scaled[keep_mask]
+        pad_sum = pad_sum[keep_mask]
 
         # Scale/unscale target and predictions
         if self.target_type == 'regression':
@@ -149,24 +180,7 @@ class Model(pl.LightningModule):
 
         # Compute loss
         loss = self.loss(y_hat_scaled, y_scaled)
-
-        if self.concept_level == "residue":
-            pad_sum = pad.sum(dim=1)
-            pad_sum[pad_sum == 0] = 1
-            loss = (loss * pad).sum(dim=1) / pad_sum
-        elif self.concept_level == 'residue_pair':
-            # Create pair embeddings
-            pair_mask = pad[:, None, :] * pad[:, :, None]
-            pair_mask_sum = pair_mask.sum(dim=(1, 2))
-            pair_mask_sum[pair_mask_sum == 0] = 1
-            loss = (loss * pair_mask).sum(dim=(1, 2)) / pair_mask_sum
-        elif self.concept_level == 'residue_triplet':
-            pad = pad[:, :-2] * pad[:, 1:-1] * pad[:, 2:]
-            pad_sum = pad.sum(dim=1)
-            pad_sum[pad_sum == 0] = 1
-            loss = (loss * pad).sum(dim=1) / pad_sum
-
-        loss = loss.mean()
+        loss = (loss / pad_sum).mean()
 
         # Convert target and predictions to NumPy
         y_np = y.detach().cpu().numpy()
@@ -188,13 +202,11 @@ class Model(pl.LightningModule):
         else:
             raise ValueError(f'Invalid target type: {self.target_type}')
 
-        # TODO: for test, save true and predicted values for scatter plots
-
         return loss
 
     def training_step(
             self,
-            batch: tuple[torch.Tensor, torch.Tensor],
+            batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
             batch_idx: int
     ) -> float:
         """Runs a training step.
@@ -211,7 +223,7 @@ class Model(pl.LightningModule):
 
     def validation_step(
             self,
-            batch: tuple[torch.Tensor, torch.Tensor],
+            batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
             batch_idx: int
     ) -> float:
         """Runs a validation step.
@@ -228,7 +240,7 @@ class Model(pl.LightningModule):
 
     def test_step(
             self,
-            batch: tuple[torch.Tensor, torch.Tensor],
+            batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
             batch_idx: int
     ) -> float:
         """Runs a test step.
@@ -245,7 +257,7 @@ class Model(pl.LightningModule):
 
     def predict_step(
             self,
-            batch: tuple[torch.Tensor, torch.Tensor],
+            batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
             batch_idx: int,
             dataloader_idx: int = 0
     ) -> tuple[torch.Tensor, torch.Tensor]:
