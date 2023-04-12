@@ -171,6 +171,7 @@ class Model(pl.LightningModule):
         """
         # Unpack batch
         embeddings, coords, y, padding_mask = batch
+        num_proteins, num_residues = padding_mask.shape
 
         # Compute y mask
         y_mask = ~torch.isnan(y)
@@ -180,18 +181,17 @@ class Model(pl.LightningModule):
             # Keep mask
             keep_mask = (y_mask * padding_mask).bool()
 
-            # Keep sum (for normalization by protein length)
-            keep_sum = keep_mask.sum(dim=1, keepdim=True).repeat(1, keep_mask.shape[1])
+            # Keep sum (for normalization per protein)
+            keep_sum = keep_mask.sum(dim=1, keepdim=True).repeat(1, num_residues)
             keep_sum = keep_sum[keep_mask]
         elif self.concept_level == 'residue_pair':
             # Padding mask
             pair_padding_mask = padding_mask[:, None, :] * padding_mask[:, :, None]
 
             # Random sampling of residue pairs (to avoid memory issues)
-            num_proteins = y.shape[0]
             num_pairs = num_proteins * self.max_residue_pairs_per_protein
 
-            pair_padding_mask_flat = pair_padding_mask.view(pair_padding_mask.shape[0], -1)
+            pair_padding_mask_flat = pair_padding_mask.view(num_proteins, -1)
             pair_indices = torch.nonzero(y_mask * pair_padding_mask_flat)
             pair_indices = pair_indices[torch.randperm(pair_indices.shape[0])[:num_pairs]]
 
@@ -200,16 +200,16 @@ class Model(pl.LightningModule):
             keep_mask[pair_indices[:, 0], pair_indices[:, 1]] = 1
             keep_mask = keep_mask.bool()
 
-            # Keep sum (for normalization by protein length)
-            keep_sum = keep_mask.sum(dim=1, keepdim=True).repeat(1, keep_mask.shape[1])
+            # Keep sum (for normalization per protein)
+            keep_sum = keep_mask.sum(dim=1, keepdim=True).repeat(1, num_residues ** 2)
             keep_sum = keep_sum[keep_mask]
         elif self.concept_level == 'residue_triplet':
             # Keep mask
             triplet_padding_mask = padding_mask[:, :-2] * padding_mask[:, 1:-1] * padding_mask[:, 2:]
             keep_mask = (y_mask * triplet_padding_mask).bool()
 
-            # Keep sum (for normalization by protein length)
-            keep_sum = keep_mask.sum(dim=1, keepdim=True).repeat(1, keep_mask.shape[1])
+            # Keep sum (for normalization per protein)
+            keep_sum = keep_mask.sum(dim=1, keepdim=True).repeat(1, num_residues)
             keep_sum = keep_sum[keep_mask]
         else:
             raise ValueError(f'Invalid concept level: {self.concept_level}')
@@ -234,9 +234,9 @@ class Model(pl.LightningModule):
         else:
             raise ValueError(f'Invalid target type: {self.target_type}')
 
-        # Compute loss
+        # Compute loss (average per protein and then averaged across proteins)
         loss = self.loss(y_hat_scaled, y_scaled)
-        loss = (loss / keep_sum).mean()
+        loss = (loss / keep_sum) / num_proteins
 
         # Convert target and predictions to NumPy
         y_np = y.detach().cpu().numpy()
