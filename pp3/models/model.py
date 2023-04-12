@@ -251,8 +251,9 @@ class Model(pl.LightningModule):
             self.log(f'{step_type}_rmse', np.sqrt(mean_squared_error(y_np, y_hat_np)))
             self.log(f'{step_type}_r2', r2_score(y_np, y_hat_np))
         elif self.target_type == 'binary_classification':
-            self.log(f'{step_type}_auc', roc_auc_score(y_np, y_hat_np))
-            self.log(f'{step_type}_ap', average_precision_score(y_np, y_hat_np))
+            if len(np.unique(y_np)) == 2:
+                self.log(f'{step_type}_auc', roc_auc_score(y_np, y_hat_np))
+                self.log(f'{step_type}_ap', average_precision_score(y_np, y_hat_np))
         elif self.target_type == 'multi_classification':
             self.log(f'{step_type}_accuracy', (y_np == np.argmax(y_hat_np, axis=1)).mean())
         else:
