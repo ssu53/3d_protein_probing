@@ -128,11 +128,11 @@ class Model(pl.LightningModule):
             # If needed, modify embedding structure based on concept level
         elif self.concept_level == 'residue_pair':
             # Create pair embeddings
-            keep_mask_indices = torch.nonzero(keep_mask)
+            num_proteins, num_residues = padding_mask.shape
+            keep_mask_indices = torch.nonzero(keep_mask.view(num_proteins, num_residues, num_residues))
 
-            breakpoint()  # TODO: check this and fix memory issues / random sampling
-            left = encodings[:, None, :, :].expand(-1, encodings.shape[1], -1, -1)
-            right = encodings[:, :, None, :].expand(-1, -1, encodings.shape[1], -1)
+            left = encodings[keep_mask_indices[:, 0], keep_mask_indices[:, 1]]
+            right = encodings[keep_mask_indices[:, 0], keep_mask_indices[:, 2]]
             encodings = torch.cat([left, right], dim=-1)
         elif self.concept_level == 'residue_triplet':
             # Create adjacent triples of residue embeddings
