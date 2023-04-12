@@ -211,8 +211,6 @@ class Model(pl.LightningModule):
         # Make predictions
         y_hat_scaled = self(embeddings, coords, padding_mask, keep_mask).squeeze(dim=-1)
 
-        breakpoint()
-
         # Scale/unscale target and predictions
         if self.target_type == 'regression':
             y = y.float()
