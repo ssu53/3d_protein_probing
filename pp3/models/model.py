@@ -236,7 +236,7 @@ class Model(pl.LightningModule):
 
         # Compute loss (average per protein and then averaged across proteins)
         loss = self.loss(y_hat_scaled, y_scaled)
-        loss = (loss / keep_sum) / num_proteins
+        loss = (loss / keep_sum).sum() / num_proteins
 
         # Convert target and predictions to NumPy
         y_np = y.detach().cpu().numpy()
