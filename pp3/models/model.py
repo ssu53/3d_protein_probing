@@ -139,6 +139,7 @@ class Model(pl.LightningModule):
             encodings = torch.cat([encodings[:, :-2], encodings[:, 1:-1], encodings[:, 2:]], dim=-1)
             encodings = encodings[keep_mask]
 
+        breakpoint()
         encodings = self.fc(encodings)
 
         return encodings
@@ -164,41 +165,47 @@ class Model(pl.LightningModule):
 
         # Set up masks
         if self.concept_level == 'residue':
-            # Padding mask
-            padding_sum = padding_mask.sum(dim=1, keepdim=True).repeat(1, padding_mask.shape[1])
-
             # Keep mask
             keep_mask = (y_mask * padding_mask).bool()
-        elif self.concept_level == 'residue_pair':
-            breakpoint()
 
-            # Padding mask (TODO: check this)
+            # Keep sum (for normalization by protein length)
+            keep_sum = keep_mask.sum(dim=1, keepdim=True).repeat(1, keep_mask.shape[1])
+            keep_sum = keep_sum[keep_mask]
+        elif self.concept_level == 'residue_pair':
+            # Padding mask
             pair_padding_mask = padding_mask[:, None, :] * padding_mask[:, :, None]
-            padding_sum = pair_padding_mask.sum(dim=(1, 2), keepdim=True).squeeze(dim=-1).repeat(1, padding_mask.shape[1])
 
             # Random sampling of residue pairs (to avoid memory issues)
+            num_proteins = y.shape[0]
+            num_pairs = num_proteins * self.max_residue_pairs_per_protein
+
             pair_padding_mask_flat = pair_padding_mask.view(pair_padding_mask.shape[0], -1)
             pair_indices = torch.nonzero(y_mask * pair_padding_mask_flat)
-            pair_indices = pair_indices[torch.randperm(pair_indices.shape[0])[:self.max_residue_pairs_per_protein]]
-
-            y_mask = torch.zeros_like(y_mask)
-            y_mask[pair_indices[:, 0], pair_indices[:, 1]] = 1
+            pair_indices = pair_indices[torch.randperm(pair_indices.shape[0])[:num_pairs]]
 
             # Keep mask
+            keep_mask = torch.zeros_like(y_mask)
+            keep_mask[pair_indices[:, 0], pair_indices[:, 1]] = 1
             keep_mask = y_mask.bool()
-        elif self.concept_level == 'residue_triplet':
-            # Padding mask
-            triplet_padding_mask = padding_mask[:, :-2] * padding_mask[:, 1:-1] * padding_mask[:, 2:]
-            padding_sum = triplet_padding_mask.sum(dim=1, keepdim=True).repeat(1, triplet_padding_mask.shape[1])
 
+            # Keep sum (for normalization by protein length)
+            breakpoint()
+            keep_sum = keep_mask.sum(dim=1, keepdim=True).repeat(1, keep_mask.shape[1])
+            keep_sum = keep_sum[keep_mask]
+        elif self.concept_level == 'residue_triplet':
             # Keep mask
+            triplet_padding_mask = padding_mask[:, :-2] * padding_mask[:, 1:-1] * padding_mask[:, 2:]
             keep_mask = (y_mask * triplet_padding_mask).bool()
+
+            # Keep sum (for normalization by protein length)
+            keep_sum = keep_mask.sum(dim=1, keepdim=True).repeat(1, keep_mask.shape[1])
+            keep_sum = keep_sum[keep_mask]
         else:
             raise ValueError(f'Invalid concept level: {self.concept_level}')
 
-        # Select target and padding sum using keep mask
+        # Select target using keep mask
+        breakpoint()
         y = y[keep_mask]
-        padding_sum = padding_sum[keep_mask]
 
         # Make predictions
         y_hat_scaled = self(embeddings, coords, padding_mask, keep_mask).squeeze(dim=-1)
@@ -219,7 +226,7 @@ class Model(pl.LightningModule):
 
         # Compute loss
         loss = self.loss(y_hat_scaled, y_scaled)
-        loss = (loss / padding_sum).mean()
+        loss = (loss / keep_sum).mean()
 
         # Convert target and predictions to NumPy
         y_np = y.detach().cpu().numpy()
