@@ -138,8 +138,11 @@ class Model(pl.LightningModule):
             # Create adjacent triples of residue embeddings
             encodings = torch.cat([encodings[:, :-2], encodings[:, 1:-1], encodings[:, 2:]], dim=-1)
             encodings = encodings[keep_mask]
+        elif self.concept_level == 'residue':
+            encodings = encodings[keep_mask]
+        else:
+            raise ValueError(f'Invalid concept level: {self.concept_level}')
 
-        breakpoint()
         encodings = self.fc(encodings)
 
         return encodings
@@ -204,11 +207,12 @@ class Model(pl.LightningModule):
             raise ValueError(f'Invalid concept level: {self.concept_level}')
 
         # Select target using keep mask
-        breakpoint()
         y = y[keep_mask]
 
         # Make predictions
         y_hat_scaled = self(embeddings, coords, padding_mask, keep_mask).squeeze(dim=-1)
+
+        breakpoint()
 
         # Scale/unscale target and predictions
         if self.target_type == 'regression':
