@@ -108,7 +108,7 @@ class Model(pl.LightningModule):
             embeddings: torch.Tensor,
             coords: torch.Tensor,
             padding_mask: torch.Tensor,
-            keep_mask: torch.Tensor
+            keep_mask: torch.Tensor = None
     ) -> torch.Tensor:
         """Runs the model on the data.
 
@@ -120,16 +120,22 @@ class Model(pl.LightningModule):
         """
         encodings = self.module(embeddings, coords, padding_mask)
 
+        # If needed, modify embedding structure based on concept level
         if self.concept_level == 'protein':
             pad_sum = padding_mask.sum(dim=1)
             pad_sum[pad_sum == 0] = 1
             encodings = (encodings * padding_mask).sum(dim=1) / pad_sum
-            encodings = encodings[keep_mask]
-            # If needed, modify embedding structure based on concept level
+
+            if keep_mask is not None:
+                encodings = encodings[keep_mask]
         elif self.concept_level == 'residue_pair':
             # Create pair embeddings
             num_proteins, num_residues = padding_mask.shape
-            keep_mask_indices = torch.nonzero(keep_mask.view(num_proteins, num_residues, num_residues))
+
+            if keep_mask is not None:
+                keep_mask_indices = torch.nonzero(keep_mask.view(num_proteins, num_residues, num_residues))
+            else:
+                keep_mask_indices = torch.nonzero(torch.ones(num_proteins, num_residues, num_residues))
 
             left = encodings[keep_mask_indices[:, 0], keep_mask_indices[:, 1]]
             right = encodings[keep_mask_indices[:, 0], keep_mask_indices[:, 2]]
@@ -137,9 +143,12 @@ class Model(pl.LightningModule):
         elif self.concept_level == 'residue_triplet':
             # Create adjacent triples of residue embeddings
             encodings = torch.cat([encodings[:, :-2], encodings[:, 1:-1], encodings[:, 2:]], dim=-1)
-            encodings = encodings[keep_mask]
+
+            if keep_mask is not None:
+                encodings = encodings[keep_mask]
         elif self.concept_level == 'residue':
-            encodings = encodings[keep_mask]
+            if keep_mask is not None:
+                encodings = encodings[keep_mask]
         else:
             raise ValueError(f'Invalid concept level: {self.concept_level}')
 
@@ -316,10 +325,10 @@ class Model(pl.LightningModule):
         :return: A tensor of predictions and true values for the batch.
         """
         # Unpack batch
-        x, c, y, pad = batch
+        embeddings, coords, y, padding_mask = batch
 
         # Make predictions
-        y_hat_scaled = self(x, c, pad).squeeze(dim=1)
+        y_hat_scaled = self(embeddings, coords, padding_mask).squeeze(dim=1)
 
         # Unscale predictions
         if self.target_type == 'regression':
