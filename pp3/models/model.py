@@ -63,7 +63,7 @@ class Model(pl.LightningModule):
         self.dropout = dropout
         self.concept_level = concept_level
 
-        self.max_residue_pairs_per_protein = 1000
+        self.max_residue_pairs_per_protein = 100
 
         if model_type == 'mlp':
             self.module = MLP(
@@ -128,7 +128,7 @@ class Model(pl.LightningModule):
             # If needed, modify embedding structure based on concept level
         elif self.concept_level == 'residue_pair':
             # Create pair embeddings
-            y_mask_indices = torch.nonzero(keep_mask)
+            keep_mask_indices = torch.nonzero(keep_mask)
 
             breakpoint()  # TODO: check this and fix memory issues / random sampling
             left = encodings[:, None, :, :].expand(-1, encodings.shape[1], -1, -1)
@@ -189,10 +189,9 @@ class Model(pl.LightningModule):
             # Keep mask
             keep_mask = torch.zeros_like(y_mask)
             keep_mask[pair_indices[:, 0], pair_indices[:, 1]] = 1
-            keep_mask = y_mask.bool()
+            keep_mask = keep_mask.bool()
 
             # Keep sum (for normalization by protein length)
-            breakpoint()
             keep_sum = keep_mask.sum(dim=1, keepdim=True).repeat(1, keep_mask.shape[1])
             keep_sum = keep_sum[keep_mask]
         elif self.concept_level == 'residue_triplet':
