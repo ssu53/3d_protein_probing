@@ -155,6 +155,7 @@ def probe_sequence_embeddings(
     trainer.test(datamodule=data_module, ckpt_path='best')
 
     # Make test predictions
+    # TODO: fix this for residue_pair concepts (both memory issues and concat issues)
     test_preds, test_targets = zip(*trainer.predict(datamodule=data_module, ckpt_path='best'))
     test_preds = torch.cat(test_preds)
     test_targets = torch.cat(test_targets)

@@ -72,7 +72,7 @@ class Model(pl.LightningModule):
                 num_layers=self.num_layers - 1,  # One less layer in MLP since we add the final layer
                 dropout=dropout
             )
-            last_hidden_dim = self.hidden_dim
+            last_hidden_dim = self.hidden_dim if self.num_layers > 1 else self.input_dim
         elif model_type == 'egnn':
             self.module = EGNN(
                 node_dim=self.input_dim,
