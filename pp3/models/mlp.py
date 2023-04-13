@@ -16,7 +16,6 @@ class MLP(nn.Module):
         """Initialize the model.
 
         :param input_dim: The dimensionality of the input to the model.
-        :param output_dim: The dimensionality of the output of the model.
         :param hidden_dim: The dimensionality of the hidden layers.
         :param num_layers: The number of layers.
         :param dropout: The dropout rate.

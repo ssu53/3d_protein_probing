@@ -86,24 +86,53 @@ python scripts/compute_esm_embeddings.py \
 
 ## Probe ESM2 embeddings for concepts
 
-Probe sequence embeddings for concepts.
+Probe sequence models for concepts.
 ```bash
 #!/bin/bash
 
-for CONCEPT in protein_sasa protein_sasa_normalized residue_sasa bond_angles secondary_structure residue_distances
+for CONCEPT in residue_sasa bond_angles secondary_structure residue_distances residue_contacts
 do
     for PROTEIN_EMBEDDING_METHOD in plm baseline
     do
         for NUM_LAYERS in 1 2
         do
             python scripts/probe_sequence_embeddings.py \
+                --project_name probing \
                 --proteins_path data/pdb_single_chain_protein_30_identity/proteins.pt \
                 --embeddings_path data/pdb_single_chain_protein_30_identity/embeddings/esm2_t33_650M_UR50D.pt \
-                --save_dir results/pdb_single_chain_protein_30_identity/esm2_t33_650M_UR50D \
+                --save_dir results/pdb_single_chain_protein_30_identity \
                 --concepts_dir data/pdb_single_chain_protein_30_identity/concepts \
                 --concept $CONCEPT \
                 --protein_embedding_method $PROTEIN_EMBEDDING_METHOD \
-                --num_layers $NUM_LAYERS
+                --num_layers $NUM_LAYERS \
+                --model_type mlp \
+                --batch_size 100
+        done
+    done
+done
+```
+
+Probe structure models (currently just EGNN, later TFN and IPA) for concepts.
+```bash
+#!/bin/bash
+
+for CONCEPT in residue_sasa bond_angles secondary_structure residue_distances residue_contacts
+do
+    for PROTEIN_EMBEDDING_METHOD in baseline # plm (currently experiencing memory issues)
+    do
+        for NUM_LAYERS in 4
+        do
+            python scripts/probe_sequence_embeddings.py \
+                --project_name probing \
+                --proteins_path data/pdb_single_chain_protein_30_identity/proteins.pt \
+                --embeddings_path data/pdb_single_chain_protein_30_identity/embeddings/esm2_t33_650M_UR50D.pt \
+                --save_dir results/pdb_single_chain_protein_30_identity \
+                --concepts_dir data/pdb_single_chain_protein_30_identity/concepts \
+                --concept $CONCEPT \
+                --protein_embedding_method $PROTEIN_EMBEDDING_METHOD \
+                --num_layers $NUM_LAYERS \
+                --model_type egnn \
+                --batch_size 2
         done
     done
 done

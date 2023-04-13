@@ -69,7 +69,7 @@ class Model(pl.LightningModule):
             self.module = MLP(
                 input_dim=self.input_dim,
                 hidden_dim=self.hidden_dim,
-                num_layers=self.num_layers,
+                num_layers=self.num_layers - 1,  # One less layer in MLP since we add the final layer
                 dropout=dropout
             )
             last_hidden_dim = self.hidden_dim
