@@ -69,7 +69,7 @@ class Model(pl.LightningModule):
         self.dropout = dropout
         self.concept_level = concept_level
 
-        self.max_residue_pairs_per_protein = 100
+        self.max_residue_pairs = 1000
 
         if encoder_type == 'mlp':
             self.encoder = MLP(
@@ -204,11 +204,9 @@ class Model(pl.LightningModule):
             pair_padding_mask = padding_mask[:, None, :] * padding_mask[:, :, None]
 
             # Random sampling of residue pairs (to avoid memory issues)
-            num_pairs = num_proteins * self.max_residue_pairs_per_protein
-
             pair_padding_mask_flat = pair_padding_mask.view(num_proteins, -1)
             pair_indices = torch.nonzero(y_mask * pair_padding_mask_flat)
-            pair_indices = pair_indices[torch.randperm(pair_indices.shape[0])[:num_pairs]]
+            pair_indices = pair_indices[torch.randperm(pair_indices.shape[0])[:self.max_residue_pairs]]
 
             # Keep mask
             keep_mask = torch.zeros_like(y_mask)
