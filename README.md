@@ -94,7 +94,8 @@ for CONCEPT in residue_sasa bond_angles secondary_structure residue_distances re
 do
     for EMBEDDING_METHOD in plm baseline
     do
-        for ENCODER_NUM_LAYERS in 0 1
+        for ENCODER_NUM_LAYERS in 0 1 2
+        do
             for PREDICTOR_NUM_LAYERS in 1 2
             do
                 python scripts/probe.py \
@@ -137,12 +138,12 @@ do
                     --concepts_dir data/pdb_single_chain_protein_30_identity/concepts \
                     --concept $CONCEPT \
                     --embedding_method $EMBEDDING_METHOD \
-                    --encoder_type mlp \
+                    --encoder_type egnn \
                     --encoder_num_layers $ENCODER_NUM_LAYERS \
                     --encoder_hidden_dim 100 \
                     --predictor_num_layers $PREDICTOR_NUM_LAYERS \
                     --predictor_hidden_dim 100 \
-                    --batch_size 100
+                    --batch_size 2
             done
         done
     done
