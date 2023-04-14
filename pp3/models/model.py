@@ -13,7 +13,7 @@ from sklearn.metrics import (
 )
 from pp3.models.egnn import EGNN
 from pp3.models.mlp import MLP
-from pp3.utils.constants import BATCH_TYPE, MODEL_TYPES
+from pp3.utils.constants import BATCH_TYPE, ENCODER_TYPES
 
 
 class Model(pl.LightningModule):
@@ -21,11 +21,13 @@ class Model(pl.LightningModule):
 
     def __init__(
         self,
-        model_type: MODEL_TYPES,
+        encoder_type: ENCODER_TYPES,
         input_dim: int,
         output_dim: int,
-        hidden_dim: int,
-        num_layers: int,
+        encoder_num_layers: int,
+        encoder_hidden_dim: int,
+        predictor_num_layers: int,
+        predictor_hidden_dim: int,
         concept_level: str,
         target_type: str,
         target_mean: float | None,
@@ -36,11 +38,13 @@ class Model(pl.LightningModule):
     ) -> None:
         """Initialize the model.
 
-        :param model_type: The model type to use.
+        :param encoder_type: The encoder type to use for encoding residue embeddings.
         :param input_dim: The dimensionality of the input to the model.
         :param output_dim: The dimensionality of the output of the model.
-        :param hidden_dim: The dimensionality of the hidden layers.
-        :param num_layers: The number of layers.
+        :param encoder_num_layers: The number of layers in the encoder model.
+        :param encoder_hidden_dim: The hidden dimension of the encoder model.
+        :param predictor_num_layers: The number of layers in the final predictor MLP model.
+        :param predictor_hidden_dim: The hidden dimension of the final predictor MLP model.
         :param concept_level: The concept level (e.g., protein, residue, residue_pair, residue_triplet).
         :param target_type: The type of the target values (e.g., regression or classification)
         :param target_mean: The mean target value across the training set.
@@ -53,8 +57,10 @@ class Model(pl.LightningModule):
 
         self.input_dim = input_dim
         self.output_dim = output_dim
-        self.hidden_dim = hidden_dim
-        self.num_layers = num_layers
+        self.encoder_num_layers = encoder_num_layers
+        self.encoder_hidden_dim = encoder_hidden_dim
+        self.predictor_num_layers = predictor_num_layers
+        self.predictor_hidden_dim = predictor_hidden_dim
         self.target_type = target_type
         self.target_mean = target_mean
         self.target_std = target_std
@@ -65,40 +71,49 @@ class Model(pl.LightningModule):
 
         self.max_residue_pairs_per_protein = 100
 
-        if model_type == 'mlp':
-            self.module = MLP(
+        if encoder_type == 'mlp':
+            self.encoder = MLP(
                 input_dim=self.input_dim,
-                hidden_dim=self.hidden_dim,
-                num_layers=self.num_layers - 1,  # One less layer in MLP since we add the final layer
+                hidden_dim=self.encoder_hidden_dim,
+                output_dim=self.encoder_hidden_dim,
+                num_layers=self.encoder_num_layers,
+                last_layer_activation=True,
                 dropout=dropout
             )
-            last_hidden_dim = self.hidden_dim if self.num_layers > 1 else self.input_dim
-        elif model_type == 'egnn':
-            self.module = EGNN(
+            last_hidden_dim = self.encoder_hidden_dim if self.encoder_num_layers > 0 else self.input_dim
+        elif encoder_type == 'egnn':
+            self.encoder = EGNN(
                 node_dim=self.input_dim,
-                dist_dim=self.hidden_dim,
-                message_dim=self.hidden_dim,
-                proj_dim=self.hidden_dim,
-                num_layers=self.num_layers,
+                dist_dim=self.encoder_hidden_dim,
+                message_dim=self.encoder_hidden_dim,
+                proj_dim=self.encoder_hidden_dim,
+                num_layers=self.encoder_num_layers,
                 dropout=dropout
             )
             last_hidden_dim = self.input_dim
-        elif model_type == 'tfn':
+        elif encoder_type == 'tfn':
             raise NotImplementedError
         else:
-            raise ValueError(f'Invalid model type: {model_type}')
+            raise ValueError(f'Invalid model type: {encoder_type}')
 
         # Create final layer
         if self.concept_level in {'protein', 'residue'}:
-            last_dim_multiplier = 1
+            predictor_dim_multiplier = 1
         elif self.concept_level == 'residue_pair':
-            last_dim_multiplier = 2
+            predictor_dim_multiplier = 2
         elif self.concept_level == 'residue_triplet':
-            last_dim_multiplier = 3
+            predictor_dim_multiplier = 3
         else:
             raise ValueError(f'Invalid concept level: {self.concept_level}')
 
-        self.fc = nn.Linear(last_hidden_dim * last_dim_multiplier, self.output_dim)
+        self.predictor = MLP(
+            input_dim=last_hidden_dim * predictor_dim_multiplier,
+            hidden_dim=self.predictor_hidden_dim,
+            output_dim=self.output_dim,
+            num_layers=self.predictor_num_layers,
+            last_layer_activation=False,
+            dropout=dropout
+        )
 
         # Create loss function
         self.loss = self._get_loss_fn()
@@ -118,7 +133,7 @@ class Model(pl.LightningModule):
         :param keep_mask: A tensor containing the target mask.
         :return: A tensor containing the model's prediction.
         """
-        encodings = self.module(embeddings, coords, padding_mask)
+        encodings = self.encoder(embeddings, coords, padding_mask)
 
         # If needed, modify embedding structure based on concept level
         if self.concept_level == 'protein':
@@ -152,7 +167,7 @@ class Model(pl.LightningModule):
         else:
             raise ValueError(f'Invalid concept level: {self.concept_level}')
 
-        encodings = self.fc(encodings)
+        encodings = self.predictor(encodings)
 
         return encodings
 
@@ -335,9 +350,9 @@ class Model(pl.LightningModule):
         if self.target_type == 'regression':
             y_hat = y_hat_scaled * self.target_std + self.target_mean
         elif self.target_type == 'binary_classification':
-            y_hat = F.sigmoid(y_hat_scaled)
+            y_hat = torch.sigmoid(y_hat_scaled)
         elif self.target_type == 'multi_classification':
-            y_hat = F.softmax(y_hat_scaled, dim=-1)
+            y_hat = torch.softmax(y_hat_scaled, dim=-1)
         else:
             raise ValueError(f'Invalid target type: {self.target_type}')
 

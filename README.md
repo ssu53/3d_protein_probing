@@ -96,7 +96,7 @@ do
     do
         for NUM_LAYERS in 1 2
         do
-            python scripts/probe_sequence_embeddings.py \
+            python scripts/probe.py \
                 --project_name probing \
                 --proteins_path data/pdb_single_chain_protein_30_identity/proteins.pt \
                 --embeddings_path data/pdb_single_chain_protein_30_identity/embeddings/esm2_t33_650M_UR50D.pt \
@@ -122,7 +122,7 @@ do
     do
         for NUM_LAYERS in 4
         do
-            python scripts/probe_sequence_embeddings.py \
+            python scripts/probe.py \
                 --project_name probing \
                 --proteins_path data/pdb_single_chain_protein_30_identity/proteins.pt \
                 --embeddings_path data/pdb_single_chain_protein_30_identity/embeddings/esm2_t33_650M_UR50D.pt \

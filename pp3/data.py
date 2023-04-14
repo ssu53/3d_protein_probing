@@ -55,7 +55,6 @@ class ProteinConceptDataset(Dataset):
             pdb_id_to_concept_value: dict[str, torch.Tensor | float],
             concept_level: str,
             concept_type: str,
-            protein_embedding_method: str,
             pdb_id_to_coordinates: dict[str, torch.Tensor],
     ) -> None:
         """Initialize the dataset.
@@ -66,7 +65,7 @@ class ProteinConceptDataset(Dataset):
         :param pdb_id_to_concept_value: A dictionary mapping PDB ID to concept values.
         :param concept_level: The level of the concept (e.g., protein or residue).
         :param concept_type: The type of the concept (e.g., regression or classification).
-        :param protein_embedding_method: The method to use to compute the protein embedding from the residue embeddings.
+        :param embedding_method: The method to use to compute the protein embedding from the residue embeddings.
         """
         self.pdb_ids = pdb_ids
         self.pdb_id_to_protein = pdb_id_to_protein
@@ -74,7 +73,6 @@ class ProteinConceptDataset(Dataset):
         self.pdb_id_to_concept_value = pdb_id_to_concept_value
         self.concept_level = concept_level
         self.concept_type = concept_type
-        self.protein_embedding_method = protein_embedding_method
         self.pdb_id_to_coordinates = pdb_id_to_coordinates
 
         self.max_pairs = 25 ** 2
@@ -160,8 +158,7 @@ class ProteinConceptDataModule(pl.LightningDataModule):
             embeddings_path: Path,
             concepts_dir: Path,
             concept: str,
-            protein_embedding_method: str,
-            plm_residue_to_protein_method: str,
+            embedding_method: str,
             batch_size: int,
             num_workers: int = 8,
             split_seed: int = 0
@@ -173,8 +170,7 @@ class ProteinConceptDataModule(pl.LightningDataModule):
         :param concepts_dir: Path to a directory containing PT files with dictionaries mapping PDB ID to concept values.
         :param concept: The concept to learn.
         :param batch_size: The batch size.
-        :param protein_embedding_method: The method to use to compute the protein embedding from the residue embeddings.
-        :param plm_residue_to_protein_method: The method to use to compute the PLM protein embedding from the residue embeddings for protein concepts.
+        :param embedding_method: The method to use to compute the protein embedding from the residue embeddings.
         :param num_workers: The number of workers to use for data loading.
         :param split_seed: The random seed to use for the train/val/test split.
         """
@@ -185,8 +181,7 @@ class ProteinConceptDataModule(pl.LightningDataModule):
         self.concept = concept
         self.concept_level = get_concept_level(concept)
         self.concept_type = get_concept_type(concept)
-        self.protein_embedding_method = protein_embedding_method
-        self.plm_residue_to_protein_method = plm_residue_to_protein_method
+        self.embedding_method = embedding_method
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.split_seed = split_seed
@@ -206,12 +201,12 @@ class ProteinConceptDataModule(pl.LightningDataModule):
         :return: A dictionary mapping PDB ID to embeddings.
         """
         # PLM embeddings
-        if self.protein_embedding_method == 'plm':
+        if self.embedding_method == 'plm':
             # Load PDB ID to PLM embeddings dictionary
             pdb_id_to_embeddings = torch.load(self.embeddings_path)
 
         # Baseline embeddings
-        elif self.protein_embedding_method == 'baseline':
+        elif self.embedding_method == 'baseline':
             # Compute baseline embeddings
             pdb_id_to_embeddings = {
                 pdb_id: get_baseline_residue_embedding(protein['sequence'])
@@ -219,7 +214,7 @@ class ProteinConceptDataModule(pl.LightningDataModule):
             }
         # Other embedding methods
         else:
-            raise ValueError(f'Invalid protein embedding method: {self.protein_embedding_method}')
+            raise ValueError(f'Invalid embedding method: {self.embedding_method}')
 
         return pdb_id_to_embeddings
 
@@ -266,7 +261,6 @@ class ProteinConceptDataModule(pl.LightningDataModule):
             pdb_id_to_concept_value=pdb_id_to_concept_value,
             concept_level=self.concept_level,
             concept_type=self.concept_type,
-            protein_embedding_method=self.protein_embedding_method,
             pdb_id_to_coordinates=pdb_id_to_coordinates
         )
         print(f'Train dataset size: {len(self.train_dataset):,}')
@@ -279,7 +273,6 @@ class ProteinConceptDataModule(pl.LightningDataModule):
             pdb_id_to_concept_value=pdb_id_to_concept_value,
             concept_level=self.concept_level,
             concept_type=self.concept_type,
-            protein_embedding_method=self.protein_embedding_method,
             pdb_id_to_coordinates=pdb_id_to_coordinates
         )
         print(f'Val dataset size: {len(self.val_dataset):,}')
@@ -292,7 +285,6 @@ class ProteinConceptDataModule(pl.LightningDataModule):
             pdb_id_to_concept_value=pdb_id_to_concept_value,
             concept_level=self.concept_level,
             concept_type=self.concept_type,
-            protein_embedding_method=self.protein_embedding_method,
             pdb_id_to_coordinates=pdb_id_to_coordinates
         )
         print(f'Test dataset size: {len(self.test_dataset):,}')
