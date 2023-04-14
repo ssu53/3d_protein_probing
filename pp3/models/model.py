@@ -13,7 +13,7 @@ from sklearn.metrics import (
 )
 from pp3.models.egnn import EGNN
 from pp3.models.mlp import MLP
-from pp3.utils.constants import BATCH_TYPE, ENCODER_TYPES
+from pp3.utils.constants import BATCH_TYPE, ENCODER_TYPES, MAX_SEQ_LEN
 
 
 class Model(pl.LightningModule):
@@ -68,8 +68,6 @@ class Model(pl.LightningModule):
         self.weight_decay = weight_decay
         self.dropout = dropout
         self.concept_level = concept_level
-
-        self.max_residue_pairs = 1000
 
         if encoder_type == 'mlp':
             self.encoder = MLP(
@@ -204,9 +202,11 @@ class Model(pl.LightningModule):
             pair_padding_mask = padding_mask[:, None, :] * padding_mask[:, :, None]
 
             # Random sampling of residue pairs (to avoid memory issues)
+            num_pairs = num_proteins * MAX_SEQ_LEN
+
             pair_padding_mask_flat = pair_padding_mask.view(num_proteins, -1)
             pair_indices = torch.nonzero(y_mask * pair_padding_mask_flat)
-            pair_indices = pair_indices[torch.randperm(pair_indices.shape[0])[:self.max_residue_pairs]]
+            pair_indices = pair_indices[torch.randperm(pair_indices.shape[0])[:num_pairs]]
 
             # Keep mask
             keep_mask = torch.zeros_like(y_mask)
