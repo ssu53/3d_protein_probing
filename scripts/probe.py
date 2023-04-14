@@ -14,14 +14,14 @@ from pp3.utils.plot import plot_preds_vs_targets
 
 
 def probe(
+    project_name: str,
     proteins_path: Path,
     embeddings_path: Path,
     save_dir: Path,
-    project_name: str,
     concepts_dir: Path,
     concept: str,
     embedding_method: Literal['plm', 'baseline'],
-    encoder_type: ENCODER_TYPES = 'mlp',
+    encoder_type: ENCODER_TYPES,
     encoder_num_layers: int = 1,
     encoder_hidden_dim: int = 100,
     predictor_num_layers: int = 2,
@@ -38,10 +38,10 @@ def probe(
 ) -> None:
     """Probe a model for a 3D geometric protein concepts.
 
+    :param project_name: The name of the project to use for WandB logging.
     :param proteins_path: Path to PT file containing a dictionary mapping PDB ID to structure and sequence.
     :param embeddings_path: Path to PT file containing a dictionary mapping PDB ID to embeddings.
     :param save_dir: Path to directory where results and predictions will be saved.
-    :param project_name: The name of the project to use for WandB logging.
     :param concepts_dir: Path to a directory containing PT files with dictionaries mapping PDB ID to concept values.
     :param concept: The concept to learn.
     :param embedding_method: The method to use to compute the initial residue embeddings.
@@ -61,7 +61,7 @@ def probe(
     :param split_seed: The random seed to use for the train/val/test split.
     """
     # Create save directory
-    run_name = f'{concept}_{encoder_type}_{embedding_method}_{encoder_num_layers}_layers'
+    run_name = f'{concept}_{embedding_method}_{encoder_type}_{encoder_num_layers}L_{predictor_num_layers}L'
     save_dir = save_dir / run_name
     save_dir.mkdir(parents=True, exist_ok=True)
 

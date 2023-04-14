@@ -53,8 +53,8 @@ class MLP(nn.Module):
     def forward(
             self,
             embeddings: torch.Tensor,
-            coords: torch.Tensor,
-            padding_mask: torch.Tensor
+            coords: torch.Tensor = None,
+            padding_mask: torch.Tensor = None
     ) -> torch.Tensor:
         """Runs the model on the data.
 
