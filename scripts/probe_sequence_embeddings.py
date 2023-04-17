@@ -34,7 +34,8 @@ def probe_sequence_embeddings(
     max_epochs: int = 1000,
     ckpt_every_k_epochs: int = 10,
     num_workers: int = 8,
-    split_seed: int = 0
+    split_seed: int = 0,
+    max_neighbors: int | None = None,
 ) -> None:
     """Probe sequence embeddings for a 3D geometric concept.
 
@@ -95,7 +96,8 @@ def probe_sequence_embeddings(
         target_std=data_module.train_dataset.target_std,
         learning_rate=learning_rate,
         weight_decay=weight_decay,
-        dropout=dropout
+        dropout=dropout,
+        max_neighbors=max_neighbors,
     )
 
     print(model)
@@ -110,7 +112,8 @@ def probe_sequence_embeddings(
             'batch_size': batch_size,
             'loss_fn': loss_fn,
             'learning_rate': learning_rate,
-            'split_seed': split_seed
+            'split_seed': split_seed,
+            'num_neighbors': max_neighbors,
         })
     elif logger_type == 'tensorboard':
         from pytorch_lightning.loggers import TensorBoardLogger

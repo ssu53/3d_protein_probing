@@ -30,10 +30,10 @@ class EGNN_Layer(nn.Module):
     def __init__(
         self,
         node_dim: int,
-        dist_dim: int,
-        proj_dim: int,
-        message_dim: int,
-        edge_dim: int,
+        dist_dim: int = 16,
+        proj_dim: int = 128,
+        message_dim: int = 32,
+        edge_dim: int = 16,
         dropout: float = 0.0,
         use_sinusoidal: bool = True,
         activation: Callable = nn.ReLU,
@@ -62,7 +62,6 @@ class EGNN_Layer(nn.Module):
         )
 
         if update_coors:
-            self.gate_x = nn.Parameter(torch.zeros(1))
             self.phi_x = nn.Sequential(
                 nn.Linear(message_dim, proj_dim),
                 nn.Dropout(dropout),
@@ -71,7 +70,6 @@ class EGNN_Layer(nn.Module):
             )
 
         if update_feats:
-            self.gate_h = nn.Parameter(torch.zeros(1))
             self.phi_h = nn.Sequential(
                 nn.Linear(node_dim + message_dim, proj_dim),
                 nn.Dropout(dropout),
@@ -80,23 +78,37 @@ class EGNN_Layer(nn.Module):
             )
 
     def forward(
-            self,
-            embeddings: torch.Tensor,
-            coords: torch.Tensor,
-            padding_mask: torch.Tensor,
-            edges: torch.Tensor = None
+        self,
+        embeddings: torch.Tensor,
+        coords: torch.Tensor,
+        padding_mask: torch.Tensor,
+        edges: torch.Tensor = None,
+        neighbor_ids=None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         # Compute pairwise distances
         B, N = embeddings.shape[:2]
-        rel_coors = coords.unsqueeze(2) - coords.unsqueeze(1)
-        rel_dist = (rel_coors ** 2).sum(dim=-1)
-        dists = self.dist_embedding(rearrange(rel_dist, 'b i j -> (b i j)'))
-        dists = rearrange(dists, '(b i j) d -> b i j d', b=B, i=N, j=N)
+        M = neighbor_ids.shape[-1] if neighbor_ids is not None else N
+
+        if neighbor_ids is not None:
+            n_embeddings = embeddings[
+                torch.arange(B)[:, None], neighbor_ids.reshape(B, -1)
+            ].reshape(B, N, M, -1)
+            n_coords = coords[
+                torch.arange(B)[:, None], neighbor_ids.reshape(B, -1)
+            ].reshape(B, N, M, -1)
+            feats2 = n_embeddings
+        else:
+            n_embeddings = embeddings
+            n_coords = coords.unsqueeze(1)
+            feats2 = n_embeddings.unsqueeze(1).expand(-1, N, -1, -1)
+
+        rel_coors = coords.unsqueeze(2) - n_coords
+        rel_dist = (rel_coors**2).sum(dim=-1)
+        dists = self.dist_embedding(rearrange(rel_dist, "b i j -> (b i j)"))
+        dists = rearrange(dists, "(b i j) d -> b i j d", b=B, i=N, j=M)
 
         # Compute pairwise features
-        feats1 = embeddings.unsqueeze(1).expand(-1, N, -1, -1)
-        feats2 = embeddings.unsqueeze(2).expand(-1, -1, N, -1)
-
+        feats1 = embeddings.unsqueeze(2).expand(-1, -1, M, -1)
         if edges is not None:
             feats_pair = torch.cat((feats1, feats2, dists, edges), dim=-1)
         else:
@@ -104,26 +116,29 @@ class EGNN_Layer(nn.Module):
 
         # Compute messages
         m_ij = self.phi_e(feats_pair)
-        self_mask = 1.0 - torch.eye(N).view(1, N, N, 1).to(m_ij)
-        pad_mask_sum = (padding_mask.sum(dim=1, keepdim=True) - 1).unsqueeze(-1)
+        if neighbor_ids is not None:
+            # Padding and self already ignored
+            mask = torch.ones((B, N, M), device=m_ij.device)
+            mask_sum = M
+        else:
+            mask = padding_mask.unsqueeze(1) * padding_mask.unsqueeze(2)
+            mask = mask * (1.0 - torch.eye(N).view(1, N, N).to(m_ij))
+            mask_sum = mask.sum(dim=2, keepdim=True)
 
         # Compute coordinate update
         if self.update_coors:
             rel_coors = torch.nan_to_num(rel_coors / rel_dist.unsqueeze(-1)).detach()
             delta = rel_coors * self.phi_x(m_ij)
-            delta = delta * padding_mask.view(-1, N, 1, 1)
-            delta = delta * self_mask
-
-            delta = delta.sum(dim=2) / pad_mask_sum
-            coords = coords + self.gate_x * delta
+            delta = delta * mask.unsqueeze(-1)
+            delta = delta.sum(dim=2) / mask_sum
+            coords = coords + delta
 
         # Compute feature update
         if self.update_feats:
-            m_ij = m_ij * padding_mask.view(-1, N, 1, 1)
-            m_ij = m_ij * self_mask
-
-            m_i = m_ij.sum(dim=2) / pad_mask_sum
-            embeddings = embeddings + self.gate_h * self.phi_h(torch.cat((embeddings, m_i), dim=-1))
+            m_ij = m_ij * padding_mask.view(B, N, 1, 1)
+            m_ij = m_ij * mask.unsqueeze(-1)
+            m_i = m_ij.sum(dim=2) / mask_sum
+            embeddings = embeddings + self.phi_h(torch.cat((embeddings, m_i), dim=-1))
 
         return embeddings, coords
 
@@ -139,10 +154,12 @@ class EGNN(nn.Module):
         message_dim: int,
         proj_dim: int,
         num_layers: int,
+        max_neighbors=None,
         dropout: float = 0.0,
     ) -> None:
         super().__init__()
 
+        self.max_neighbors = max_neighbors
         self.dist_embedding = SinusoidalEmbeddings(dist_dim)
         layers = [
             EGNN_Layer(
@@ -160,23 +177,38 @@ class EGNN(nn.Module):
         self.layers = nn.ModuleList(layers)
 
     def forward(
-            self,
-            embeddings: torch.Tensor,
-            coords: torch.Tensor,
-            padding_mask: torch.Tensor
+        self, embeddings: torch.Tensor, coords: torch.Tensor, padding_mask: torch.Tensor
     ) -> torch.Tensor:
         # Compute pairwise distances in original coordinates
         B, N = embeddings.shape[:2]
         rel_coors = coords.unsqueeze(2) - coords.unsqueeze(1)
         rel_dist = (rel_coors**2).sum(dim=-1)
-        dists = self.dist_embedding(rearrange(rel_dist, 'b i j -> (b i j)'))
-        dists = rearrange(dists, '(b i j) d -> b i j d', b=B, i=N, j=N)
+        dists = self.dist_embedding(rearrange(rel_dist, "b i j -> (b i j)"))
+        dists = rearrange(dists, "(b i j) d -> b i j d", b=B, i=N, j=N)
 
-        # Add to edges so we always keep the original distances
-        edges = dists
+        # Create neighbors list, with max_neighbors neighbors
+        neighbor_ids = None
+        padding_mask = padding_mask.float()
+        if self.max_neighbors is not None:
+            # set padding to max distance so they are always last
+            pair_mask = padding_mask.unsqueeze(2) * padding_mask.unsqueeze(1)
+            rel_dist = rel_dist + (1 - pair_mask) * rel_dist.max()
+            neighbor_ids = torch.argsort(rel_dist, dim=-1)
+            # Increment by 1 to ignore self
+            neighbor_ids = neighbor_ids[:, :, 1:self.max_neighbors + 1]
+            edges = dists[
+                torch.arange(B)[:, None, None],
+                torch.arange(N)[None, :, None],
+                neighbor_ids
+            ]
+        else:
+            # Add to edges so we always keep the original distances
+            edges = dists
 
         # Run layers, updating both features and coordinates
         for layer in self.layers:
-            embeddings, coords = layer(embeddings, coords, padding_mask, edges)
+            embeddings, coords = layer(
+                embeddings, coords, padding_mask, edges, neighbor_ids
+            )
 
         return embeddings

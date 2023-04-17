@@ -32,7 +32,8 @@ class Model(pl.LightningModule):
         target_std: float | None,
         learning_rate: float = 1e-4,
         weight_decay: float = 0.0,
-        dropout: float = 0.0
+        dropout: float = 0.0,
+        max_neighbors: int | None = None,
     ) -> None:
         """Initialize the model.
 
@@ -76,11 +77,12 @@ class Model(pl.LightningModule):
         elif model_type == 'egnn':
             self.module = EGNN(
                 node_dim=self.input_dim,
-                dist_dim=self.hidden_dim,
+                dist_dim=16,
                 message_dim=self.hidden_dim,
                 proj_dim=self.hidden_dim,
                 num_layers=self.num_layers,
-                dropout=dropout
+                dropout=dropout,
+                max_neighbors=max_neighbors
             )
             last_hidden_dim = self.input_dim
         elif model_type == 'tfn':
