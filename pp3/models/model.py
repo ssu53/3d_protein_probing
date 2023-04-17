@@ -206,7 +206,18 @@ class Model(pl.LightningModule):
 
             pair_padding_mask_flat = pair_padding_mask.view(num_proteins, -1)
             pair_indices = torch.nonzero(y_mask * pair_padding_mask_flat)
-            pair_indices = pair_indices[torch.randperm(pair_indices.shape[0])[:num_pairs]]
+
+            # Balance classes if binary task during training (contact maps is very unbalanced)
+            if self.target_type == 'binary_classification' and step_type == 'train':
+                zeros = pair_indices[y[pair_indices[:, 0], pair_indices[:, 1]] == 0.0]
+                ones = pair_indices[y[pair_indices[:, 0], pair_indices[:, 1]] == 1.0]
+
+                zeros = zeros[torch.randperm(zeros.shape[0])[:num_pairs // 2]]
+                ones = ones[torch.randperm(ones.shape[0])[:num_pairs // 2]]
+
+                pair_indices = torch.cat([zeros, ones])
+            else:
+                pair_indices = pair_indices[torch.randperm(pair_indices.shape[0])[:num_pairs]]
 
             # Keep mask
             keep_mask = torch.zeros_like(y_mask)
