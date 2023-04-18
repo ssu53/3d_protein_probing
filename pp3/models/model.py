@@ -84,7 +84,9 @@ class Model(pl.LightningModule):
             self.encoder = EGNN(
                 node_dim=self.input_dim,
                 hidden_dim=self.encoder_hidden_dim,
-                num_layers=self.num_layers
+                num_layers=self.encoder_num_layers,
+                max_neighbors=max_neighbors,
+                dropout=dropout
             )
             last_hidden_dim = self.input_dim
         elif encoder_type == 'tfn':
