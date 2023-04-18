@@ -11,9 +11,9 @@ do
             --save_dir /Mounts/rbg-storage1/users/jwohlwend/prob_results \
             --concepts_dir /storage/jwohlwend/prob_pdb/concepts \
             --concept $CONCEPT \
-            --protein_embedding_method $PROTEIN_EMBEDDING_METHOD \
-            --num_layers 3 \
-            --model_type egnn \
+            --embedding_method $PROTEIN_EMBEDDING_METHOD \
+            --encoder_num_layers 3 \
+            --encoder_type egnn \
             --batch_size 16 \
             --num_workers 8 \
             --max_neighbors 24

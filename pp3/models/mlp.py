@@ -10,29 +10,37 @@ class MLP(nn.Module):
         self,
         input_dim: int,
         hidden_dim: int,
+        output_dim: int,
         num_layers: int,
-        dropout: float = 0.0,
+        last_layer_activation: bool = False,
+        dropout: float = 0.0
     ) -> None:
         """Initialize the model.
 
         :param input_dim: The dimensionality of the input to the model.
         :param hidden_dim: The dimensionality of the hidden layers.
+        :param output_dim: The dimensionality of the output of the model.
         :param num_layers: The number of layers.
+        :param last_layer_activation: Whether to apply an activation function to the last layer.
         :param dropout: The dropout rate.
         """
         super(MLP, self).__init__()
 
-        self.input_dim = input_dim
-        self.num_layers = num_layers
-        self.layer_dims = (
-            [self.input_dim] + [hidden_dim] * self.num_layers
-        )
+        self.last_layer_activation = last_layer_activation
+
+        # Create layer dimensions
+        if num_layers < 1:
+            layer_dims = []
+        else:
+            layer_dims = (
+                [input_dim] + [hidden_dim] * (num_layers - 1) + [output_dim]
+            )
 
         # Create layers
         self.layers = nn.ModuleList(
             [
-                nn.Linear(self.layer_dims[i], self.layer_dims[i + 1])
-                for i in range(len(self.layer_dims) - 1)
+                nn.Linear(layer_dims[i], layer_dims[i + 1])
+                for i in range(len(layer_dims) - 1)
             ]
         )
 
@@ -45,8 +53,8 @@ class MLP(nn.Module):
     def forward(
             self,
             embeddings: torch.Tensor,
-            coords: torch.Tensor,
-            padding_mask: torch.Tensor
+            coords: torch.Tensor = None,
+            padding_mask: torch.Tensor = None
     ) -> torch.Tensor:
         """Runs the model on the data.
 
@@ -56,9 +64,11 @@ class MLP(nn.Module):
         :return: A tensor containing the model's prediction.
         """
         # Apply layers
-        for layer in self.layers:
+        for i, layer in enumerate(self.layers):
             embeddings = self.dropout(embeddings)
             embeddings = layer(embeddings)
-            embeddings = self.activation(embeddings)
+
+            if self.last_layer_activation or i < len(self.layers) - 1:
+                embeddings = self.activation(embeddings)
 
         return embeddings

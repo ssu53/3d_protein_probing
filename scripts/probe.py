@@ -1,4 +1,4 @@
-"""Probe sequence embeddings for 3D geometric concepts."""
+"""Probe a model for 3D geometric protein concepts."""
 from pathlib import Path
 from typing import Literal
 
@@ -9,25 +9,25 @@ from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from pp3.concepts import get_concept_output_dim, get_concept_type, get_concept_level
 from pp3.models.model import Model
 from pp3.data import ProteinConceptDataModule
-from pp3.utils.constants import MODEL_TYPES
+from pp3.utils.constants import ENCODER_TYPES
 from pp3.utils.plot import plot_preds_vs_targets
 
 
-def probe_sequence_embeddings(
+def probe(
+    project_name: str,
     proteins_path: Path,
     embeddings_path: Path,
     save_dir: Path,
     concepts_dir: Path,
     concept: str,
-    model_type: MODEL_TYPES = 'mlp',
-    project_name: str = 'Probing',
-    protein_embedding_method: Literal['plm', 'baseline'] = 'plm',
-    plm_residue_to_protein_method: Literal['mean', 'max', 'sum'] = 'sum',
-    hidden_dim: int = 100,
-    num_layers: int = 1,
-    batch_size: int = 100,
+    embedding_method: Literal['plm', 'baseline'],
+    encoder_type: ENCODER_TYPES,
+    encoder_num_layers: int,
+    encoder_hidden_dim: int,
+    predictor_num_layers: int,
+    predictor_hidden_dim: int,
+    batch_size: int,
     logger_type: Literal['wandb', 'tensorboard'] = 'wandb',
-    loss_fn: str = 'huber',
     learning_rate: float = 1e-4,
     weight_decay: float = 0.0,
     dropout: float = 0.0,
@@ -37,22 +37,22 @@ def probe_sequence_embeddings(
     split_seed: int = 0,
     max_neighbors: int | None = None,
 ) -> None:
-    """Probe sequence embeddings for a 3D geometric concept.
+    """Probe a model for a 3D geometric protein concepts.
 
+    :param project_name: The name of the project to use for WandB logging.
     :param proteins_path: Path to PT file containing a dictionary mapping PDB ID to structure and sequence.
     :param embeddings_path: Path to PT file containing a dictionary mapping PDB ID to embeddings.
     :param save_dir: Path to directory where results and predictions will be saved.
     :param concepts_dir: Path to a directory containing PT files with dictionaries mapping PDB ID to concept values.
     :param concept: The concept to learn.
-    :param model_type: The model type to use.
-    :param project_name: The name of the project to use for WandB logging.
-    :param protein_embedding_method: The method to use to compute the protein or residue embeddings.
-    :param plm_residue_to_protein_method: The method to use to compute the PLM protein embedding from the residue embeddings for protein concepts.
-    :param hidden_dim: The hidden dimension of the MLP.
-    :param num_layers: The number of layers in the MLP.
+    :param embedding_method: The method to use to compute the initial residue embeddings.
+    :param encoder_type: The encoder type to use for encoding residue embeddings.
+    :param encoder_num_layers: The number of layers in the encoder model.
+    :param encoder_hidden_dim: The hidden dimension of the encoder model.
+    :param predictor_num_layers: The number of layers in the final predictor MLP model.
+    :param predictor_hidden_dim: The hidden dimension of the final predictor MLP model.
     :param batch_size: The batch size.
     :param logger_type: The logger_type to use.
-    :param loss_fn: The loss function to use.
     :param learning_rate: The learning rate for the optimizer.
     :param weight_decay: The weight decay for the optimizer.
     :param dropout: The dropout rate.
@@ -60,9 +60,10 @@ def probe_sequence_embeddings(
     :param ckpt_every_k_epochs: Save a checkpoint every k epochs.
     :param num_workers: The number of workers to use for data loading.
     :param split_seed: The random seed to use for the train/val/test split.
+    :param max_neighbors: The maximum number of neighbors to use for the graph in EGNN.
     """
     # Create save directory
-    run_name = f'{concept}_{model_type}_{protein_embedding_method}_{num_layers}_layers'
+    run_name = f'{concept}_{embedding_method}_{encoder_type}_{encoder_num_layers}L_{predictor_num_layers}L'
     save_dir = save_dir / run_name
     save_dir.mkdir(parents=True, exist_ok=True)
 
@@ -75,8 +76,7 @@ def probe_sequence_embeddings(
         embeddings_path=embeddings_path,
         concepts_dir=concepts_dir,
         concept=concept,
-        protein_embedding_method=protein_embedding_method,
-        plm_residue_to_protein_method=plm_residue_to_protein_method,
+        embedding_method=embedding_method,
         batch_size=batch_size,
         num_workers=num_workers,
         split_seed=split_seed
@@ -85,11 +85,13 @@ def probe_sequence_embeddings(
 
     # Build model
     model = Model(
-        model_type=model_type,
+        encoder_type=encoder_type,
         input_dim=data_module.embedding_dim,
         output_dim=get_concept_output_dim(concept),
-        hidden_dim=hidden_dim,
-        num_layers=num_layers,
+        encoder_num_layers=encoder_num_layers,
+        encoder_hidden_dim=encoder_hidden_dim,
+        predictor_num_layers=predictor_num_layers,
+        predictor_hidden_dim=predictor_hidden_dim,
         concept_level=get_concept_level(concept),
         target_type=get_concept_type(concept),
         target_mean=data_module.train_dataset.target_mean,
@@ -106,12 +108,25 @@ def probe_sequence_embeddings(
         from pytorch_lightning.loggers import WandbLogger
         logger = WandbLogger(project=project_name, save_dir=str(save_dir), name=run_name)
         logger.experiment.config.update({
+            'project_name': project_name,
+            'proteins_path': str(proteins_path),
+            'embeddings_path': str(embeddings_path),
+            'save_dir': str(save_dir),
+            'concepts_dir': str(concepts_dir),
             'concept': concept,
-            'hidden_dim': hidden_dim,
-            'num_layers': num_layers,
+            'embedding_method': embedding_method,
+            'encoder_type': encoder_type,
+            'encoder_num_layers': encoder_num_layers,
+            'encoder_hidden_dim': encoder_hidden_dim,
+            'predictor_num_layers': predictor_num_layers,
+            'predictor_hidden_dim': predictor_hidden_dim,
             'batch_size': batch_size,
-            'loss_fn': loss_fn,
             'learning_rate': learning_rate,
+            'weight_decay': weight_decay,
+            'dropout': dropout,
+            'max_epochs': max_epochs,
+            'ckpt_every_k_epochs': ckpt_every_k_epochs,
+            'num_workers': num_workers,
             'split_seed': split_seed,
             'num_neighbors': max_neighbors,
         })
@@ -182,4 +197,4 @@ def probe_sequence_embeddings(
 if __name__ == '__main__':
     from tap import tapify
 
-    tapify(probe_sequence_embeddings)
+    tapify(probe)

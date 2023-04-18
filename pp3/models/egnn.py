@@ -30,10 +30,10 @@ class EGNN_Layer(nn.Module):
     def __init__(
         self,
         node_dim: int,
-        dist_dim: int = 16,
-        proj_dim: int = 128,
-        message_dim: int = 32,
-        edge_dim: int = 16,
+        edge_dim: int,
+        dist_dim: int,
+        proj_dim: int,
+        message_dim: int,
         dropout: float = 0.0,
         use_sinusoidal: bool = True,
         activation: Callable = nn.ReLU,
@@ -83,7 +83,7 @@ class EGNN_Layer(nn.Module):
         coords: torch.Tensor,
         padding_mask: torch.Tensor,
         edges: torch.Tensor = None,
-        neighbor_ids=None,
+        neighbor_ids: torch.Tensor = None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         # Compute pairwise distances
         B, N = embeddings.shape[:2]
@@ -146,18 +146,19 @@ class EGNN_Layer(nn.Module):
 class EGNN(nn.Module):
     """A simple fully connected EGNN."""
 
-    # TODO: check these defaults
     def __init__(
         self,
         node_dim: int,
-        dist_dim: int,
-        message_dim: int,
-        proj_dim: int,
-        num_layers: int,
-        max_neighbors=None,
+        hidden_dim: int = 16,
+        num_layers: int = 3,
+        max_neighbors: int | None = None,
         dropout: float = 0.0,
     ) -> None:
         super().__init__()
+
+        dist_dim = hidden_dim
+        proj_dim = hidden_dim * 8
+        message_dim = hidden_dim * 2
 
         self.max_neighbors = max_neighbors
         self.dist_embedding = SinusoidalEmbeddings(dist_dim)
