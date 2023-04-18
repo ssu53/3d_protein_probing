@@ -126,7 +126,7 @@ for CONCEPT in residue_sasa bond_angles secondary_structure residue_distances re
 do
     for EMBEDDING_METHOD in baseline # plm (currently experiencing memory issues)
     do
-        for ENCODER_NUM_LAYERS in 4
+        for ENCODER_NUM_LAYERS in 3
         do
             for PREDICTOR_NUM_LAYERS in 1 2
             do
@@ -140,10 +140,11 @@ do
                     --embedding_method $EMBEDDING_METHOD \
                     --encoder_type egnn \
                     --encoder_num_layers $ENCODER_NUM_LAYERS \
-                    --encoder_hidden_dim 100 \
+                    --encoder_hidden_dim 16 \
                     --predictor_num_layers $PREDICTOR_NUM_LAYERS \
                     --predictor_hidden_dim 100 \
-                    --batch_size 2
+                    --batch_size 16 \
+                    --max_neighbors 24
             done
         done
     done

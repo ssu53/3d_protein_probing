@@ -22,11 +22,11 @@ def probe(
     concept: str,
     embedding_method: Literal['plm', 'baseline'],
     encoder_type: ENCODER_TYPES,
-    encoder_num_layers: int = 1,
-    encoder_hidden_dim: int = 100,
-    predictor_num_layers: int = 2,
-    predictor_hidden_dim: int = 100,
-    batch_size: int = 100,
+    encoder_num_layers: int,
+    encoder_hidden_dim: int,
+    predictor_num_layers: int,
+    predictor_hidden_dim: int,
+    batch_size: int,
     logger_type: Literal['wandb', 'tensorboard'] = 'wandb',
     learning_rate: float = 1e-4,
     weight_decay: float = 0.0,
@@ -34,7 +34,8 @@ def probe(
     max_epochs: int = 1000,
     ckpt_every_k_epochs: int = 10,
     num_workers: int = 8,
-    split_seed: int = 0
+    split_seed: int = 0,
+    max_neighbors: int | None = None,
 ) -> None:
     """Probe a model for a 3D geometric protein concepts.
 
@@ -59,6 +60,7 @@ def probe(
     :param ckpt_every_k_epochs: Save a checkpoint every k epochs.
     :param num_workers: The number of workers to use for data loading.
     :param split_seed: The random seed to use for the train/val/test split.
+    :param max_neighbors: The maximum number of neighbors to use for the graph in EGNN.
     """
     # Create save directory
     run_name = f'{concept}_{embedding_method}_{encoder_type}_{encoder_num_layers}L_{predictor_num_layers}L'
@@ -96,7 +98,8 @@ def probe(
         target_std=data_module.train_dataset.target_std,
         learning_rate=learning_rate,
         weight_decay=weight_decay,
-        dropout=dropout
+        dropout=dropout,
+        max_neighbors=max_neighbors,
     )
 
     print(model)
@@ -105,12 +108,27 @@ def probe(
         from pytorch_lightning.loggers import WandbLogger
         logger = WandbLogger(project=project_name, save_dir=str(save_dir), name=run_name)
         logger.experiment.config.update({
+            'project_name': project_name,
+            'proteins_path': str(proteins_path),
+            'embeddings_path': str(embeddings_path),
+            'save_dir': str(save_dir),
+            'concepts_dir': str(concepts_dir),
             'concept': concept,
-            'hidden_dim': encoder_hidden_dim,
-            'num_layers': encoder_num_layers,
+            'embedding_method': embedding_method,
+            'encoder_type': encoder_type,
+            'encoder_num_layers': encoder_num_layers,
+            'encoder_hidden_dim': encoder_hidden_dim,
+            'predictor_num_layers': predictor_num_layers,
+            'predictor_hidden_dim': predictor_hidden_dim,
             'batch_size': batch_size,
             'learning_rate': learning_rate,
-            'split_seed': split_seed
+            'weight_decay': weight_decay,
+            'dropout': dropout,
+            'max_epochs': max_epochs,
+            'ckpt_every_k_epochs': ckpt_every_k_epochs,
+            'num_workers': num_workers,
+            'split_seed': split_seed,
+            'num_neighbors': max_neighbors,
         })
     elif logger_type == 'tensorboard':
         from pytorch_lightning.loggers import TensorBoardLogger

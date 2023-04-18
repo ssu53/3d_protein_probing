@@ -70,7 +70,7 @@ def compute_concepts(
     # Check which PDB IDs have structures
     with Pool() as pool:
         concept_dicts = list(
-            tqdm(pool.imap(compute_concepts_for_structure_fn, pdb_ids), total=len(pdb_ids))
+            tqdm(pool.map(compute_concepts_for_structure_fn, pdb_ids), total=len(pdb_ids))
         )
 
     # Map PDB IDs to concepts
