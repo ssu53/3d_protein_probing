@@ -29,17 +29,23 @@ def collate_fn(
     """
     embeddings, coords, y = zip(*batch)
 
-    # Flatten y if needed
-    if isinstance(y[0], torch.Tensor) and y[0].ndim > 1:
-        y = [y_i.flatten() for y_i in y]
-
     # Apply padding
     lengths = [embedding.shape[0] for embedding in embeddings]
     max_seq_len = max(lengths)
     padding_mask = torch.tensor([[1] * length + [0] * (max_seq_len - length) for length in lengths])
     embeddings = torch.nn.utils.rnn.pad_sequence(embeddings, batch_first=True)
     coords = torch.nn.utils.rnn.pad_sequence(coords, batch_first=True)
-    y = torch.nn.utils.rnn.pad_sequence(y, batch_first=True)
+
+    # Flatten y if needed
+    if isinstance(y[0], torch.Tensor) and y[0].ndim == 2:
+        padded_y = torch.zeros((len(y), max_seq_len, max_seq_len))
+
+        for i, y_i in enumerate(y):
+            padded_y[i, :y_i.shape[0], :y_i.shape[1]] = y_i
+
+        y = padded_y.view(len(y), -1)
+    else:
+        y = torch.nn.utils.rnn.pad_sequence(y, batch_first=True)
 
     return embeddings, coords, y, padding_mask
 
