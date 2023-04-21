@@ -21,7 +21,7 @@ from pp3.utils.pdb import (
 def convert_pdb_to_pytorch(
         pdb_id: str,
         pdb_dir: Path,
-        max_protein_length: int = MAX_SEQ_LEN
+        max_protein_length: int
 ) -> dict[str, torch.Tensor | str] | None:
     """Parses PDB file and converts structure and sequence to PyTorch format while removing invalid structures.
 
@@ -62,7 +62,7 @@ def pdb_to_pytorch(
         pdb_dir: Path,
         proteins_save_path: Path,
         ids_save_path: Path,
-        max_protein_length: int | None = None
+        max_protein_length: int | None = MAX_SEQ_LEN
 ) -> None:
     """Parses PDB files and saves coordinates and sequence in PyTorch format while removing invalid structures.
 
