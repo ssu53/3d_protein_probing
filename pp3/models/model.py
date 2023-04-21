@@ -13,6 +13,7 @@ from sklearn.metrics import (
 )
 from pp3.models.egnn import EGNN
 from pp3.models.mlp import MLP
+from pp3.models.tfn import TFN
 from pp3.utils.constants import BATCH_TYPE, ENCODER_TYPES, MAX_SEQ_LEN
 
 
@@ -90,7 +91,11 @@ class Model(pl.LightningModule):
             )
             last_hidden_dim = self.input_dim
         elif encoder_type == 'tfn':
-            raise NotImplementedError
+            self.encoder = TFN(
+                node_dim=self.input_dim,
+                num_layers=self.encoder_num_layers,
+            )
+            last_hidden_dim = self.input_dim
         else:
             raise ValueError(f'Invalid model type: {encoder_type}')
 

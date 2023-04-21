@@ -24,5 +24,6 @@ dependencies:
   - wandb
   - einops
   - pip:
+    - e3nn
     - fair-esm
     - typed-argument-parser>=1.8.0
