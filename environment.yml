@@ -26,4 +26,5 @@ dependencies:
   - pip:
     - e3nn
     - fair-esm
+    - tensorboardX
     - typed-argument-parser>=1.8.0

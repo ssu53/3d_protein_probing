@@ -239,7 +239,7 @@ class TFN(torch.nn.Module):
         num_layers: int,
         sh_lmax: int = 1,
         ns: int = 32,
-        nv: int =4,
+        nv: int = 4,
         ntps: int = 16,
         ntpv: int = 4,
         fc_dim: int = 128,
