@@ -36,6 +36,8 @@ def probe(
     num_workers: int = 8,
     split_seed: int = 0,
     max_neighbors: int | None = None,
+    patience: int = 25,
+    pair_class_balance: bool = False
 ) -> None:
     """Probe a model for a 3D geometric protein concepts.
 
@@ -61,6 +63,8 @@ def probe(
     :param num_workers: The number of workers to use for data loading.
     :param split_seed: The random seed to use for the train/val/test split.
     :param max_neighbors: The maximum number of neighbors to use for the graph in EGNN.
+    :param patience: The number of epochs to wait for validation loss to improve before early stopping.
+    :param pair_class_balance: Whether to balance the classes for residue pair binary classification during training.
     """
     # Create save directory
     run_name = f'{concept}_{embedding_method}_{encoder_type}_{encoder_num_layers}L_{predictor_num_layers}L'
@@ -100,6 +104,7 @@ def probe(
         weight_decay=weight_decay,
         dropout=dropout,
         max_neighbors=max_neighbors,
+        pair_class_balance=pair_class_balance
     )
 
     print(model)
@@ -129,6 +134,7 @@ def probe(
             'num_workers': num_workers,
             'split_seed': split_seed,
             'num_neighbors': max_neighbors,
+            'patience': patience
         })
     elif logger_type == 'tensorboard':
         from pytorch_lightning.loggers import TensorBoardLogger
@@ -148,7 +154,7 @@ def probe(
     # Build early stopping callback
     early_stopping = EarlyStopping(
         monitor='val_loss',
-        patience=25,
+        patience=patience,
         mode='min'
     )
 

@@ -90,7 +90,7 @@ Probe sequence models for concepts.
 ```bash
 #!/bin/bash
 
-for CONCEPT in residue_sasa bond_angles secondary_structure residue_distances residue_contacts
+for CONCEPT in residue_sasa secondary_structure bond_angles dihedral_angles residue_distances residue_contacts
 do
     for EMBEDDING_METHOD in plm baseline
     do
@@ -122,7 +122,7 @@ Probe structure models (currently just EGNN, later TFN and IPA) for concepts.
 ```bash
 #!/bin/bash
 
-for CONCEPT in residue_sasa bond_angles secondary_structure residue_distances residue_contacts
+for CONCEPT in residue_sasa secondary_structure bond_angles dihedral_angles residue_distances residue_contacts
 do
     for EMBEDDING_METHOD in baseline # plm (currently experiencing memory issues)
     do

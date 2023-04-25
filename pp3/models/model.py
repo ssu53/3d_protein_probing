@@ -37,6 +37,7 @@ class Model(pl.LightningModule):
         weight_decay: float = 0.0,
         dropout: float = 0.0,
         max_neighbors: int | None = None,
+        pair_class_balance: bool = False
     ) -> None:
         """Initialize the model.
 
@@ -54,6 +55,8 @@ class Model(pl.LightningModule):
         :param learning_rate: The learning rate.
         :param weight_decay: The weight decay.
         :param dropout: The dropout rate.
+        :param max_neighbors: The maximum number of neighbors to consider for each residue.
+        :param pair_class_balance: Whether to balance the classes for residue pair binary classification during training.
         """
         super(Model, self).__init__()
 
@@ -70,6 +73,7 @@ class Model(pl.LightningModule):
         self.weight_decay = weight_decay
         self.dropout = dropout
         self.concept_level = concept_level
+        self.pair_class_balance = pair_class_balance
 
         if encoder_type == 'mlp':
             self.encoder = MLP(
@@ -220,6 +224,17 @@ class Model(pl.LightningModule):
             pair_padding_mask_flat = pair_padding_mask.view(num_proteins, -1)
             pair_indices = torch.nonzero(y_mask * pair_padding_mask_flat)
             pair_indices = pair_indices[torch.randperm(pair_indices.shape[0])[:num_pairs]]
+
+            if self.pair_class_balance and self.target_type == 'binary_classification' and step_type == 'train':
+                zeros = pair_indices[y[pair_indices[:, 0], pair_indices[:, 1]] == 0.0]
+                ones = pair_indices[y[pair_indices[:, 0], pair_indices[:, 1]] == 1.0]
+
+                zeros = zeros[torch.randperm(zeros.shape[0])[:num_pairs // 2]]
+                ones = ones[torch.randperm(ones.shape[0])[:num_pairs // 2]]
+
+                pair_indices = torch.cat([zeros, ones])
+            else:
+                pair_indices = pair_indices[torch.randperm(pair_indices.shape[0])[:num_pairs]]
 
             # Keep mask
             keep_mask = torch.zeros_like(y_mask)
