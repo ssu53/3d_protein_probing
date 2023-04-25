@@ -11,6 +11,7 @@ from biotite.structure import (
     get_residue_count,
     filter_backbone,
     index_angle,
+    index_dihedral,
     sasa
 )
 from biotite.structure.info import standardize_order
@@ -173,6 +174,25 @@ def bond_angles(structure: AtomArray) -> torch.Tensor:
 
     # Get bond angles
     angles = index_angle(structure, index)
+
+    return torch.from_numpy(angles)
+
+
+@register_concept(concept_level='residue_quadruplet', concept_type='regression', output_dim=1)
+def dihedral_angles(structure: AtomArray) -> torch.Tensor:
+    """Get the dihedral angles between residue quadruplets.
+
+    :param structure: The protein structure.
+    :return: A PyTorch tensor with the dihedral angles between residue quadruplets (length N - 3).
+    """
+    # Get CA indices
+    indices = np.arange(0, len(structure))[structure.atom_name == 'CA']
+
+    # Set up index quadruples
+    index = np.stack([indices[:-3], indices[1:-2], indices[2:-1], indices[3:]]).T
+
+    # Get dihedral angles
+    angles = index_dihedral(structure, index)
 
     return torch.from_numpy(angles)
 

@@ -106,6 +106,8 @@ class Model(pl.LightningModule):
             predictor_dim_multiplier = 2
         elif self.concept_level == 'residue_triplet':
             predictor_dim_multiplier = 3
+        elif self.concept_level == 'residue_quadruplet':
+            predictor_dim_multiplier = 4
         else:
             raise ValueError(f'Invalid concept level: {self.concept_level}')
 
@@ -161,6 +163,12 @@ class Model(pl.LightningModule):
         elif self.concept_level == 'residue_triplet':
             # Create adjacent triples of residue embeddings
             encodings = torch.cat([encodings[:, :-2], encodings[:, 1:-1], encodings[:, 2:]], dim=-1)
+
+            if keep_mask is not None:
+                encodings = encodings[keep_mask]
+        elif self.concept_level == 'residue_quadruplet':
+            # Create adjacent quadruples of residue embeddings
+            encodings = torch.cat([encodings[:, :-3], encodings[:, 1:-2], encodings[:, 2:-1], encodings[:, 3:]], dim=-1)
 
             if keep_mask is not None:
                 encodings = encodings[keep_mask]
@@ -228,6 +236,14 @@ class Model(pl.LightningModule):
 
             # Keep sum (for normalization per protein)
             keep_sum = keep_mask.sum(dim=1, keepdim=True).repeat(1, num_residues - 2)
+            keep_sum = keep_sum[keep_mask]
+        elif self.concept_level == 'residue_quadruplet':
+            # Keep mask
+            quadruplet_padding_mask = padding_mask[:, :-3] * padding_mask[:, 1:-2] * padding_mask[:, 2:-1] * padding_mask[:, 3:]
+            keep_mask = (y_mask * quadruplet_padding_mask).bool()
+
+            # Keep sum (for normalization per protein)
+            keep_sum = keep_mask.sum(dim=1, keepdim=True).repeat(1, num_residues - 3)
             keep_sum = keep_sum[keep_mask]
         else:
             raise ValueError(f'Invalid concept level: {self.concept_level}')
