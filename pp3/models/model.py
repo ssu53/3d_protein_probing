@@ -4,6 +4,7 @@ import pytorch_lightning as pl
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 from sklearn.metrics import (
     average_precision_score,
     mean_absolute_error,
@@ -392,13 +393,17 @@ class Model(pl.LightningModule):
 
         return y_hat, y
 
-    def configure_optimizers(self) -> torch.optim.Optimizer:
-        """Configures the optimizer."""
-        return torch.optim.Adam(
+    def configure_optimizers(self) -> tuple[list[torch.optim.Optimizer], list[ReduceLROnPlateau]]:
+        """Configures the optimizer and scheduler."""
+        optimizer = torch.optim.Adam(
             self.parameters(),
             lr=self.learning_rate,
             weight_decay=self.weight_decay
         )
+
+        scheduler = ReduceLROnPlateau(optimizer, mode='min')
+
+        return [optimizer], [scheduler]
 
     def _get_loss_fn(self) -> nn.Module:
         """Gets the loss function."""
