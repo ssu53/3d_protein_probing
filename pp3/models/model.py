@@ -393,7 +393,7 @@ class Model(pl.LightningModule):
 
         return y_hat, y
 
-    def configure_optimizers(self) -> tuple[list[torch.optim.Optimizer], list[ReduceLROnPlateau]]:
+    def configure_optimizers(self) -> dict[str, torch.optim.Optimizer | ReduceLROnPlateau | str]:
         """Configures the optimizer and scheduler."""
         optimizer = torch.optim.Adam(
             self.parameters(),
@@ -403,7 +403,11 @@ class Model(pl.LightningModule):
 
         scheduler = ReduceLROnPlateau(optimizer, mode='min')
 
-        return [optimizer], [scheduler]
+        return {
+            'optimizer': optimizer,
+            'lr_scheduler': scheduler,
+            'monitor': 'val_loss'
+        }
 
     def _get_loss_fn(self) -> nn.Module:
         """Gets the loss function."""
