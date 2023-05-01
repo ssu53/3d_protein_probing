@@ -1,10 +1,10 @@
 import math
-import numpy as np
 from e3nn import o3
 import torch
 from torch import nn
 from torch.nn import functional as F
 from e3nn.nn import BatchNorm
+from einops import rearrange
 
 
 def sinusoidal_embedding(timesteps, embedding_dim, max_positions=10000):
@@ -35,124 +35,6 @@ class GaussianSmearing(torch.nn.Module):
         return torch.exp(self.coeff * torch.pow(dist, 2)).float()
 
 
-class FasterTensorProduct(torch.nn.Module):
-    def __init__(self, in_irreps, sh_irreps, out_irreps, **kwargs):
-        super().__init__()
-        for ir in in_irreps:
-            m, (l, p) = ir
-            assert l in [0, 1], "Higher order in irreps are not supported"
-        for ir in out_irreps:
-            m, (l, p) = ir
-            assert l in [0, 1], "Higher order out irreps are not supported"
-        assert o3.Irreps(sh_irreps) == o3.Irreps(
-            "1x0e+1x1o"
-        ), "sh_irreps don't look like 1st order spherical harmonics"
-        self.in_irreps = o3.Irreps(in_irreps)
-        self.out_irreps = o3.Irreps(out_irreps)
-
-        in_muls = {"0e": 0, "1o": 0, "1e": 0, "0o": 0}
-        out_muls = {"0e": 0, "1o": 0, "1e": 0, "0o": 0}
-        for m, ir in self.in_irreps:
-            in_muls[str(ir)] = m
-        for m, ir in self.out_irreps:
-            out_muls[str(ir)] = m
-
-        self.weight_shapes = {
-            "0e": (in_muls["0e"] + in_muls["1o"], out_muls["0e"]),
-            "1o": (in_muls["0e"] + in_muls["1o"] + in_muls["1e"], out_muls["1o"]),
-            "1e": (in_muls["1o"] + in_muls["1e"] + in_muls["0o"], out_muls["1e"]),
-            "0o": (in_muls["1e"] + in_muls["0o"], out_muls["0o"]),
-        }
-        self.weight_numel = sum(a * b for (a, b) in self.weight_shapes.values())
-
-    def forward(self, in_, sh, weight):
-        in_dict, out_dict = {}, {"0e": [], "1o": [], "1e": [], "0o": []}
-        for (m, ir), sl in zip(self.in_irreps, self.in_irreps.slices()):
-            in_dict[str(ir)] = in_[..., sl]
-            if ir[0] == 1:
-                in_dict[str(ir)] = in_dict[str(ir)].reshape(
-                    list(in_dict[str(ir)].shape)[:-1] + [-1, 3]
-                )
-        sh_0e, sh_1o = sh[..., 0], sh[..., 1:]
-        if "0e" in in_dict:
-            out_dict["0e"].append(in_dict["0e"] * sh_0e.unsqueeze(-1))
-            out_dict["1o"].append(in_dict["0e"].unsqueeze(-1) * sh_1o.unsqueeze(-2))
-        if "1o" in in_dict:
-            out_dict["0e"].append(
-                (in_dict["1o"] * sh_1o.unsqueeze(-2)).sum(-1) / np.sqrt(3)
-            )
-            out_dict["1o"].append(in_dict["1o"] * sh_0e.unsqueeze(-1).unsqueeze(-1))
-            out_dict["1e"].append(
-                torch.cross(
-                    in_dict["1o"].expand(-1, in_dict["1o"].shape[2], -1, -1, -1),
-                    sh_1o.unsqueeze(-2).expand(-1, -1, -1, in_dict["1o"].shape[-2], -1),
-                    dim=-1,
-                )
-                / np.sqrt(2)
-            )
-        if "1e" in in_dict:
-            out_dict["1o"].append(
-                torch.cross(
-                    in_dict["1e"].expand(-1, in_dict["1e"].shape[2], -1, -1, -1),
-                    sh_1o.unsqueeze(-2).expand(-1, -1, -1, in_dict["1e"].shape[-2], -1),
-                    dim=-1,
-                )
-                / np.sqrt(2)
-            )
-            out_dict["1e"].append(in_dict["1e"] * sh_0e.unsqueeze(-1).unsqueeze(-1))
-            out_dict["0o"].append(
-                (in_dict["1e"] * sh_1o.unsqueeze(-2)).sum(-1) / np.sqrt(3)
-            )
-        if "0o" in in_dict:
-            out_dict["1e"].append(in_dict["0o"].unsqueeze(-1) * sh_1o.unsqueeze(-2))
-            out_dict["0o"].append(in_dict["0o"] * sh_0e.unsqueeze(-1))
-
-        weight_dict = {}
-        start = 0
-        for key in self.weight_shapes:
-            in_, out = self.weight_shapes[key]
-            weight_dict[key] = weight[..., start : start + in_ * out].reshape(
-                list(weight.shape)[:-1] + [in_, out]
-            ) / np.sqrt(in_)
-            start += in_ * out
-
-        if out_dict["0e"]:
-            out_dict["0e"] = torch.cat(out_dict["0e"], dim=-1)
-            out_dict["0e"] = torch.matmul(
-                out_dict["0e"].unsqueeze(-2), weight_dict["0e"]
-            ).squeeze(-2)
-
-        if out_dict["1o"]:
-            out_dict["1o"] = torch.cat(out_dict["1o"], dim=-2)
-            out_dict["1o"] = (
-                out_dict["1o"].unsqueeze(-2) * weight_dict["1o"].unsqueeze(-1)
-            ).sum(-3)
-            out_dict["1o"] = out_dict["1o"].reshape(
-                list(out_dict["1o"].shape)[:-2] + [-1]
-            )
-
-        if out_dict["1e"]:
-            out_dict["1e"] = torch.cat(out_dict["1e"], dim=-2)
-            out_dict["1e"] = (
-                out_dict["1e"].unsqueeze(-2) * weight_dict["1e"].unsqueeze(-1)
-            ).sum(-3)
-            out_dict["1e"] = out_dict["1e"].reshape(
-                list(out_dict["1e"].shape)[:-2] + [-1]
-            )
-
-        if out_dict["0o"]:
-            out_dict["0o"] = torch.cat(out_dict["0o"], dim=-1)
-            # out_dict['0o'] = (out_dict['0o'].unsqueeze(-1) * weight_dict['0o']).sum(-2)
-            out_dict["0o"] = torch.matmul(
-                out_dict["0o"].unsqueeze(-2), weight_dict["0o"]
-            ).squeeze(-2)
-
-        out = []
-        for _, ir in self.out_irreps:
-            out.append(out_dict[str(ir)])
-        return torch.cat(out, dim=-1)
-
-
 class TensorProductConvLayer(torch.nn.Module):
     def __init__(
         self,
@@ -168,7 +50,6 @@ class TensorProductConvLayer(torch.nn.Module):
         fc_dim=32,
         lin_self=False,
         attention=False,
-        use_fast=False,
     ):
         super(TensorProductConvLayer, self).__init__()
 
@@ -178,12 +59,9 @@ class TensorProductConvLayer(torch.nn.Module):
 
         self.nf = node_feature_dim
         self.lin_in = o3.Linear(in_irreps, in_tp_irreps, internal_weights=True)
-        if use_fast:
-            self.tp = FasterTensorProduct(in_tp_irreps, sh_irreps, out_tp_irreps)
-        else:
-            self.tp = o3.FullyConnectedTensorProduct(
-                in_tp_irreps, sh_irreps, out_tp_irreps, shared_weights=False
-            )
+        self.tp = o3.FullyConnectedTensorProduct(
+            in_tp_irreps, sh_irreps, out_tp_irreps, shared_weights=False
+        )
 
         self.lin_out = o3.Linear(out_tp_irreps, out_irreps, internal_weights=True)
         if lin_self:
@@ -193,9 +71,6 @@ class TensorProductConvLayer(torch.nn.Module):
 
         self.fc = nn.Sequential(
             nn.Linear(n_edge_features, fc_dim),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(fc_dim, fc_dim),
             nn.ReLU(),
             nn.Dropout(dropout),
             nn.Linear(fc_dim, self.tp.weight_numel),
@@ -252,8 +127,8 @@ class TFN(torch.nn.Module):
         lin_nf: int = 1,
         lin_self: bool = False,
         parity: int = 1,
-        attention: bool = False,
-        use_fast: bool = False,
+        dropout: float = 0,
+        max_neighbors: int | None = None,
     ) -> None:
         super(TFN, self).__init__()
 
@@ -261,19 +136,18 @@ class TFN(torch.nn.Module):
         self.parity = parity
         self.ns = ns
         self.num_layers = num_layers
+        self.max_neighbors = max_neighbors
 
         self.sh_irreps = o3.Irreps.spherical_harmonics(lmax=sh_lmax)
         self.node_embedding = nn.Sequential(
             nn.Linear(node_dim, ns),
-            nn.ReLU(),
-            nn.Linear(ns, ns),
+            nn.Dropout(dropout),
             nn.ReLU(),
             nn.Linear(ns, ns),
         )
         self.edge_embedding = nn.Sequential(
             nn.Linear(radius_emb_dim + pos_emb_dim + edge_dim, ns),
-            nn.ReLU(),
-            nn.Linear(ns, ns),
+            nn.Dropout(dropout),
             nn.ReLU(),
             nn.Linear(ns, ns),
         )
@@ -336,8 +210,6 @@ class TFN(torch.nn.Module):
                 node_feature_dim=min(ns, lin_nf),
                 fc_dim=fc_dim,
                 lin_self=lin_self,
-                attention=attention,
-                use_fast=use_fast,
             )
             conv_layers.append(layer)
             update_layers.append(
@@ -351,7 +223,7 @@ class TFN(torch.nn.Module):
         self.conv_layers = nn.ModuleList(conv_layers)
         self.update_layers = nn.ModuleList(update_layers)
 
-    def compute_edge_attr(self, pos, edge_pos_emb, edge_attr=None):
+    def compute_edge_attr(self, pos, edge_attr=None, edge_pos_emb=None):
         B, N, _ = pos.shape
 
         # Distance embedding
@@ -359,15 +231,21 @@ class TFN(torch.nn.Module):
         edge_length_emb = self.distance_expansion(
             edge_vec.norm(dim=-1).flatten() ** 0.5
         ).reshape(B, N, N, -1)
+        edges = edge_length_emb
+
+        # Add positional encoding
+        if edge_pos_emb is None:
+            edges = torch.cat(
+                [edges, edge_pos_emb.expand(B, -1, -1, -1)],
+                -1,
+            )
 
         # Spherical harmonics
         if edge_attr is not None:
             edges = torch.cat(
-                [edge_length_emb, edge_pos_emb.expand(B, -1, -1, -1), edge_attr],
+                [edges, edge_attr],
                 -1,
             )
-        else:
-            edges = torch.cat([edge_length_emb, edge_pos_emb.expand(B, -1, -1, -1)], -1)
 
         edge_sh = o3.spherical_harmonics(
             self.sh_irreps, edge_vec, normalize=True, normalization="component"
@@ -375,7 +253,6 @@ class TFN(torch.nn.Module):
 
         # Edge features
         edges = self.edge_embedding(edges)
-
         return edges, edge_sh
 
     def forward(
@@ -383,19 +260,44 @@ class TFN(torch.nn.Module):
         embeddings: torch.Tensor,
         coords: torch.Tensor,
         padding_mask: torch.Tensor,
-        edges: torch.Tensor | None = None,
     ) -> torch.Tensor:
-        B, N, _ = coords.shape
+        # Compute pairwise distances in original coordinates
+        B, N = embeddings.shape[:2]
+        rel_coors = coords.unsqueeze(2) - coords.unsqueeze(1)
+        rel_dist = (rel_coors**2).sum(dim=-1) ** 0.5
+        dists = self.distance_expansion(rearrange(rel_dist, "b i j -> (b i j)"))
+        dists = rearrange(dists, "(b i j) d -> b i j d", b=B, i=N, j=N)
+
+        # Create neighbors list, with max_neighbors neighbors
+        neighbor_ids = None
+        padding_mask = padding_mask.float()
+        if self.max_neighbors is not None:
+            # set padding to max distance so they are always last
+            pair_mask = padding_mask.unsqueeze(2) * padding_mask.unsqueeze(1)
+            rel_dist = rel_dist + (1 - pair_mask) * rel_dist.max()
+            neighbor_ids = torch.argsort(rel_dist, dim=-1)
+            # Increment by 1 to ignore self
+            neighbor_ids = neighbor_ids[:, :, 1 : self.max_neighbors + 1]
+            edges = dists[
+                torch.arange(B)[:, None, None],
+                torch.arange(N)[None, :, None],
+                neighbor_ids,
+            ]
+        else:
+            # Add to edges so we always keep the original distances
+            edges = dists
+
         embeddings = self.node_embedding(embeddings)
 
         # Relative positional embedding
-        idx = torch.arange(N, device=coords.device)
-        idx = idx.unsqueeze(0) - idx.unsqueeze(1)
-        edge_pos_emb = sinusoidal_embedding(idx.flatten(), self.pos_emb_dim)
-        edge_pos_emb = edge_pos_emb.reshape(1, N, N, -1)
+        # Consider adding this back in
+        # idx = torch.arange(N, device=coords.device)
+        # idx = idx.unsqueeze(0) - idx.unsqueeze(1)
+        # edge_pos_emb = sinusoidal_embedding(idx.flatten(), self.pos_emb_dim)
+        # edge_pos_emb = edge_pos_emb.reshape(1, N, N, -1)
 
         for i in range(self.num_layers):
-            edges, edge_sh = self.compute_edge_attr(coords, edge_pos_emb, edges)
+            edges, edge_sh = self.compute_edge_attr(coords, edge_attr=edges)
 
             # Compute edge features
             edge_attr_ = torch.cat(
