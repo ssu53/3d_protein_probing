@@ -401,11 +401,11 @@ class Model(pl.LightningModule):
             weight_decay=self.weight_decay
         )
 
-        scheduler = ReduceLROnPlateau(optimizer, mode='min')
+        # scheduler = ReduceLROnPlateau(optimizer, mode='min')
 
         return {
             'optimizer': optimizer,
-            'lr_scheduler': scheduler,
+            # 'lr_scheduler': scheduler,
             'monitor': 'val_loss'
         }
 
