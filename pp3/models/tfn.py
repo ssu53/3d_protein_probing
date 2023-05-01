@@ -78,21 +78,18 @@ class TensorProductConvLayer(torch.nn.Module):
         self.batch_norm = BatchNorm(out_irreps) if batch_norm else None
 
     def forward(
-        self,
-        node_attr,
-        edge_attr,
-        edge_sh,
-        mask,
-        residual=True,
+        self, node_attr, edge_attr, edge_sh, mask, residual=True, apply_mask=True
     ):
         B, N = mask.shape
         node_attr_in = self.lin_in(node_attr)
-
-        tp = self.tp(node_attr_in[:, None], edge_sh, self.fc(edge_attr))
-        tp = tp * mask.view(B, 1, N, 1)
-        self_mask = 1 - torch.eye(N, device=edge_sh.device).view(1, N, N, 1)
-        tp = tp * self_mask
-        out = tp.sum(dim=2) / (mask.sum(-1).view(B, 1, 1) - 1)
+        tp = self.tp(node_attr_in[:, :, None], edge_sh, self.fc(edge_attr))
+        if apply_mask:
+            tp = tp * mask.view(B, 1, N, 1)
+            self_mask = 1 - torch.eye(N, device=edge_sh.device).view(1, N, N, 1)
+            tp = tp * self_mask
+            out = tp.sum(dim=2) / (mask.sum(-1).view(B, 1, 1) - 1)
+        else:
+            out = tp.mean(dim=2)
 
         out = self.lin_out(out)
 
@@ -118,8 +115,8 @@ class TFN(torch.nn.Module):
         ntps: int = 16,
         ntpv: int = 4,
         fc_dim: int = 128,
-        edge_dim: int = 0,
-        pos_emb_dim: int = 16,
+        edge_dim: int = 50,
+        pos_emb_dim: int = 0,
         radius_emb_dim: int = 50,
         radius_emb_type: str = "gaussian",
         radius_emb_max: int = 50,
@@ -223,18 +220,16 @@ class TFN(torch.nn.Module):
         self.conv_layers = nn.ModuleList(conv_layers)
         self.update_layers = nn.ModuleList(update_layers)
 
-    def compute_edge_attr(self, pos, edge_attr=None, edge_pos_emb=None):
-        B, N, _ = pos.shape
+    def compute_edge_attr(self, edge_vec, edge_attr=None, edge_pos_emb=None):
+        B, N, M, _ = edge_vec.shape
 
         # Distance embedding
-        edge_vec = pos.unsqueeze(1) - pos.unsqueeze(2)
-        edge_length_emb = self.distance_expansion(
-            edge_vec.norm(dim=-1).flatten() ** 0.5
-        ).reshape(B, N, N, -1)
-        edges = edge_length_emb
+        edges = self.distance_expansion(edge_vec.norm(dim=-1).flatten() ** 0.5).reshape(
+            B, N, M, -1
+        )
 
         # Add positional encoding
-        if edge_pos_emb is None:
+        if edge_pos_emb is not None:
             edges = torch.cat(
                 [edges, edge_pos_emb.expand(B, -1, -1, -1)],
                 -1,
@@ -272,20 +267,21 @@ class TFN(torch.nn.Module):
         neighbor_ids = None
         padding_mask = padding_mask.float()
         if self.max_neighbors is not None:
+            assert self.max_neighbors < N
             # set padding to max distance so they are always last
             pair_mask = padding_mask.unsqueeze(2) * padding_mask.unsqueeze(1)
             rel_dist = rel_dist + (1 - pair_mask) * rel_dist.max()
             neighbor_ids = torch.argsort(rel_dist, dim=-1)
             # Increment by 1 to ignore self
             neighbor_ids = neighbor_ids[:, :, 1 : self.max_neighbors + 1]
-            edges = dists[
+            edges_in = dists[
                 torch.arange(B)[:, None, None],
                 torch.arange(N)[None, :, None],
                 neighbor_ids,
             ]
         else:
             # Add to edges so we always keep the original distances
-            edges = dists
+            edges_in = dists
 
         embeddings = self.node_embedding(embeddings)
 
@@ -297,21 +293,40 @@ class TFN(torch.nn.Module):
         # edge_pos_emb = edge_pos_emb.reshape(1, N, N, -1)
 
         for i in range(self.num_layers):
-            edges, edge_sh = self.compute_edge_attr(coords, edge_attr=edges)
+            if neighbor_ids is not None:
+                M = neighbor_ids.shape[-1]
+                n_embeddings = embeddings[
+                    torch.arange(B)[:, None], neighbor_ids.reshape(B, -1)
+                ].reshape(B, N, M, -1)
+                n_coords = coords[
+                    torch.arange(B)[:, None], neighbor_ids.reshape(B, -1)
+                ].reshape(B, N, M, -1)
+                feats2 = n_embeddings
+            else:
+                M = N
+                n_embeddings = embeddings
+                n_coords = coords.unsqueeze(1)
+                feats2 = n_embeddings.unsqueeze(1).expand(-1, N, -1, -1)
+
+            rel_coors = coords.unsqueeze(2) - n_coords
+            edges, edge_sh = self.compute_edge_attr(rel_coors, edge_attr=edges_in)
 
             # Compute edge features
             edge_attr_ = torch.cat(
                 [
                     edges,
-                    embeddings[..., None, : self.ns].expand(-1, -1, N, -1),
-                    embeddings[..., None, :, : self.ns].expand(-1, N, -1, -1),
+                    embeddings.unsqueeze(2).expand(-1, -1, M, -1)[..., : self.ns],
+                    feats2[..., : self.ns],
                 ],
                 -1,
             )
 
             # Update node features
             layer = self.conv_layers[i]
-            embeddings = layer(embeddings, edge_attr_, edge_sh, padding_mask)
+            apply_mask = self.max_neighbors is None
+            embeddings = layer(
+                embeddings, edge_attr_, edge_sh, padding_mask, apply_mask=apply_mask
+            )
 
             # Update node positions
             update = self.update_layers[i]

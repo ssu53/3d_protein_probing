@@ -4,7 +4,7 @@ for CONCEPT in residue_sasa # bond_angles secondary_structure residue_distances 
 do
     for PROTEIN_EMBEDDING_METHOD in baseline # plm (currently experiencing memory issues)
     do
-        python probe_sequence_embeddings.py \
+        python probe.py \
             --project_name probing \
             --proteins_path /storage/jwohlwend/prob_pdb/proteins.pt \
             --embeddings_path /storage/jwohlwend/prob_pdb/esm2_t33_650M_UR50D.pt \
@@ -16,6 +16,9 @@ do
             --encoder_type egnn \
             --batch_size 16 \
             --num_workers 8 \
-            --max_neighbors 24
+            --max_neighbors 24 \
+            --encoder_hidden_dim 256 \
+            --predictor_num_layers 2 \
+            --predictor_hidden_dim 128
     done
 done
