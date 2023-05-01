@@ -4,7 +4,7 @@ from typing import Literal
 
 import torch
 import pytorch_lightning as pl
-from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
+from pytorch_lightning.callbacks import EarlyStopping, LearningRateMonitor, ModelCheckpoint
 
 from pp3.concepts import get_concept_output_dim, get_concept_type, get_concept_level
 from pp3.models.model import Model
@@ -163,6 +163,9 @@ def probe(
         mode='min'
     )
 
+    # Building learning rate monitor callback
+    lr_monitor = LearningRateMonitor(logging_interval='step')
+
     # Build trainer
     trainer = pl.Trainer(
         logger=logger,
@@ -171,7 +174,7 @@ def probe(
         deterministic=True,
         max_epochs=max_epochs,
         log_every_n_steps=25,
-        callbacks=[ckpt_callback, early_stopping]
+        callbacks=[ckpt_callback, early_stopping, lr_monitor]
     )
 
     # Train model
