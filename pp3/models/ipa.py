@@ -3,8 +3,6 @@ import math
 import torch
 import torch.nn as nn
 
-from minifold.utils.linear import Linear
-
 
 def is_fp16_enabled():
     fp16_enabled = torch.get_autocast_gpu_dtype() == torch.float16
@@ -216,16 +214,14 @@ class StructureModule(nn.Module):
         self.dim = dim
         self.layers = layers
 
-        self.input_fc = Linear(dim, dim)
+        self.input_fc = nn.Linear(dim, dim)
         self.input_ln = nn.LayerNorm(dim)
         self.ipa = IPA(dim, dim)
         self.ipa_ln = nn.LayerNorm(dim)
         self.transition_fc = nn.Sequential(
-            Linear(dim, dim, init="relu"),
+            nn.Linear(dim, dim),
             nn.ReLU(),
-            Linear(dim, dim, init="relu"),
-            nn.ReLU(),
-            Linear(dim, dim, init="final"),
+            nn.Linear(dim, dim),
         )
         self.transition_ln = nn.LayerNorm(dim)
         self.backbone_update = BackboneUpdate(dim)
