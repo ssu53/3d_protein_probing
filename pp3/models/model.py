@@ -99,6 +99,8 @@ class Model(pl.LightningModule):
             self.encoder = TFN(
                 node_dim=self.input_dim,
                 num_layers=self.encoder_num_layers,
+                max_neighbors=max_neighbors,
+                dropout=dropout
             )
             last_hidden_dim = self.input_dim
         else:

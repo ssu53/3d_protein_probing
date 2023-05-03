@@ -136,11 +136,17 @@ class TFN(torch.nn.Module):
         self.max_neighbors = max_neighbors
 
         self.sh_irreps = o3.Irreps.spherical_harmonics(lmax=sh_lmax)
-        self.node_embedding = nn.Sequential(
+        self.node_embedding_in = nn.Sequential(
             nn.Linear(node_dim, ns),
             nn.Dropout(dropout),
             nn.ReLU(),
             nn.Linear(ns, ns),
+        )
+        self.node_embedding_out = nn.Sequential(
+            nn.Linear(ns, ns),
+            nn.Dropout(dropout),
+            nn.ReLU(),
+            nn.Linear(ns, node_dim),
         )
         self.edge_embedding = nn.Sequential(
             nn.Linear(radius_emb_dim + pos_emb_dim + edge_dim, ns),
@@ -283,7 +289,7 @@ class TFN(torch.nn.Module):
             # Add to edges so we always keep the original distances
             edges_in = dists
 
-        embeddings = self.node_embedding(embeddings)
+        embeddings = self.node_embedding_in(embeddings)
 
         # Relative positional embedding
         # Consider adding this back in
@@ -336,4 +342,5 @@ class TFN(torch.nn.Module):
 
             coords = coords + dX
 
+        embeddings = self.node_embedding_out(embeddings)
         return embeddings
