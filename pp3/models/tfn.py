@@ -142,12 +142,6 @@ class TFN(torch.nn.Module):
             nn.ReLU(),
             nn.Linear(ns, ns),
         )
-        self.node_embedding_out = nn.Sequential(
-            nn.Linear(ns, ns),
-            nn.Dropout(dropout),
-            nn.ReLU(),
-            nn.Linear(ns, node_dim),
-        )
         self.edge_embedding = nn.Sequential(
             nn.Linear(radius_emb_dim + pos_emb_dim + edge_dim, ns),
             nn.Dropout(dropout),
@@ -225,6 +219,12 @@ class TFN(torch.nn.Module):
             )
         self.conv_layers = nn.ModuleList(conv_layers)
         self.update_layers = nn.ModuleList(update_layers)
+        self.node_embedding_out = nn.Sequential(
+            nn.Linear(out_irreps, out_irreps),
+            nn.Dropout(dropout),
+            nn.ReLU(),
+            nn.Linear(out_irreps, node_dim),
+        )
 
     def compute_edge_attr(self, edge_vec, edge_attr=None, edge_pos_emb=None):
         B, N, M, _ = edge_vec.shape
@@ -342,5 +342,6 @@ class TFN(torch.nn.Module):
 
             coords = coords + dX
 
+        import pdb; pdb.set_trace()
         embeddings = self.node_embedding_out(embeddings)
         return embeddings
