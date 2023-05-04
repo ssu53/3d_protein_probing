@@ -23,12 +23,14 @@ def get_pdb_path(pdb_id: str, pdb_dir: Path, simple_format: bool = False) -> Pat
 
     :param pdb_id: The PDB ID of the protein structure.
     :param pdb_dir: The directory containing the PDB structures.
+    :param simple_format: Whether to use the simple PDB format.
     :return: The path of the PDB file.
     """
     if simple_format:
         path = pdb_dir / f"{pdb_id}.pdb"
     else:
         path = pdb_dir / pdb_id[1:3].lower() / f'pdb{pdb_id.lower()}.ent'
+
     return path
 
 
