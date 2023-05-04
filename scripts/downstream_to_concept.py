@@ -3,6 +3,8 @@ import json
 from pathlib import Path
 
 import torch
+from biotite.structure import get_chain_count
+from biotite.structure.io.pdb import PDBFile
 
 from pp3.utils.pdb import get_pdb_path
 
@@ -32,7 +34,7 @@ def downstream_to_concept(
 
     # Extract mapping from PDB ID to concept value
     pdb_to_concept = {
-        protein['pdb_id']: protein[concept_name]
+        protein['pdb_id'].split('_')[0]: protein[concept_name]
         for protein in data.values()
         if protein is not None
     }
@@ -48,7 +50,16 @@ def downstream_to_concept(
 
     print(f'Number of proteins with corresponding PDB files: {len(pdb_to_concept):,}')
 
+    # Only keep single chain proteins
+    for pdb_id in pdb_to_concept:
+        structure = PDBFile.read(get_pdb_path(pdb_id=pdb_id, pdb_dir=pdb_dir)).get_structure()
+        if get_chain_count(structure) != 1:
+            del pdb_to_concept[pdb_id]
+
+    print(f'Number of single chain proteins: {len(pdb_to_concept):,}')
+
     # Save mapping from PDB ID to concept value as PyTorch file
+    save_dir.mkdir(parents=True, exist_ok=True)
     torch.save(pdb_to_concept, save_dir / f'{concept_name}.pt')
 
 
