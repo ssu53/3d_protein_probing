@@ -33,7 +33,7 @@ def convert_pdb_to_pytorch(
     # Load PDB structure
     try:
         print(f'Converting {pdb_id} {pdb_dir}')
-        structure = load_structure(pdb_id=pdb_id, pdb_dir=pdb_dir)
+        structure = load_structure(pdb_id=pdb_id, pdb_dir=pdb_dir, one_chain_only=True)
     except (BadStructureError, FileNotFoundError, InvalidFileError, ValueError, TypeError) as e:
         return {'error': repr(e)}
 

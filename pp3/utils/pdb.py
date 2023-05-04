@@ -60,7 +60,7 @@ def verify_residues(structure: AtomArray) -> None:
             raise ValueError('Residue contains invalid atoms')
 
 
-def load_structure(pdb_id: str, pdb_dir: Path) -> AtomArray:
+def load_structure(pdb_id: str, pdb_dir: Path, one_chain_only: bool = False) -> AtomArray:
     """Load the protein structure from a PDB file.
 
     Note: Only keeps amino acids, standardizes atom order, and checks quality of structure.
@@ -73,6 +73,7 @@ def load_structure(pdb_id: str, pdb_dir: Path) -> AtomArray:
 
     :param pdb_id: The PDB ID of the protein structure.
     :param pdb_dir: The directory containing the PDB structures.
+    :param one_chain_only: Whether to only allow proteins with one chain.
     :return: The loaded (and cleaned) protein structure.
     """
     # Get PDB file path
@@ -95,8 +96,8 @@ def load_structure(pdb_id: str, pdb_dir: Path) -> AtomArray:
     if len(structure) == 0:
         raise ValueError('Structure does not contain any residues after cleaning')
 
-    # Ensure only one chain
-    if get_chain_count(structure) != 1:
+    # Optionally, ensure only one chain
+    if one_chain_only and get_chain_count(structure) != 1:
         raise ValueError('Structure contains more than one chain')
 
     # Standardize atom order

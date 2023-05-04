@@ -25,7 +25,7 @@ def compute_concepts_for_structure(
     :return: A dictionary mapping concept names to values.
     """
     # Load PDB structure
-    structure = load_structure(pdb_id=pdb_id, pdb_dir=pdb_dir)
+    structure = load_structure(pdb_id=pdb_id, pdb_dir=pdb_dir, one_chain_only=True)
 
     # Set up concept dictionary
     if concepts is None:

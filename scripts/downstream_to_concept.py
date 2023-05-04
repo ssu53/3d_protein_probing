@@ -53,7 +53,7 @@ def downstream_to_concept(
     print(f'Number of proteins with corresponding PDB files: {len(pdb_to_concept):,}')
 
     # Only keep single chain proteins
-    for pdb_id in tqdm(pdb_to_concept):
+    for pdb_id in tqdm(list(pdb_to_concept)):
         try:
             load_structure(pdb_id=pdb_id, pdb_dir=pdb_dir)
         except (BadStructureError, FileNotFoundError, InvalidFileError, ValueError, TypeError) as e:
