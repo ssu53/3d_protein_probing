@@ -6,6 +6,24 @@ import requests
 from tqdm.contrib.concurrent import thread_map
 
 
+def pdb_request(url: str, query: dict) -> dict | None:
+    """Send a query to the RCSB PDB search API.
+
+    :param url: The URL of the RCSB PDB search API.
+    :param query: The query to send.
+    """
+    response = requests.post(url, data=json.dumps(query), headers={'Content-Type': 'application/json'})
+
+    if response.status_code == 204:
+        return None
+
+    try:
+        return response.json()
+    except json.decoder.JSONDecodeError:
+        print(response.text)
+        return None
+
+
 def search_pdb_experimental(sequence: str) -> dict | None:
     url = "https://search.rcsb.org/rcsbsearch/v2/query"
     query = {
@@ -99,12 +117,10 @@ def search_pdb_experimental(sequence: str) -> dict | None:
         }
     }
 
-    response = requests.post(url, data=json.dumps(query), headers={'Content-Type': 'application/json'})
-
-    if response.status_code == 204:
-        return None
-    else:
-        return response.json()
+    return pdb_request(
+        url=url,
+        query=query
+    )
 
 
 def search_pdb_computational(sequence: str) -> dict | None:
@@ -198,12 +214,10 @@ def search_pdb_computational(sequence: str) -> dict | None:
         }
     }
 
-    response = requests.post(url, data=json.dumps(query), headers={'Content-Type': 'application/json'})
-
-    if response.status_code == 204:
-        return None
-    else:
-        return response.json()
+    return pdb_request(
+        url=url,
+        query=query
+    )
 
 
 def extract_item(results: dict, solubility: float, sequence: str) -> dict | None:
@@ -242,7 +256,7 @@ def setup_solubility(data_path: Path, save_path: Path) -> None:
     with open(data_path) as f:
         data = json.load(f)
 
-    sequence_solubilities = [(item["sequence"], item["solubility"]) for item in data]
+    sequence_solubilities = [(item["sequence"], item["solubility"]) for item in data.values()]
 
     # Search PDB by sequence
     data = [item for item in thread_map(search_pdb, sequence_solubilities, max_workers=8) if item is not None]
