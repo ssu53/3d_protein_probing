@@ -60,7 +60,12 @@ def verify_residues(structure: AtomArray) -> None:
             raise ValueError('Residue contains invalid atoms')
 
 
-def load_structure(pdb_id: str, pdb_dir: Path, one_chain_only: bool = False) -> AtomArray:
+def load_structure(
+        pdb_id: str,
+        pdb_dir: Path,
+        one_chain_only: bool = False,
+        chain_id: str | None = None
+) -> AtomArray:
     """Load the protein structure from a PDB file.
 
     Note: Only keeps amino acids, standardizes atom order, and checks quality of structure.
@@ -74,8 +79,13 @@ def load_structure(pdb_id: str, pdb_dir: Path, one_chain_only: bool = False) -> 
     :param pdb_id: The PDB ID of the protein structure.
     :param pdb_dir: The directory containing the PDB structures.
     :param one_chain_only: Whether to only allow proteins with one chain.
+    :param chain_id: The chain ID of the protein structure to extract. Used if one_chain_only is False.
     :return: The loaded (and cleaned) protein structure.
     """
+    # Check if chain ID is given when allowing multichain proteins
+    if not one_chain_only and chain_id is None:
+        raise ValueError('Need chain_id if not restricting to one chain proteins')
+
     # Get PDB file path
     pdb_path = get_pdb_path(pdb_id=pdb_id, pdb_dir=pdb_dir)
 
@@ -92,13 +102,17 @@ def load_structure(pdb_id: str, pdb_dir: Path, one_chain_only: bool = False) -> 
     # Keep only amino acid residues
     structure = structure[filter_canonical_amino_acids(structure)]
 
+    # Restrict to one chain, either by enforcing one chain only or by selecting a chain
+    if one_chain_only:
+        if get_chain_count(structure) != 1:
+            raise ValueError('Structure contains more than one chain')
+    else:
+        # Restrict to chain
+        structure = structure[structure.chain_id == chain_id]
+
     # Check if there are no residues
     if len(structure) == 0:
         raise ValueError('Structure does not contain any residues after cleaning')
-
-    # Optionally, ensure only one chain
-    if one_chain_only and get_chain_count(structure) != 1:
-        raise ValueError('Structure contains more than one chain')
 
     # Standardize atom order
     structure = structure[standardize_order(structure)]

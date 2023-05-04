@@ -21,19 +21,28 @@ from pp3.utils.pdb import (
 def convert_pdb_to_pytorch(
         pdb_id: str,
         pdb_dir: Path,
-        max_protein_length: int
+        max_protein_length: int,
+        one_chain_only: bool = False,
+        chain_id: str | None = None
 ) -> dict[str, torch.Tensor | str] | None:
     """Parses PDB file and converts structure and sequence to PyTorch format while removing invalid structures.
 
     :param pdb_id: The PDB ID of the protein structure.
     :param pdb_dir: The directory containing the PDB structures.
     :param max_protein_length: The maximum length of a protein structure.
+    :param one_chain_only: Whether to only allow proteins with one chain.
+    :param chain_id: The chain ID of the protein structure to extract. Used if one_chain_only is False.
     :return: A dictionary containing the structure and sequence or an error message if the structure is invalid.
     """
     # Load PDB structure
     try:
         print(f'Converting {pdb_id} {pdb_dir}')
-        structure = load_structure(pdb_id=pdb_id, pdb_dir=pdb_dir, one_chain_only=True)
+        structure = load_structure(
+            pdb_id=pdb_id,
+            pdb_dir=pdb_dir,
+            one_chain_only=one_chain_only,
+            chain_id=chain_id
+        )
     except (BadStructureError, FileNotFoundError, InvalidFileError, ValueError, TypeError) as e:
         return {'error': repr(e)}
 
@@ -82,7 +91,8 @@ def pdb_to_pytorch(
     convert_pdb_to_pytorch_fn = partial(
         convert_pdb_to_pytorch,
         pdb_dir=pdb_dir,
-        max_protein_length=max_protein_length
+        max_protein_length=max_protein_length,
+        one_chain_only=True
     )
 
     # Convert PDB files to PyTorch format
