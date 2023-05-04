@@ -5,6 +5,7 @@ from pathlib import Path
 import torch
 from biotite.structure import get_chain_count
 from biotite.structure.io.pdb import PDBFile
+from tqdm import tqdm
 
 from pp3.utils.pdb import get_pdb_path
 
@@ -51,7 +52,7 @@ def downstream_to_concept(
     print(f'Number of proteins with corresponding PDB files: {len(pdb_to_concept):,}')
 
     # Only keep single chain proteins
-    for pdb_id in pdb_to_concept:
+    for pdb_id in tqdm(pdb_to_concept):
         structure = PDBFile.read(get_pdb_path(pdb_id=pdb_id, pdb_dir=pdb_dir)).get_structure()
         if get_chain_count(structure) != 1:
             del pdb_to_concept[pdb_id]
