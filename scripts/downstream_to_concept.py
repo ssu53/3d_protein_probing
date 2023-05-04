@@ -38,7 +38,7 @@ def downstream_to_concept(
 
     # Extract mapping from PDB ID to concept value
     pdb_id_to_concept = {
-        protein['pdb_id'].split('_')[0]: protein[concept_name]
+        protein['pdb_id']: protein[concept_name]
         for protein in data.values()
         if protein is not None
     }
@@ -49,7 +49,7 @@ def downstream_to_concept(
     pdb_id_to_concept = {
         pdb_id: concept
         for pdb_id, concept in tqdm(pdb_id_to_concept.items(), total=len(pdb_id_to_concept))
-        if get_pdb_path(pdb_id=pdb_id, pdb_dir=pdb_dir).exists()
+        if get_pdb_path(pdb_id=pdb_id.split('.')[0], pdb_dir=pdb_dir).exists()
     }
 
     print(f'Number of proteins with corresponding PDB files: {len(pdb_id_to_concept):,}')
@@ -59,14 +59,14 @@ def downstream_to_concept(
     error_counter = Counter()
 
     for pdb_id in tqdm(pdb_id_to_concept):
-        protein_id, chain_id = pdb_id.split('_')
+        protein_id, chain_id = pdb_id.split('.')
 
         protein = convert_pdb_to_pytorch(
             pdb_id=protein_id,
             pdb_dir=pdb_dir,
             max_protein_length=max_protein_length,
             one_chain_only=False,
-            chain_id=pdb_id
+            chain_id=chain_id
         )
 
         if 'error' in protein:

@@ -1,34 +1,12 @@
-import os
+"""Set up the solubility dataset (assumes it has already been downloaded and partially processed."""
 import json
-import subprocess
+from pathlib import Path
+
 import requests
-import pandas as pd
-from tqdm import tqdm
 from tqdm.contrib.concurrent import thread_map
-from biotite.sequence.io.fasta import FastaFile
 
-data_dir = "/oak/stanford/groups/jamesz/swansonk/3d_protein_probing/data"
-thermo_meta_url = "https://github.com/J-SNACKKB/FLIP/raw/main/splits/meltome/full_dataset.json.zip"
-thermo_seq_url = "https://github.com/J-SNACKKB/FLIP/raw/main/splits/meltome/full_dataset_sequences.fasta.zip"
-split_url = "https://github.com/J-SNACKKB/FLIP/raw/main/splits/meltome/splits.zip"
 
-thermo_seq_file = os.path.join(data_dir, "full_dataset_sequences.fasta")
-if not os.path.exists(thermo_seq_file):
-    subprocess.call(["wget", thermo_seq_url], cwd=data_dir)
-    subprocess.call(["unzip", "full_dataset_sequences.fasta.zip"], cwd=data_dir)
-    subprocess.call(["wget", thermo_meta_url], cwd=data_dir)
-    subprocess.call(["unzip", "full_dataset.json.zip"], cwd=data_dir)
-    subprocess.call(["wget", split_url], cwd=data_dir)
-    subprocess.call(["unzip", "splits.zip"], cwd=data_dir)
-
-thermo_meta_file = os.path.join(data_dir, "full_dataset.json")
-splits_file = os.path.join(data_dir, "splits/mixed_split.csv")
-
-thermo_meta_data = json.load(open(thermo_meta_file, "r"))
-thermo_seq_data = FastaFile.read(thermo_seq_file)
-splits_data = pd.read_csv(splits_file)
-
-def search_pdb_experimental(sequence):
+def search_pdb_experimental(sequence: str) -> dict | None:
     url = "https://search.rcsb.org/rcsbsearch/v2/query"
     query = {
         "query": {
@@ -106,7 +84,7 @@ def search_pdb_experimental(sequence):
                 }
             ]
         },
-        "return_type": "polymer_entity",
+        "return_type": "polymer_instance",
         "request_options": {
             "results_content_type": [
                 "experimental"
@@ -120,14 +98,16 @@ def search_pdb_experimental(sequence):
             "scoring_strategy": "combined"
         }
     }
+
     response = requests.post(url, data=json.dumps(query), headers={'Content-Type': 'application/json'})
+
     if response.status_code == 204:
         return None
     else:
         return response.json()
 
 
-def search_pdb_computational(sequence):
+def search_pdb_computational(sequence: str) -> dict | None:
     url = "https://search.rcsb.org/rcsbsearch/v2/query"
     query = {
         "query": {
@@ -203,7 +183,7 @@ def search_pdb_computational(sequence):
                 }
             ]
         },
-        "return_type": "polymer_entity",
+        "return_type": "polymer_instance",
         "request_options": {
             "results_content_type": [
                 "computational"
@@ -217,43 +197,64 @@ def search_pdb_computational(sequence):
             "scoring_strategy": "combined"
         }
     }
+
     response = requests.post(url, data=json.dumps(query), headers={'Content-Type': 'application/json'})
+
     if response.status_code == 204:
         return None
     else:
         return response.json()
 
 
-def extract_item(results, melting_point, seq):
+def extract_item(results: dict, solubility: float, sequence: str) -> dict | None:
     for result in results:
         if result["score"] >= 1.0:
             return {
-                "melting_point": melting_point,
-                "sequence": seq,
+                "solubility": solubility,
+                "sequence": sequence,
                 "pdb_id": result["identifier"]
             }
+
     return None
 
 
-def search_pdb(args):
-    idx, seq = args
-    melting_point = float(idx.split("=")[-1])
-    found_experimental = search_pdb_experimental(seq)
+def search_pdb(sequence_solubility: tuple[str, float]):
+    sequence, solubility = sequence_solubility
+
+    found_experimental = search_pdb_experimental(sequence)
     item = None
+
     if found_experimental is not None:
         # Attempt searching for experimental data
-        item = extract_item(found_experimental["result_set"], melting_point, seq)
-    
+        item = extract_item(found_experimental["result_set"], solubility, sequence)
+
     if item is None:
         # if not found, check computational data
-        found_computational = search_pdb_computational(seq)
+        found_computational = search_pdb_computational(sequence)
         if found_computational is not None:
-            item = extract_item(found_computational["result_set"], melting_point, seq)
+            item = extract_item(found_computational["result_set"], solubility, sequence)
+
     return item
 
 
-save_file = os.path.join(data_dir, "pdb_thermostability", "seq_melting_data.json")
-all_items = thread_map(search_pdb, thermo_seq_data.items(), max_workers=8)
-all_items = [item for item in all_items if item is not None]
-with open(save_file, "w") as f:
-    json.dump(all_items, f)
+def setup_solubility(data_path: Path, save_path: Path) -> None:
+    # Load data
+    with open(data_path) as f:
+        data = json.load(f)
+
+    sequence_solubilities = [(item["sequence"], item["solubility"]) for item in data]
+
+    # Search PDB by sequence
+    data = [item for item in thread_map(search_pdb, sequence_solubilities, max_workers=8) if item is not None]
+
+    # Save data
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(save_path, "w") as f:
+        json.dump(data, f)
+
+
+if __name__ == '__main__':
+    from tap import tapify
+
+    tapify(setup_solubility)
