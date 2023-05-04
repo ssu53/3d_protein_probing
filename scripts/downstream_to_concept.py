@@ -3,11 +3,12 @@ import json
 from pathlib import Path
 
 import torch
-from biotite.structure import get_chain_count
+from biotite import InvalidFileError
+from biotite.structure import get_chain_count, BadStructureError
 from biotite.structure.io.pdb import PDBFile
 from tqdm import tqdm
 
-from pp3.utils.pdb import get_pdb_path
+from pp3.utils.pdb import get_pdb_path, load_structure
 
 
 def downstream_to_concept(
@@ -45,7 +46,7 @@ def downstream_to_concept(
     # Only keep PDB IDs where we have the corresponding PDB file
     pdb_to_concept = {
         pdb_id: concept
-        for pdb_id, concept in pdb_to_concept.items()
+        for pdb_id, concept in tqdm(pdb_to_concept.items(), total=len(pdb_to_concept))
         if get_pdb_path(pdb_id=pdb_id, pdb_dir=pdb_dir).exists()
     }
 
@@ -53,8 +54,9 @@ def downstream_to_concept(
 
     # Only keep single chain proteins
     for pdb_id in tqdm(pdb_to_concept):
-        structure = PDBFile.read(get_pdb_path(pdb_id=pdb_id, pdb_dir=pdb_dir)).get_structure()
-        if get_chain_count(structure) != 1:
+        try:
+            load_structure(pdb_id=pdb_id, pdb_dir=pdb_dir)
+        except (BadStructureError, FileNotFoundError, InvalidFileError, ValueError, TypeError) as e:
             del pdb_to_concept[pdb_id]
 
     print(f'Number of single chain proteins: {len(pdb_to_concept):,}')
