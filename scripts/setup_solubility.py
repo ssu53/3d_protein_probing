@@ -256,7 +256,11 @@ def setup_solubility(data_path: Path, save_path: Path) -> None:
     with open(data_path) as f:
         data = json.load(f)
 
-    sequence_solubilities = [(item["sequence"], item["solubility"]) for item in data.values()]
+    sequence_solubilities = [
+        (item["sequence"], item["solubility"])
+        for item in data.values()
+        if item is not None
+    ]
 
     # Search PDB by sequence
     data = [item for item in thread_map(search_pdb, sequence_solubilities, max_workers=8) if item is not None]
