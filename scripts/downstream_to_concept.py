@@ -29,17 +29,17 @@ def downstream_to_concept(
     :param max_protein_length: The maximum length of a protein structure.
     """
     # Load downstream task dataset, merging train, val, and test splits
-    data = {}
+    data = []
     for split in ['train', 'valid', 'test']:
-        with open(data_dir / f'{data_name}_{split}.json') as f:
-            data |= json.load(f)
+        with open(data_dir / f'{data_name}_{split}_chains.json') as f:
+            data += json.load(f)
 
     print(f'Number of proteins in downstream task dataset: {len(data):,}')
 
     # Extract mapping from PDB ID to concept value
     pdb_id_to_concept = {
         protein['pdb_id']: protein[concept_name]
-        for protein in data.values()
+        for protein in data
         if protein is not None
     }
 
