@@ -238,14 +238,14 @@ def search_pdb(sequence_solubility: tuple[str, float]):
     found_experimental = search_pdb_experimental(sequence)
     item = None
 
-    if found_experimental is not None:
+    if found_experimental is not None and "result_set" in found_experimental:
         # Attempt searching for experimental data
         item = extract_item(found_experimental["result_set"], solubility, sequence)
 
     if item is None:
         # if not found, check computational data
         found_computational = search_pdb_computational(sequence)
-        if found_computational is not None:
+        if found_computational is not None and "result_set" in found_computational:
             item = extract_item(found_computational["result_set"], solubility, sequence)
 
     return item
