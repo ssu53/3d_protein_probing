@@ -215,8 +215,8 @@ do
                     --project_name probing \
                     --proteins_path data/downstream_tasks/${CONCEPT}_proteins.pt \
                     --embeddings_path data/downstream_tasks/${CONCEPT}_esm2_t33_650M_UR50D.pt \
-                    --save_dir results/pdb_single_chain_protein_30_identity \
-                    --concepts_dir data/pdb_single_chain_protein_30_identity/concepts \
+                    --save_dir results/downstream_tasks \
+                    --concepts_dir data/downstream_tasks \
                     --concept $CONCEPT \
                     --embedding_method $EMBEDDING_METHOD \
                     --encoder_type egnn \
