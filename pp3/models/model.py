@@ -210,6 +210,7 @@ class Model(pl.LightningModule):
         # Set up masks
         if self.concept_level == 'protein':
             keep_mask = y_mask
+            keep_sum = 1
         elif self.concept_level == 'residue':
             # Keep mask
             keep_mask = (y_mask * padding_mask).bool()
