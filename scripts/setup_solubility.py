@@ -1,6 +1,8 @@
 """Set up the solubility dataset (assumes it has already been downloaded and partially processed."""
 import json
+from functools import partial
 from pathlib import Path
+from typing import Literal
 
 import requests
 from tqdm.contrib.concurrent import thread_map
@@ -232,26 +234,30 @@ def extract_item(results: dict, solubility: float, sequence: str) -> dict | None
     return None
 
 
-def search_pdb(sequence_solubility: tuple[str, float]):
+def search_pdb(
+        sequence_solubility: tuple[str, float],
+        structure_type: Literal['experimental', 'computational']
+) -> dict | None:
     sequence, solubility = sequence_solubility
 
-    found_experimental = search_pdb_experimental(sequence)
-    item = None
+    if structure_type == 'experimental':
+        item = search_pdb_experimental(sequence)
+    elif structure_type == 'computational':
+        item = search_pdb_computational(sequence)
+    else:
+        raise ValueError(f"Invalid structure type: {structure_type}")
 
-    if found_experimental is not None and "result_set" in found_experimental:
-        # Attempt searching for experimental data
-        item = extract_item(found_experimental["result_set"], solubility, sequence)
-
-    if item is None:
-        # if not found, check computational data
-        found_computational = search_pdb_computational(sequence)
-        if found_computational is not None and "result_set" in found_computational:
-            item = extract_item(found_computational["result_set"], solubility, sequence)
+    if item is not None and 'result_set' in item:
+        item = extract_item(item['result_set'], solubility, sequence)
 
     return item
 
 
-def setup_solubility(data_path: Path, save_path: Path) -> None:
+def setup_solubility(
+        data_path: Path,
+        save_path: Path,
+        structure_type: Literal['experimental', 'computational']
+) -> None:
     # Load data
     with open(data_path) as f:
         data = json.load(f)
@@ -263,7 +269,15 @@ def setup_solubility(data_path: Path, save_path: Path) -> None:
     ]
 
     # Search PDB by sequence
-    data = [item for item in thread_map(search_pdb, sequence_solubilities, max_workers=8) if item is not None]
+    data = [
+        item
+        for item in thread_map(
+            partial(search_pdb, structure_type=structure_type),
+            sequence_solubilities,
+            max_workers=8
+        )
+        if item is not None
+    ]
 
     # Save data
     save_path.parent.mkdir(parents=True, exist_ok=True)
