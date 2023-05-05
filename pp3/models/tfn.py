@@ -230,9 +230,8 @@ class TFN(torch.nn.Module):
         B, N, M, _ = edge_vec.shape
 
         # Distance embedding
-        edges = self.distance_expansion(edge_vec.norm(dim=-1).flatten() ** 0.5).reshape(
-            B, N, M, -1
-        )
+        dists = edge_vec.norm(dim=-1).flatten()
+        edges = self.distance_expansion(dists).reshape(B, N, M, -1)
 
         # Add positional encoding
         if edge_pos_emb is not None:
@@ -265,7 +264,7 @@ class TFN(torch.nn.Module):
         # Compute pairwise distances in original coordinates
         B, N = embeddings.shape[:2]
         rel_coors = coords.unsqueeze(2) - coords.unsqueeze(1)
-        rel_dist = (rel_coors**2).sum(dim=-1) ** 0.5
+        rel_dist = torch.linalg.norm(rel_coors, dim=-1)
         dists = self.distance_expansion(rearrange(rel_dist, "b i j -> (b i j)"))
         dists = rearrange(dists, "(b i j) d -> b i j d", b=B, i=N, j=N)
 
@@ -342,6 +341,5 @@ class TFN(torch.nn.Module):
 
             coords = coords + dX
 
-        import pdb; pdb.set_trace()
         embeddings = self.node_embedding_out(embeddings)
         return embeddings

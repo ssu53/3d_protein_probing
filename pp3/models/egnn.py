@@ -103,7 +103,7 @@ class EGNN_Layer(nn.Module):
             feats2 = n_embeddings.unsqueeze(1).expand(-1, N, -1, -1)
 
         rel_coors = coords.unsqueeze(2) - n_coords
-        rel_dist = (rel_coors**2).sum(dim=-1) ** 0.5
+        rel_dist = torch.linalg.norm(rel_coors, dim=-1)
         dists = self.dist_embedding(rearrange(rel_dist, "b i j -> (b i j)"))
         dists = rearrange(dists, "(b i j) d -> b i j d", b=B, i=N, j=M)
 
@@ -183,7 +183,7 @@ class EGNN(nn.Module):
         # Compute pairwise distances in original coordinates
         B, N = embeddings.shape[:2]
         rel_coors = coords.unsqueeze(2) - coords.unsqueeze(1)
-        rel_dist = (rel_coors**2).sum(dim=-1) ** 0.5
+        rel_dist = torch.linalg.norm(rel_coors, dim=-1)
         dists = self.dist_embedding(rearrange(rel_dist, "b i j -> (b i j)"))
         dists = rearrange(dists, "(b i j) d -> b i j d", b=B, i=N, j=N)
 
