@@ -208,7 +208,9 @@ class Model(pl.LightningModule):
         y_mask = ~torch.isnan(y)
 
         # Set up masks
-        if self.concept_level == 'residue':
+        if self.concept_level == 'protein':
+            keep_mask = y_mask
+        elif self.concept_level == 'residue':
             # Keep mask
             keep_mask = (y_mask * padding_mask).bool()
 

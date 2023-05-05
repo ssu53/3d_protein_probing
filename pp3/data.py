@@ -37,7 +37,9 @@ def collate_fn(
     coords = torch.nn.utils.rnn.pad_sequence(coords, batch_first=True)
 
     # Flatten y if needed
-    if isinstance(y[0], torch.Tensor) and y[0].ndim == 2:
+    if isinstance(y[0], float):
+        y = torch.tensor(y)
+    elif y[0].ndim == 2:
         padded_y = torch.zeros((len(y), max_seq_len, max_seq_len))
 
         for i, y_i in enumerate(y):
