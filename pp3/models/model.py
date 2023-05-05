@@ -147,9 +147,9 @@ class Model(pl.LightningModule):
 
         # If needed, modify embedding structure based on concept level
         if self.concept_level == 'protein':
-            pad_sum = padding_mask.sum(dim=1)
+            pad_sum = padding_mask.sum(dim=1, keepdim=True)
             pad_sum[pad_sum == 0] = 1
-            encodings = (encodings * padding_mask).sum(dim=1) / pad_sum
+            encodings = (encodings * padding_mask.unsqueeze(dim=-1)).sum(dim=1) / pad_sum
 
             if keep_mask is not None:
                 encodings = encodings[keep_mask]
