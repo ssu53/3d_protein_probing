@@ -84,7 +84,7 @@ python scripts/compute_esm_embeddings.py \
 ```
 
 
-## Probe ESM2 embeddings for concepts
+## Probe sequence and structure models for concepts
 
 Probe sequence models for concepts.
 ```bash
@@ -145,6 +145,54 @@ do
                     --predictor_hidden_dim 100 \
                     --batch_size 16 \
                     --max_neighbors 24
+            done
+        done
+    done
+done
+```
+
+## Train sequence and structure models on downstream tasks
+
+Compute ESM2 embeddings for PDB structures.
+```bash
+for CONCEPT in solubility
+do
+    python scripts/compute_esm_embeddings.py \
+        --proteins_path data/downstream_tasks/${CONCEPT}_proteins.pt \
+        --hub_dir pretrained_models \
+        --esm_model esm2_t33_650M_UR50D \
+        --last_layer 33 \
+        --save_path data/downstream_tasks/${CONCEPT}_esm2_t33_650M_UR50D.pt \
+        --batch_size 5
+done
+```
+
+Train sequence models for downstream tasks.
+```bash
+#!/bin/bash
+
+for CONCEPT in solubility
+do
+    for EMBEDDING_METHOD in plm baseline
+    do
+        for ENCODER_NUM_LAYERS in 0 1 2
+        do
+            for PREDICTOR_NUM_LAYERS in 1 2
+            do
+                python scripts/probe.py \
+                    --project_name probing \
+                    --proteins_path data/downstream_tasks/${CONCEPT}_proteins.pt \
+                    --embeddings_path data/downstream_tasks/${CONCEPT}_esm2_t33_650M_UR50D.pt \
+                    --save_dir results/downstream_tasks \
+                    --concepts_dir data/downstream_tasks \
+                    --concept $CONCEPT \
+                    --embedding_method $EMBEDDING_METHOD \
+                    --encoder_type mlp \
+                    --encoder_num_layers $ENCODER_NUM_LAYERS \
+                    --encoder_hidden_dim 100 \
+                    --predictor_num_layers $PREDICTOR_NUM_LAYERS \
+                    --predictor_hidden_dim 100 \
+                    --batch_size 100
             done
         done
     done

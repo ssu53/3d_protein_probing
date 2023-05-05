@@ -22,9 +22,15 @@ from pp3.utils.pdb import get_residue_coordinates
 
 CONCEPT_FUNCTION_TYPE = Callable[[AtomArray], Any]
 CONCEPT_TO_FUNCTION = {}
-CONCEPT_TO_LEVEL = {}
-CONCEPT_TO_TYPE = {}
-CONCEPT_TO_OUTPUT_DIM = {}
+CONCEPT_TO_LEVEL = {
+    'solubility': 'protein'
+}
+CONCEPT_TO_TYPE = {
+    'solubility': 'binary_classification'
+}
+CONCEPT_TO_OUTPUT_DIM = {
+    'solubility': 1
+}
 
 
 def register_concept(
