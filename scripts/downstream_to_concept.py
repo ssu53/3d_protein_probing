@@ -10,7 +10,7 @@ from pp3.utils.constants import MAX_SEQ_LEN
 from pp3.utils.pdb import convert_pdb_id_computational
 from tqdm import tqdm
 
-from pp3.utils.pdb import get_pdb_path_experimental
+from pp3.utils.pdb import get_pdb_path_experimental, pdb_id_is_alphafold
 from pdb_to_pytorch import convert_pdb_to_pytorch
 
 
@@ -62,6 +62,10 @@ def downstream_to_concept(
         # If computational, first check if we've downloaded the PDB file, otherwise download it
         for pdb_id, concept in tqdm(pdb_id_to_concept.items(), total=len(pdb_id_to_concept)):
             pdb_id, chain = pdb_id.split('.')
+
+            if not pdb_id_is_alphafold(pdb_id=pdb_id):
+                continue
+
             pdb_id = convert_pdb_id_computational(pdb_id=pdb_id)
             pdb_path = pdb_dir / f'{pdb_id}.pdb'
 

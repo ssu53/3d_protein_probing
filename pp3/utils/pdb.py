@@ -34,6 +34,15 @@ def get_pdb_path_experimental(pdb_id: str, pdb_dir: Path, simple_format: bool = 
     return path
 
 
+def pdb_id_is_alphafold(pdb_id: str) -> bool:
+    """Check if a PDB ID is an AlphaFold PDB ID.
+
+    :param pdb_id: The PDB ID of the protein structure.
+    :return: True if the PDB ID is an AlphaFold PDB ID, False otherwise.
+    """
+    return pdb_id.startswith('AF_AF') and pdb_id.endswith('F1')
+
+
 def convert_pdb_id_computational(pdb_id: str, model_name: str = 'model_v4') -> str:
     """Converts a PDB ID to an AlphaFold download ID.
 
@@ -43,7 +52,7 @@ def convert_pdb_id_computational(pdb_id: str, model_name: str = 'model_v4') -> s
     :param model_name: The name of the AlphaFold model.
     :return: The AlphaFold download ID.
     """
-    if not (pdb_id.startswith('AF_AF') and pdb_id.endswith('F1')):
+    if not pdb_id_is_alphafold(pdb_id):
         raise ValueError(f'Invalid AlphaFold PDB ID: {pdb_id}')
 
     return f'AF-{pdb_id[5:-2]}-F1-{model_name}'
