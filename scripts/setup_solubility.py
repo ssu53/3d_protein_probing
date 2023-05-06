@@ -249,6 +249,8 @@ def search_pdb(
 
     if item is not None and 'result_set' in item:
         item = extract_item(item['result_set'], solubility, sequence)
+    else:
+        item = None
 
     return item
 

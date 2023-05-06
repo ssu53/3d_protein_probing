@@ -43,7 +43,7 @@ def downstream_to_concept(
     pdb_id_to_concept = {
         protein['pdb_id']: protein[concept_name]
         for protein in data
-        if protein is not None
+        if protein is not None and 'pdb_id' in protein
     }
 
     print(f'Number of {structure_type} proteins with unique PDB IDs: {len(pdb_id_to_concept):,}')
