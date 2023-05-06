@@ -4,11 +4,13 @@ from collections import Counter
 from pathlib import Path
 from typing import Literal
 
+import requests
 import torch
 from pp3.utils.constants import MAX_SEQ_LEN
+from pp3.utils.pdb import convert_pdb_id_computational
 from tqdm import tqdm
 
-from pp3.utils.pdb import get_pdb_path
+from pp3.utils.pdb import get_pdb_path_experimental
 from pdb_to_pytorch import convert_pdb_to_pytorch
 
 
@@ -19,7 +21,7 @@ def downstream_to_concept(
         pdb_dir: Path,
         save_dir: Path,
         structure_type: Literal['experimental', 'computational'],
-    max_protein_length: int | None = MAX_SEQ_LEN
+        max_protein_length: int | None = MAX_SEQ_LEN
 ) -> None:
     """Converts a downstream task dataset in JSON form to a concept dataset in PyTorch form.
 
@@ -49,11 +51,31 @@ def downstream_to_concept(
     print(f'Number of {structure_type} proteins with unique PDB IDs: {len(pdb_id_to_concept):,}')
 
     # Only keep PDB IDs where we have the corresponding PDB file
-    pdb_id_to_concept = {
-        pdb_id: concept
-        for pdb_id, concept in tqdm(pdb_id_to_concept.items(), total=len(pdb_id_to_concept))
-        if get_pdb_path(pdb_id=pdb_id.split('.')[0], pdb_dir=pdb_dir).exists()
-    }
+    if structure_type == 'experimental':
+        # If experimental, check if we've already downloaded the PDB file
+        pdb_id_to_concept = {
+            pdb_id: concept
+            for pdb_id, concept in tqdm(pdb_id_to_concept.items(), total=len(pdb_id_to_concept))
+            if get_pdb_path_experimental(pdb_id=pdb_id.split('.')[0], pdb_dir=pdb_dir).exists()
+        }
+    elif structure_type == 'computational':
+        # If computational, first check if we've downloaded the PDB file, otherwise download it
+        pdb_id_to_concept = {}
+        for pdb_id, concept in tqdm(pdb_id_to_concept.items(), total=len(pdb_id_to_concept)):
+            pdb_id = convert_pdb_id_computational(pdb_id=pdb_id)
+            pdb_path = pdb_dir / f'{pdb_id}.pdb'
+
+            # If we haven't downloaded the AlphaFold PDB file, download it
+            if not pdb_path.exists():
+                response = requests.get(f'https://alphafold.ebi.ac.uk/files/{pdb_id}.pdb')
+                if response.status_code == 200:
+                    pdb_path.write_text(response.text)
+
+            # If we have downloaded the AlphaFold PDB file, add it to the mapping
+            if pdb_path.exists():
+                pdb_id_to_concept[pdb_id] = concept
+    else:
+        raise ValueError(f'Invalid structure type: {structure_type}')
 
     print(f'Number of {structure_type} proteins with corresponding PDB files: {len(pdb_id_to_concept):,}')
 

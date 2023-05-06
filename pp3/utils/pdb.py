@@ -18,13 +18,13 @@ from biotite.structure.io.pdb import PDBFile
 from pp3.utils.constants import AA_3_TO_1, AA_ATOM_NAMES, BACKBONE_ATOM_NAMES
 
 
-def get_pdb_path(pdb_id: str, pdb_dir: Path, simple_format: bool = False) -> Path:
-    """Get the path of a PDB file.
+def get_pdb_path_experimental(pdb_id: str, pdb_dir: Path, simple_format: bool = False) -> Path:
+    """Get the path of an experimental PDB file.
 
     :param pdb_id: The PDB ID of the protein structure.
-    :param pdb_dir: The directory containing the PDB structures.
+    :param pdb_dir: The directory containing the experimental PDB structures.
     :param simple_format: Whether to use the simple PDB format.
-    :return: The path of the PDB file.
+    :return: The path of the experimental PDB file.
     """
     if simple_format:
         path = pdb_dir / f"{pdb_id}.pdb"
@@ -32,6 +32,21 @@ def get_pdb_path(pdb_id: str, pdb_dir: Path, simple_format: bool = False) -> Pat
         path = pdb_dir / pdb_id[1:3].lower() / f'pdb{pdb_id.lower()}.ent'
 
     return path
+
+
+def convert_pdb_id_computational(pdb_id: str, model_name: str = 'model_v4') -> str:
+    """Converts a PDB ID to an AlphaFold download ID.
+
+    Ex. AF_AFQ17898F1 ==> AF-Q17898-F1
+
+    :param pdb_id: The PDB ID of the protein structure.
+    :param model_name: The name of the AlphaFold model.
+    :return: The AlphaFold download ID.
+    """
+    if not (pdb_id.startswith('AF_AF') and pdb_id.endswith('F1')):
+        raise ValueError(f'Invalid AlphaFold PDB ID: {pdb_id}')
+
+    return f'AF-{pdb_id[5:-2]}-F1-{model_name}'
 
 
 def verify_residues(structure: AtomArray) -> None:
@@ -87,7 +102,7 @@ def load_structure(
         raise ValueError('Need chain_id if not restricting to one chain proteins')
 
     # Get PDB file path
-    pdb_path = get_pdb_path(pdb_id=pdb_id, pdb_dir=pdb_dir)
+    pdb_path = get_pdb_path_experimental(pdb_id=pdb_id, pdb_dir=pdb_dir)
 
     # Check if PDB file exists
     if not pdb_path.exists():
