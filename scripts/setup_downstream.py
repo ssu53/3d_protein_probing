@@ -1,4 +1,4 @@
-"""Set up the solubility dataset (assumes it has already been downloaded and partially processed."""
+"""Set up a downstream dataset (assumes it has already been downloaded and partially processed)."""
 import json
 from functools import partial
 from pathlib import Path
@@ -222,11 +222,11 @@ def search_pdb_computational(sequence: str) -> dict | None:
     )
 
 
-def extract_item(results: dict, solubility: float, sequence: str) -> dict | None:
+def extract_item(results: dict, value: float, sequence: str) -> dict | None:
     for result in results:
         if result["score"] >= 1.0:
             return {
-                "solubility": solubility,
+                "value": value,
                 "sequence": sequence,
                 "pdb_id": result["identifier"]
             }
@@ -235,10 +235,10 @@ def extract_item(results: dict, solubility: float, sequence: str) -> dict | None
 
 
 def search_pdb(
-        sequence_solubility: tuple[str, float],
+        sequence_value: tuple[str, float],
         structure_type: Literal['experimental', 'computational']
 ) -> dict | None:
-    sequence, solubility = sequence_solubility
+    sequence, value = sequence_value
 
     if structure_type == 'experimental':
         item = search_pdb_experimental(sequence)
@@ -248,24 +248,25 @@ def search_pdb(
         raise ValueError(f"Invalid structure type: {structure_type}")
 
     if item is not None and 'result_set' in item:
-        item = extract_item(item['result_set'], solubility, sequence)
+        item = extract_item(item['result_set'], value, sequence)
     else:
         item = None
 
     return item
 
 
-def setup_solubility(
+def setup_downstream(
         data_path: Path,
         save_path: Path,
+        downstream_task: str,
         structure_type: Literal['experimental', 'computational']
 ) -> None:
     # Load data
     with open(data_path) as f:
         data = json.load(f)
 
-    sequence_solubilities = [
-        (item["sequence"], item["solubility"])
+    sequence_values = [
+        (item["sequence"], item[downstream_task])
         for item in data.values()
         if item is not None
     ]
@@ -275,7 +276,7 @@ def setup_solubility(
         item
         for item in thread_map(
             partial(search_pdb, structure_type=structure_type),
-            sequence_solubilities,
+            sequence_values,
             max_workers=8
         )
         if item is not None
@@ -291,4 +292,4 @@ def setup_solubility(
 if __name__ == '__main__':
     from tap import tapify
 
-    tapify(setup_solubility)
+    tapify(setup_downstream)
