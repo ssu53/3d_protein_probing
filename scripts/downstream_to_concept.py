@@ -60,7 +60,6 @@ def downstream_to_concept(
         }
     elif structure_type == 'computational':
         # If computational, first check if we've downloaded the PDB file, otherwise download it
-        pdb_id_to_concept = {}
         for pdb_id, concept in tqdm(pdb_id_to_concept.items(), total=len(pdb_id_to_concept)):
             pdb_id = convert_pdb_id_computational(pdb_id=pdb_id)
             pdb_path = pdb_dir / f'{pdb_id}.pdb'
@@ -71,9 +70,9 @@ def downstream_to_concept(
                 if response.status_code == 200:
                     pdb_path.write_text(response.text)
 
-            # If we have downloaded the AlphaFold PDB file, add it to the mapping
-            if pdb_path.exists():
-                pdb_id_to_concept[pdb_id] = concept
+            # If we failed to download the AlphaFold PDB file, remove it from the mapping
+            if not pdb_path.exists():
+                del pdb_id_to_concept[pdb_id]
     else:
         raise ValueError(f'Invalid structure type: {structure_type}')
 
