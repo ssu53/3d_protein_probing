@@ -1,4 +1,4 @@
-"""Set up a downstream dataset (assumes it has already been downloaded and partially processed)."""
+"""Match sequences (with values) to PDB files."""
 import json
 from functools import partial
 from pathlib import Path
@@ -27,6 +27,7 @@ def pdb_request(url: str, query: dict) -> dict | None:
 
 
 def search_pdb_experimental(sequence: str) -> dict | None:
+    """Search the RCSB PDB for experimental structures matching a sequence."""
     url = "https://search.rcsb.org/rcsbsearch/v2/query"
     query = {
         "query": {
@@ -126,6 +127,7 @@ def search_pdb_experimental(sequence: str) -> dict | None:
 
 
 def search_pdb_computational(sequence: str) -> dict | None:
+    """Search the RCSB PDB for computational structures matching a sequence."""
     url = "https://search.rcsb.org/rcsbsearch/v2/query"
     query = {
         "query": {
@@ -222,23 +224,36 @@ def search_pdb_computational(sequence: str) -> dict | None:
     )
 
 
-def extract_item(results: dict, value: float, sequence: str) -> dict | None:
+def extract_item(results: dict, sequence: str, value: str) -> dict | None:
+    """Extract the first matching PDB structure from a dictionary of results and return it as a dict.
+
+    :param results: A dictionary of results from a PDB search.
+    :param sequence: The sequence that is matched.
+    :param value: The value for the sequence.
+    :return: A dictionary of the first matching PDB structure or None.
+    """
     for result in results:
         if result["score"] >= 1.0:
             return {
-                "value": value,
+                "pdb_id": result["identifier"],
                 "sequence": sequence,
-                "pdb_id": result["identifier"]
+                "value": float(value)
             }
 
     return None
 
 
 def search_pdb(
-        sequence_value: tuple[str, float],
+        sequence_value: str,
         structure_type: Literal['experimental', 'computational']
 ) -> dict | None:
-    sequence, value = sequence_value
+    """Search the RCSB PDB for structures matching a sequence with a value.
+
+    :param sequence_value: A string containing the sequence and value separated by "=".
+    :param structure_type: The type of structure to search for.
+    :return: A dictionary of the first matching PDB structure or None.
+    """
+    sequence, value = sequence_value.split('=')
 
     if structure_type == 'experimental':
         item = search_pdb_experimental(sequence)
@@ -248,39 +263,42 @@ def search_pdb(
         raise ValueError(f"Invalid structure type: {structure_type}")
 
     if item is not None and 'result_set' in item:
-        item = extract_item(item['result_set'], value, sequence)
+        item = extract_item(item['result_set'], sequence, value)
     else:
         item = None
 
     return item
 
 
-def setup_downstream(
+def match_sequence_to_pdb(
         data_path: Path,
         save_path: Path,
-        downstream_task: str,
         structure_type: Literal['experimental', 'computational']
 ) -> None:
+    """Match sequences to PDB structures.
+
+    :param data_path: The path to the data file with sequences and values.
+    :param save_path: The path to save the data file with sequences, values, and PDB IDs.
+    :param structure_type: The type of structure to search for.
+    """
     # Load data
     with open(data_path) as f:
         data = json.load(f)
 
-    sequence_values = [
-        (item["sequence"], item[downstream_task])
-        for item in data.values()
-        if item is not None
-    ]
+    print(f"Loaded {len(data):,} proteins with values")
 
     # Search PDB by sequence
     data = [
         item
         for item in thread_map(
             partial(search_pdb, structure_type=structure_type),
-            sequence_values,
+            data,
             max_workers=8
         )
         if item is not None
     ]
+
+    print(f"Found {len(data):,} {structure_type} proteins with values")
 
     # Save data
     save_path.parent.mkdir(parents=True, exist_ok=True)
@@ -292,4 +310,4 @@ def setup_downstream(
 if __name__ == '__main__':
     from tap import tapify
 
-    tapify(setup_downstream)
+    tapify(match_sequence_to_pdb)
