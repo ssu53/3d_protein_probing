@@ -85,8 +85,7 @@ def verify_residues(structure: AtomArray) -> None:
 
 
 def load_structure(
-        pdb_id: str,
-        pdb_dir: Path,
+        pdb_path: Path,
         one_chain_only: bool = False,
         chain_id: str | None = None
 ) -> AtomArray:
@@ -100,8 +99,7 @@ def load_structure(
     :raises ValueError: If the PDB file contains errors.
     :raises TypeError: If the PDB file contains type errors.
 
-    :param pdb_id: The PDB ID of the protein structure.
-    :param pdb_dir: The directory containing the PDB structures.
+    :param pdb_path: The path to the PDB structure.
     :param one_chain_only: Whether to only allow proteins with one chain.
     :param chain_id: The chain ID of the protein structure to extract. Used if one_chain_only is False.
     :return: The loaded (and cleaned) protein structure.
@@ -109,9 +107,6 @@ def load_structure(
     # Check if chain ID is given when allowing multichain proteins
     if not one_chain_only and chain_id is None:
         raise ValueError('Need chain_id if not restricting to one chain proteins')
-
-    # Get PDB file path
-    pdb_path = get_pdb_path_experimental(pdb_id=pdb_id, pdb_dir=pdb_dir)
 
     # Check if PDB file exists
     if not pdb_path.exists():

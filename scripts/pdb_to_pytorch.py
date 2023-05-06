@@ -12,6 +12,7 @@ from tqdm import tqdm
 
 from pp3.utils.constants import MAX_SEQ_LEN
 from pp3.utils.pdb import (
+    get_pdb_path_experimental,
     get_residue_coordinates,
     get_sequence_from_structure,
     load_structure
@@ -19,16 +20,14 @@ from pp3.utils.pdb import (
 
 
 def convert_pdb_to_pytorch(
-        pdb_id: str,
-        pdb_dir: Path,
+        pdb_path: Path,
         max_protein_length: int,
         one_chain_only: bool = False,
         chain_id: str | None = None
 ) -> dict[str, torch.Tensor | str] | None:
     """Parses PDB file and converts structure and sequence to PyTorch format while removing invalid structures.
 
-    :param pdb_id: The PDB ID of the protein structure.
-    :param pdb_dir: The directory containing the PDB structures.
+    :param pdb_path: The path to the PDB structure.
     :param max_protein_length: The maximum length of a protein structure.
     :param one_chain_only: Whether to only allow proteins with one chain.
     :param chain_id: The chain ID of the protein structure to extract. Used if one_chain_only is False.
@@ -36,10 +35,9 @@ def convert_pdb_to_pytorch(
     """
     # Load PDB structure
     try:
-        print(f'Converting {pdb_id} {pdb_dir}')
+        print(f'Converting {pdb_path.stem}')
         structure = load_structure(
-            pdb_id=pdb_id,
-            pdb_dir=pdb_dir,
+            pdb_path=pdb_path,
             one_chain_only=one_chain_only,
             chain_id=chain_id
         )
@@ -87,10 +85,18 @@ def pdb_to_pytorch(
 
     print(f'Loaded {len(pdb_ids):,} PDB IDs')
 
+    # Create PDB paths
+    pdb_paths = [
+        get_pdb_path_experimental(
+            pdb_id=pdb_id,
+            pdb_dir=pdb_dir
+        )
+        for pdb_id in pdb_ids
+    ]
+
     # Set up conversion function
     convert_pdb_to_pytorch_fn = partial(
         convert_pdb_to_pytorch,
-        pdb_dir=pdb_dir,
         max_protein_length=max_protein_length,
         one_chain_only=True
     )
@@ -100,7 +106,7 @@ def pdb_to_pytorch(
     error_counter = Counter()
 
     with Pool() as pool:
-        for pdb_id, protein in tqdm(zip(pdb_ids, map(convert_pdb_to_pytorch_fn, pdb_ids)), total=len(pdb_ids)):
+        for pdb_id, protein in tqdm(zip(pdb_ids, map(convert_pdb_to_pytorch_fn, pdb_paths)), total=len(pdb_ids)):
             if 'error' in protein:
                 error_counter[protein['error']] += 1
             else:
