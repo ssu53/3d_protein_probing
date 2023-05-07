@@ -227,6 +227,29 @@ def residue_distances(
     return distances
 
 
+@register_concept(concept_level='residue', concept_type='regression', output_dim=1)
+def residue_distances_by_residue(
+        structure: AtomArray,
+        max_distance: float | None = 25.0
+) -> torch.Tensor:
+    """Get the average distance from a residue to all other residues within a maximum distance window.
+
+    :param structure: The protein structure.
+    :param max_distance: The maximum distance between residue pairs (in Angstroms) to include.
+    :return: A PyTorch tensor with average distance from each residue to all other residues within max_distance.
+    """
+    # Get residue distances
+    distances = residue_distances(
+        structure=structure,
+        max_distance=max_distance
+    )
+
+    # Get average distance from each residue to all other residues
+    distances = torch.nanmean(distances, dim=1)
+
+    return distances
+
+
 @register_concept(concept_level='residue_pair', concept_type='binary_classification', output_dim=1)
 def residue_contacts(
         structure: AtomArray,
