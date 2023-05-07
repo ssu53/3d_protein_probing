@@ -35,14 +35,14 @@ def downstream_to_concept(
     # Load downstream task dataset, merging train, val, and test splits
     data = []
     for split in ['train', 'valid', 'test']:
-        with open(data_dir / f'{data_name}_{split}_chains_{structure_type}.json') as f:
+        with open(data_dir / f'{data_name}_{split}_{structure_type}.json') as f:
             data += json.load(f)
 
     print(f'Number of {structure_type} proteins in downstream task dataset: {len(data):,}')
 
     # Extract mapping from PDB ID to concept value
     pdb_id_to_concept = {
-        protein['pdb_id']: protein[concept_name]
+        protein['pdb_id']: protein['value']
         for protein in data
         if protein is not None and 'pdb_id' in protein
     }

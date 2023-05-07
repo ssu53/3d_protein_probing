@@ -256,3 +256,29 @@ def residue_contacts(
     contacts[short_range_mask] = torch.nan
 
     return contacts
+
+
+@register_concept(concept_level='residue', concept_type='binary_classification', output_dim=1)
+def residue_contacts_by_residue(
+        structure: AtomArray,
+        contact_threshold: float = 8.0,
+        long_range_threshold: int = 24
+) -> torch.Tensor:
+    """Get whether each residue is involved in a long-range contact.
+
+    :param structure: The protein structure.
+    :param contact_threshold: The distance threshold for a contact (below this threshold is a contact).
+    :param long_range_threshold: The distance threshold for a long-range contact (below this threshold is short-range).
+    :return: A PyTorch tensor showing which residues have long range contacts (type: bool).
+    """
+    # Get residue contacts
+    contacts = residue_contacts(
+        structure=structure,
+        contact_threshold=contact_threshold,
+        long_range_threshold=long_range_threshold
+    )
+
+    # Sum over the second dimension to get which residues have contacts
+    contacts = contacts.any(dim=1)
+
+    return contacts
