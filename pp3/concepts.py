@@ -302,6 +302,6 @@ def residue_contacts_by_residue(
     )
 
     # Sum over the second dimension to get which residues have contacts
-    contacts = contacts.any(dim=1)
+    contacts = torch.nansum(contacts, dim=1) > 0
 
     return contacts
