@@ -35,7 +35,6 @@ def convert_pdb_to_pytorch(
     """
     # Load PDB structure
     try:
-        print(f'Converting {pdb_path.stem}')
         structure = load_structure(
             pdb_path=pdb_path,
             one_chain_only=one_chain_only,

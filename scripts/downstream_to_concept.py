@@ -120,8 +120,8 @@ def downstream_to_concept(
 
     # Save proteins and concepts
     save_dir.mkdir(parents=True, exist_ok=True)
-    torch.save(pdb_id_to_protein, save_dir / f'{concept_name}_{structure_type}_proteins.pt')
-    torch.save(pdb_id_to_concept, save_dir / f'{concept_name}_{structure_type}.pt')
+    torch.save(pdb_id_to_protein, save_dir / f'{concept_name}_proteins.pt')
+    torch.save(pdb_id_to_concept, save_dir / f'{concept_name}.pt')
 
 
 if __name__ == '__main__':
