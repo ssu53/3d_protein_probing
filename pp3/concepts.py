@@ -316,4 +316,7 @@ def residue_location(
     :param structure: The protein structure.
     :return: A PyTorch tensor with the relative location of each residue (type: float).
     """
-    return torch.arange(0, len(structure)) / len(structure)
+    num_residues = get_residue_count(structure)
+    locations = torch.arange(0, num_residues) / num_residues
+
+    return locations
