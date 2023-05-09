@@ -305,3 +305,15 @@ def residue_contacts_by_residue(
     contacts = torch.nansum(contacts, dim=1) > 0
 
     return contacts
+
+
+@register_concept(concept_level='residue', concept_type='regression', output_dim=1)
+def residue_location(
+        structure: AtomArray
+) -> torch.Tensor:
+    """Get the relative location of each residue in the protein.
+
+    :param structure: The protein structure.
+    :return: A PyTorch tensor with the relative location of each residue (type: float).
+    """
+    return torch.arange(0, len(structure)) / len(structure)
