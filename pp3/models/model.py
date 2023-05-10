@@ -149,7 +149,9 @@ class Model(pl.LightningModule):
         if self.concept_level == 'protein':
             pad_sum = padding_mask.sum(dim=1, keepdim=True)
             pad_sum[pad_sum == 0] = 1
-            encodings = (encodings * padding_mask.unsqueeze(dim=-1)).sum(dim=1) / pad_sum
+
+            # Sum over all residues
+            encodings = (encodings * padding_mask.unsqueeze(dim=-1)).sum(dim=1)
 
             if keep_mask is not None:
                 encodings = encodings[keep_mask]

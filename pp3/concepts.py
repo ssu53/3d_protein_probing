@@ -308,7 +308,7 @@ def residue_contacts_by_residue(
 
 
 @register_concept(concept_level='residue', concept_type='regression', output_dim=1)
-def residue_location(
+def residue_locations(
         structure: AtomArray
 ) -> torch.Tensor:
     """Get the relative location of each residue in the protein.
