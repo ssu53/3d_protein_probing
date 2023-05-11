@@ -332,6 +332,6 @@ def b_factors(
     :param structure: The protein structure.
     :return: A PyTorch tensor with the average B-factors of each residue (type: float).
     """
-    return torch.from_numpy([
+    return torch.from_numpy(np.array([
         np.mean(residue.b_factor) for residue in residue_iter(structure)
-    ])
+    ]))
