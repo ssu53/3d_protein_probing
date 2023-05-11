@@ -4,7 +4,7 @@ from typing import Literal
 
 import torch
 import pytorch_lightning as pl
-from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
+from pytorch_lightning.callbacks import EarlyStopping, LearningRateMonitor, ModelCheckpoint
 
 from pp3.concepts import get_concept_output_dim, get_concept_type, get_concept_level
 from pp3.models.model import Model
@@ -36,6 +36,9 @@ def probe(
     num_workers: int = 8,
     split_seed: int = 0,
     max_neighbors: int | None = None,
+    patience: int = 25,
+    pair_class_balance: bool = False,
+    run_name_suffix: str = ''
 ) -> None:
     """Probe a model for a 3D geometric protein concepts.
 
@@ -61,9 +64,15 @@ def probe(
     :param num_workers: The number of workers to use for data loading.
     :param split_seed: The random seed to use for the train/val/test split.
     :param max_neighbors: The maximum number of neighbors to use for the graph in EGNN.
+    :param patience: The number of epochs to wait for validation loss to improve before early stopping.
+    :param pair_class_balance: Whether to balance the classes for residue pair binary classification during training.
+    :param run_name_suffix: A suffix to append to the run name.
     """
     # Create save directory
     run_name = f'{concept}_{embedding_method}_{encoder_type}_{encoder_num_layers}L_{predictor_num_layers}L'
+    if run_name_suffix:
+        run_name += f'_{run_name_suffix}'
+
     save_dir = save_dir / run_name
     save_dir.mkdir(parents=True, exist_ok=True)
 
@@ -100,6 +109,7 @@ def probe(
         weight_decay=weight_decay,
         dropout=dropout,
         max_neighbors=max_neighbors,
+        pair_class_balance=pair_class_balance
     )
 
     print(model)
@@ -129,6 +139,7 @@ def probe(
             'num_workers': num_workers,
             'split_seed': split_seed,
             'num_neighbors': max_neighbors,
+            'patience': patience
         })
     elif logger_type == 'tensorboard':
         from pytorch_lightning.loggers import TensorBoardLogger
@@ -148,9 +159,12 @@ def probe(
     # Build early stopping callback
     early_stopping = EarlyStopping(
         monitor='val_loss',
-        patience=25,
+        patience=patience,
         mode='min'
     )
+
+    # Building learning rate monitor callback
+    lr_monitor = LearningRateMonitor(logging_interval='step')
 
     # Build trainer
     trainer = pl.Trainer(
@@ -160,7 +174,7 @@ def probe(
         deterministic=True,
         max_epochs=max_epochs,
         log_every_n_steps=25,
-        callbacks=[ckpt_callback, early_stopping]
+        callbacks=[ckpt_callback, early_stopping, lr_monitor]
     )
 
     # Train model

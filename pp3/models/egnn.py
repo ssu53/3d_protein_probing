@@ -82,8 +82,8 @@ class EGNN_Layer(nn.Module):
         embeddings: torch.Tensor,
         coords: torch.Tensor,
         padding_mask: torch.Tensor,
-        edges: torch.Tensor = None,
-        neighbor_ids: torch.Tensor = None,
+        edges: torch.Tensor | None = None,
+        neighbor_ids: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         # Compute pairwise distances
         B, N = embeddings.shape[:2]

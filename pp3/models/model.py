@@ -4,6 +4,7 @@ import pytorch_lightning as pl
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 from sklearn.metrics import (
     average_precision_score,
     mean_absolute_error,
@@ -13,6 +14,7 @@ from sklearn.metrics import (
 )
 from pp3.models.egnn import EGNN
 from pp3.models.mlp import MLP
+from pp3.models.tfn import TFN
 from pp3.utils.constants import BATCH_TYPE, ENCODER_TYPES, MAX_SEQ_LEN
 
 
@@ -36,6 +38,7 @@ class Model(pl.LightningModule):
         weight_decay: float = 0.0,
         dropout: float = 0.0,
         max_neighbors: int | None = None,
+        pair_class_balance: bool = False
     ) -> None:
         """Initialize the model.
 
@@ -53,6 +56,8 @@ class Model(pl.LightningModule):
         :param learning_rate: The learning rate.
         :param weight_decay: The weight decay.
         :param dropout: The dropout rate.
+        :param max_neighbors: The maximum number of neighbors to consider for each residue.
+        :param pair_class_balance: Whether to balance the classes for residue pair binary classification during training.
         """
         super(Model, self).__init__()
 
@@ -69,6 +74,7 @@ class Model(pl.LightningModule):
         self.weight_decay = weight_decay
         self.dropout = dropout
         self.concept_level = concept_level
+        self.pair_class_balance = pair_class_balance
 
         if encoder_type == 'mlp':
             self.encoder = MLP(
@@ -90,7 +96,11 @@ class Model(pl.LightningModule):
             )
             last_hidden_dim = self.input_dim
         elif encoder_type == 'tfn':
-            raise NotImplementedError
+            self.encoder = TFN(
+                node_dim=self.input_dim,
+                num_layers=self.encoder_num_layers,
+            )
+            last_hidden_dim = self.input_dim
         else:
             raise ValueError(f'Invalid model type: {encoder_type}')
 
@@ -101,6 +111,8 @@ class Model(pl.LightningModule):
             predictor_dim_multiplier = 2
         elif self.concept_level == 'residue_triplet':
             predictor_dim_multiplier = 3
+        elif self.concept_level == 'residue_quadruplet':
+            predictor_dim_multiplier = 4
         else:
             raise ValueError(f'Invalid concept level: {self.concept_level}')
 
@@ -135,9 +147,11 @@ class Model(pl.LightningModule):
 
         # If needed, modify embedding structure based on concept level
         if self.concept_level == 'protein':
-            pad_sum = padding_mask.sum(dim=1)
+            pad_sum = padding_mask.sum(dim=1, keepdim=True)
             pad_sum[pad_sum == 0] = 1
-            encodings = (encodings * padding_mask).sum(dim=1) / pad_sum
+
+            # Average over all residues
+            encodings = (encodings * padding_mask.unsqueeze(dim=-1)).sum(dim=1) / pad_sum
 
             if keep_mask is not None:
                 encodings = encodings[keep_mask]
@@ -156,6 +170,12 @@ class Model(pl.LightningModule):
         elif self.concept_level == 'residue_triplet':
             # Create adjacent triples of residue embeddings
             encodings = torch.cat([encodings[:, :-2], encodings[:, 1:-1], encodings[:, 2:]], dim=-1)
+
+            if keep_mask is not None:
+                encodings = encodings[keep_mask]
+        elif self.concept_level == 'residue_quadruplet':
+            # Create adjacent quadruples of residue embeddings
+            encodings = torch.cat([encodings[:, :-3], encodings[:, 1:-2], encodings[:, 2:-1], encodings[:, 3:]], dim=-1)
 
             if keep_mask is not None:
                 encodings = encodings[keep_mask]
@@ -190,7 +210,10 @@ class Model(pl.LightningModule):
         y_mask = ~torch.isnan(y)
 
         # Set up masks
-        if self.concept_level == 'residue':
+        if self.concept_level == 'protein':
+            keep_mask = y_mask
+            keep_sum = 1
+        elif self.concept_level == 'residue':
             # Keep mask
             keep_mask = (y_mask * padding_mask).bool()
 
@@ -208,6 +231,17 @@ class Model(pl.LightningModule):
             pair_indices = torch.nonzero(y_mask * pair_padding_mask_flat)
             pair_indices = pair_indices[torch.randperm(pair_indices.shape[0])[:num_pairs]]
 
+            if self.pair_class_balance and self.target_type == 'binary_classification' and step_type == 'train':
+                zeros = pair_indices[y[pair_indices[:, 0], pair_indices[:, 1]] == 0.0]
+                ones = pair_indices[y[pair_indices[:, 0], pair_indices[:, 1]] == 1.0]
+
+                zeros = zeros[torch.randperm(zeros.shape[0])[:num_pairs // 2]]
+                ones = ones[torch.randperm(ones.shape[0])[:num_pairs // 2]]
+
+                pair_indices = torch.cat([zeros, ones])
+            else:
+                pair_indices = pair_indices[torch.randperm(pair_indices.shape[0])[:num_pairs]]
+
             # Keep mask
             keep_mask = torch.zeros_like(y_mask)
             keep_mask[pair_indices[:, 0], pair_indices[:, 1]] = 1
@@ -223,6 +257,14 @@ class Model(pl.LightningModule):
 
             # Keep sum (for normalization per protein)
             keep_sum = keep_mask.sum(dim=1, keepdim=True).repeat(1, num_residues - 2)
+            keep_sum = keep_sum[keep_mask]
+        elif self.concept_level == 'residue_quadruplet':
+            # Keep mask
+            quadruplet_padding_mask = padding_mask[:, :-3] * padding_mask[:, 1:-2] * padding_mask[:, 2:-1] * padding_mask[:, 3:]
+            keep_mask = (y_mask * quadruplet_padding_mask).bool()
+
+            # Keep sum (for normalization per protein)
+            keep_sum = keep_mask.sum(dim=1, keepdim=True).repeat(1, num_residues - 3)
             keep_sum = keep_sum[keep_mask]
         else:
             raise ValueError(f'Invalid concept level: {self.concept_level}')
@@ -356,13 +398,21 @@ class Model(pl.LightningModule):
 
         return y_hat, y
 
-    def configure_optimizers(self) -> torch.optim.Optimizer:
-        """Configures the optimizer."""
-        return torch.optim.Adam(
+    def configure_optimizers(self) -> dict[str, torch.optim.Optimizer | ReduceLROnPlateau | str]:
+        """Configures the optimizer and scheduler."""
+        optimizer = torch.optim.Adam(
             self.parameters(),
             lr=self.learning_rate,
             weight_decay=self.weight_decay
         )
+
+        # scheduler = ReduceLROnPlateau(optimizer, mode='min')
+
+        return {
+            'optimizer': optimizer,
+            # 'lr_scheduler': scheduler,
+            'monitor': 'val_loss'
+        }
 
     def _get_loss_fn(self) -> nn.Module:
         """Gets the loss function."""

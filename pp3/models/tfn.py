@@ -237,11 +237,11 @@ class TFN(torch.nn.Module):
         self,
         node_dim: int,
         num_layers: int,
-        sh_lmax: int,
-        ns: int,
-        nv: int,
-        ntps: int,
-        ntpv: int,
+        sh_lmax: int = 1,
+        ns: int = 32,
+        nv: int = 4,
+        ntps: int = 16,
+        ntpv: int = 4,
         fc_dim: int = 128,
         edge_dim: int = 0,
         pos_emb_dim: int = 16,
@@ -254,7 +254,7 @@ class TFN(torch.nn.Module):
         parity: int = 1,
         attention: bool = False,
         use_fast: bool = False,
-    ):
+    ) -> None:
         super(TFN, self).__init__()
 
         self.pos_emb_dim = pos_emb_dim
@@ -380,43 +380,43 @@ class TFN(torch.nn.Module):
 
     def forward(
         self,
-        node_attr,
-        pos,
-        mask,
-        edge_attr=None,
-    ):
-        B, N, _ = pos.shape
-        node_attr = self.node_embedding(node_attr)
+        embeddings: torch.Tensor,
+        coords: torch.Tensor,
+        padding_mask: torch.Tensor,
+        edges: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        B, N, _ = coords.shape
+        embeddings = self.node_embedding(embeddings)
 
         # Relative positional embedding
-        idx = torch.arange(N, device=pos.device)
+        idx = torch.arange(N, device=coords.device)
         idx = idx.unsqueeze(0) - idx.unsqueeze(1)
         edge_pos_emb = sinusoidal_embedding(idx.flatten(), self.pos_emb_dim)
         edge_pos_emb = edge_pos_emb.reshape(1, N, N, -1)
 
         for i in range(self.num_layers):
-            edges, edge_sh = self.compute_edge_attr(pos, edge_pos_emb, edge_attr)
+            edges, edge_sh = self.compute_edge_attr(coords, edge_pos_emb, edges)
 
             # Compute edge features
             edge_attr_ = torch.cat(
                 [
                     edges,
-                    node_attr[..., None, : self.ns].expand(-1, -1, N, -1),
-                    node_attr[..., None, :, : self.ns].expand(-1, N, -1, -1),
+                    embeddings[..., None, : self.ns].expand(-1, -1, N, -1),
+                    embeddings[..., None, :, : self.ns].expand(-1, N, -1, -1),
                 ],
                 -1,
             )
 
             # Update node features
             layer = self.conv_layers[i]
-            node_attr = layer(node_attr, edge_attr_, edge_sh, mask)
+            embeddings = layer(embeddings, edge_attr_, edge_sh, padding_mask)
 
             # Update node positions
             update = self.update_layers[i]
-            dX = update(node_attr, node_attr)
+            dX = update(embeddings, embeddings)
             if self.parity:
                 dX = dX.view(B, N, 2, 3).mean(-2)
 
-            pos = pos + dX
+            coords = coords + dX
 
-        return node_attr
+        return embeddings
