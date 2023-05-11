@@ -12,6 +12,7 @@ from biotite.structure import (
     filter_backbone,
     index_angle,
     index_dihedral,
+    residue_iter,
     sasa
 )
 from biotite.structure.info import standardize_order
@@ -326,9 +327,11 @@ def residue_locations(
 def b_factors(
         structure: AtomArray
 ) -> torch.Tensor:
-    """Get the B-factors of each atom.
+    """Get the average B-factors of each residue.
 
     :param structure: The protein structure.
-    :return: A PyTorch tensor with the B-factors of each atom (type: float).
+    :return: A PyTorch tensor with the average B-factors of each residue (type: float).
     """
-    return torch.from_numpy(structure.b_factor)
+    return torch.from_numpy([
+        np.mean(residue.b_factor) for residue in residue_iter(structure)
+    ])
