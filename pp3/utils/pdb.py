@@ -113,7 +113,7 @@ def load_structure(
         raise FileNotFoundError('PDB file does not exist')
 
     # Parse PDB structure
-    structure = PDBFile.read(pdb_path).get_structure()
+    structure = PDBFile.read(pdb_path).get_structure(extra_fields=['b_factor'])
 
     # Get first model
     structure = structure[0]

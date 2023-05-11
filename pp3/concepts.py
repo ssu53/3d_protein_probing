@@ -320,3 +320,15 @@ def residue_locations(
     locations = torch.arange(0, num_residues) / num_residues
 
     return locations
+
+
+@register_concept(concept_level='residue', concept_type='regression', output_dim=1)
+def b_factors(
+        structure: AtomArray
+) -> torch.Tensor:
+    """Get the B-factors of each atom.
+
+    :param structure: The protein structure.
+    :return: A PyTorch tensor with the B-factors of each atom (type: float).
+    """
+    return torch.from_numpy(structure.b_factor)
