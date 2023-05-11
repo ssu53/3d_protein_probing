@@ -90,7 +90,7 @@ def pdb_to_pytorch(
     error_counter = Counter()
 
     with Pool() as pool:
-        for pdb_id, protein in tqdm(zip(pdb_ids, map(convert_pdb_to_pytorch_fn, pdb_ids)), total=len(pdb_ids)):
+        for pdb_id, protein in tqdm(zip(pdb_ids, pool.imap(convert_pdb_to_pytorch_fn, pdb_ids)), total=len(pdb_ids)):
             if 'error' in protein:
                 error_counter[protein['error']] += 1
             else:

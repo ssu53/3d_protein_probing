@@ -34,6 +34,8 @@ gunzip -r pdb
 
 ### Get diverse set of PDB IDs
 
+> This step has been completed previously, and the data can be found at `data/pdb_single_chain_protein_30_identity/pdb_ids.txt`.
+
 Search for single chain proteins with 30% sequence clustering on 2/4/23.
 1. Go to https://www.rcsb.org/search/advanced
 2. Under Structure Attributes, add "Total Number of Polymer Instances (Chains)" = 1 AND "Entry Polymer Types" is "Protein (only)"
