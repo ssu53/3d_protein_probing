@@ -150,8 +150,8 @@ class Model(pl.LightningModule):
             pad_sum = padding_mask.sum(dim=1, keepdim=True)
             pad_sum[pad_sum == 0] = 1
 
-            # Sum over all residues
-            encodings = (encodings * padding_mask.unsqueeze(dim=-1)).sum(dim=1)
+            # Average over all residues
+            encodings = (encodings * padding_mask.unsqueeze(dim=-1)).sum(dim=1) / pad_sum
 
             if keep_mask is not None:
                 encodings = encodings[keep_mask]
