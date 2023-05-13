@@ -124,6 +124,7 @@ class EGNN_Layer(nn.Module):
             mask = padding_mask.unsqueeze(1) * padding_mask.unsqueeze(2)
             mask = mask * (1.0 - torch.eye(N).view(1, N, N).to(m_ij))
             mask_sum = mask.sum(dim=2, keepdim=True)
+            mask_sum[mask_sum == 0] = 1.0
 
         # Compute coordinate update
         if self.update_coors:
