@@ -3,7 +3,7 @@ from collections import Counter
 
 import torch
 
-from pp3.utils.constants import AA_1, AA_1_TO_INDEX, BLOSUM62_AA_TO_VECTOR
+from pp3.utils.constants import AA_1, AA_1_TO_INDEX, BLOSUM62_AA_TO_VECTOR, MAX_SEQ_LEN
 
 
 def get_baseline_residue_embedding_index(sequence: str, index: int) -> torch.Tensor:
@@ -20,7 +20,7 @@ def get_baseline_residue_embedding_index(sequence: str, index: int) -> torch.Ten
     :return: The embedding of the residue.
     """
     # Get the length of the protein sequence
-    protein_length = len(sequence)
+    protein_length = len(sequence) / MAX_SEQ_LEN
 
     # Create a one-hot vector for the residue
     residue_one_hot = [0] * len(AA_1)
