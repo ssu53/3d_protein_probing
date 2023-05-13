@@ -33,7 +33,7 @@ def probe(
     dropout: float = 0.0,
     max_epochs: int = 1000,
     ckpt_every_k_epochs: int = 10,
-    num_workers: int = 8,
+    num_workers: int = 4,
     split_seed: int = 0,
     max_neighbors: int | None = None,
     patience: int = 25,

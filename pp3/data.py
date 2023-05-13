@@ -168,7 +168,7 @@ class ProteinConceptDataModule(pl.LightningDataModule):
             concept: str,
             embedding_method: str,
             batch_size: int,
-            num_workers: int = 8,
+            num_workers: int = 4,
             split_seed: int = 0
     ) -> None:
         """Initialize the data module.
