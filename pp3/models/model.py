@@ -149,9 +149,11 @@ class Model(pl.LightningModule):
 
         # If needed, modify embedding structure based on concept level
         if self.concept_level == 'protein':
-            pad_sum = padding_mask.sum(dim=1)
+            pad_sum = padding_mask.sum(dim=1, keepdim=True)
             pad_sum[pad_sum == 0] = 1
-            encodings = (encodings * padding_mask).sum(dim=1) / pad_sum
+
+            # Average over all residues
+            encodings = (encodings * padding_mask.unsqueeze(dim=-1)).sum(dim=1) / pad_sum
 
             if keep_mask is not None:
                 encodings = encodings[keep_mask]
@@ -210,7 +212,10 @@ class Model(pl.LightningModule):
         y_mask = ~torch.isnan(y)
 
         # Set up masks
-        if self.concept_level == 'residue':
+        if self.concept_level == 'protein':
+            keep_mask = y_mask
+            keep_sum = 1
+        elif self.concept_level == 'residue':
             # Keep mask
             keep_mask = (y_mask * padding_mask).bool()
 
@@ -393,6 +398,14 @@ class Model(pl.LightningModule):
         else:
             raise ValueError(f'Invalid target type: {self.target_type}')
 
+        # Reshape predictions and targets
+        y = y.view(-1)
+
+        if self.target_type == 'multi_classification':
+            y_hat = y_hat.view(-1, y_hat.shape[-1])
+        else:
+            y_hat = y_hat.view(-1)
+
         return y_hat, y
 
     def configure_optimizers(self) -> dict[str, torch.optim.Optimizer | ReduceLROnPlateau | str]:
@@ -403,11 +416,11 @@ class Model(pl.LightningModule):
             weight_decay=self.weight_decay
         )
 
-        scheduler = ReduceLROnPlateau(optimizer, mode='min')
+        # scheduler = ReduceLROnPlateau(optimizer, mode='min')
 
         return {
             'optimizer': optimizer,
-            'lr_scheduler': scheduler,
+            # 'lr_scheduler': scheduler,
             'monitor': 'val_loss'
         }
 

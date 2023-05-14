@@ -12,6 +12,7 @@ from biotite.structure import (
     filter_backbone,
     index_angle,
     index_dihedral,
+    residue_iter,
     sasa
 )
 from biotite.structure.info import standardize_order
@@ -22,9 +23,15 @@ from pp3.utils.pdb import get_residue_coordinates
 
 CONCEPT_FUNCTION_TYPE = Callable[[AtomArray], Any]
 CONCEPT_TO_FUNCTION = {}
-CONCEPT_TO_LEVEL = {}
-CONCEPT_TO_TYPE = {}
-CONCEPT_TO_OUTPUT_DIM = {}
+CONCEPT_TO_LEVEL = {
+    'solubility': 'protein'
+}
+CONCEPT_TO_TYPE = {
+    'solubility': 'binary_classification'
+}
+CONCEPT_TO_OUTPUT_DIM = {
+    'solubility': 1
+}
 
 
 def register_concept(
@@ -221,6 +228,29 @@ def residue_distances(
     return distances
 
 
+@register_concept(concept_level='residue', concept_type='regression', output_dim=1)
+def residue_distances_by_residue(
+        structure: AtomArray,
+        max_distance: float | None = 25.0
+) -> torch.Tensor:
+    """Get the average distance from a residue to all other residues within a maximum distance window.
+
+    :param structure: The protein structure.
+    :param max_distance: The maximum distance between residue pairs (in Angstroms) to include.
+    :return: A PyTorch tensor with average distance from each residue to all other residues within max_distance.
+    """
+    # Get residue distances
+    distances = residue_distances(
+        structure=structure,
+        max_distance=max_distance
+    )
+
+    # Get average distance from each residue to all other residues
+    distances = torch.nanmean(distances, dim=1)
+
+    return distances
+
+
 @register_concept(concept_level='residue_pair', concept_type='binary_classification', output_dim=1)
 def residue_contacts(
         structure: AtomArray,
@@ -250,3 +280,58 @@ def residue_contacts(
     contacts[short_range_mask] = torch.nan
 
     return contacts
+
+
+@register_concept(concept_level='residue', concept_type='binary_classification', output_dim=1)
+def residue_contacts_by_residue(
+        structure: AtomArray,
+        contact_threshold: float = 8.0,
+        long_range_threshold: int = 24
+) -> torch.Tensor:
+    """Get whether each residue is involved in a long-range contact.
+
+    :param structure: The protein structure.
+    :param contact_threshold: The distance threshold for a contact (below this threshold is a contact).
+    :param long_range_threshold: The distance threshold for a long-range contact (below this threshold is short-range).
+    :return: A PyTorch tensor showing which residues have long range contacts (type: bool).
+    """
+    # Get residue contacts
+    contacts = residue_contacts(
+        structure=structure,
+        contact_threshold=contact_threshold,
+        long_range_threshold=long_range_threshold
+    )
+
+    # Sum over the second dimension to get which residues have contacts
+    contacts = torch.nansum(contacts, dim=1) > 0
+
+    return contacts
+
+
+@register_concept(concept_level='residue', concept_type='regression', output_dim=1)
+def residue_locations(
+        structure: AtomArray
+) -> torch.Tensor:
+    """Get the relative location of each residue in the protein.
+
+    :param structure: The protein structure.
+    :return: A PyTorch tensor with the relative location of each residue (type: float).
+    """
+    num_residues = get_residue_count(structure)
+    locations = torch.arange(0, num_residues) / num_residues
+
+    return locations
+
+
+@register_concept(concept_level='residue', concept_type='regression', output_dim=1)
+def b_factors(
+        structure: AtomArray
+) -> torch.Tensor:
+    """Get the average B-factors of each residue.
+
+    :param structure: The protein structure.
+    :return: A PyTorch tensor with the average B-factors of each residue (type: float).
+    """
+    return torch.from_numpy(np.array([
+        np.mean(residue.b_factor) for residue in residue_iter(structure)
+    ]))
