@@ -396,6 +396,14 @@ class Model(pl.LightningModule):
         else:
             raise ValueError(f'Invalid target type: {self.target_type}')
 
+        # Reshape predictions and targets
+        y = y.view(-1)
+
+        if self.target_type == 'multi_classification':
+            y_hat = y_hat.view(-1, y_hat.shape[-1])
+        else:
+            y_hat = y_hat.view(-1)
+
         return y_hat, y
 
     def configure_optimizers(self) -> dict[str, torch.optim.Optimizer | ReduceLROnPlateau | str]:

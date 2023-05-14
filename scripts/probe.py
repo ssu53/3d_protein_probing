@@ -187,12 +187,24 @@ def probe(
     trainer.test(datamodule=data_module, ckpt_path='best')
 
     # Make test predictions
-    # TODO: fix this for residue_pair concepts (both memory issues and concat issues)
     test_preds, test_targets = zip(*trainer.predict(datamodule=data_module, ckpt_path='best'))
     test_preds = torch.cat(test_preds)
     test_targets = torch.cat(test_targets)
 
+    # Remove NaNs
+    keep_mask = ~torch.isnan(test_targets)
+    test_preds = test_preds[keep_mask]
+    test_targets = test_targets[keep_mask]
+
+    # Save test targets and predictions
+    print(f'Saving test targets and predictions to {save_dir}')
+    torch.save({
+        'prediction': test_preds,
+        'target': test_targets
+    }, save_dir / 'target_and_prediction.pt')
+
     # Plot predictions vs targets
+    print(f'Plotting predictions vs targets to {save_dir}')
     plot_preds_vs_targets(
         preds=test_preds,
         targets=test_targets,
@@ -200,12 +212,6 @@ def probe(
         concept=concept,
         save_path=save_dir / 'target_vs_prediction.pdf',
     )
-
-    # Save test targets and predictions
-    torch.save({
-        'prediction': test_preds,
-        'target': test_targets
-    }, save_dir / 'target_and_prediction.pt')
 
 
 if __name__ == '__main__':
