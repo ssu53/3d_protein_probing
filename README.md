@@ -92,62 +92,53 @@ Probe sequence models for concepts.
 ```bash
 #!/bin/bash
 
-for CONCEPT in residue_sasa secondary_structure bond_angles dihedral_angles residue_distances residue_contacts
+for CONCEPT in residue_sasa secondary_structure bond_angles dihedral_angles residue_distances residue_distances_by_residue residue_contacts residue_contacts_by_residue residue_locations
 do
     for EMBEDDING_METHOD in plm baseline
     do
-        for ENCODER_NUM_LAYERS in 0 1 2
-        do
-            for PREDICTOR_NUM_LAYERS in 1 2
-            do
-                python scripts/probe.py \
-                    --project_name probing \
-                    --proteins_path data/pdb_single_chain_protein_30_identity/proteins.pt \
-                    --embeddings_path data/pdb_single_chain_protein_30_identity/embeddings/esm2_t33_650M_UR50D.pt \
-                    --save_dir results/pdb_single_chain_protein_30_identity \
-                    --concepts_dir data/pdb_single_chain_protein_30_identity/concepts \
-                    --concept $CONCEPT \
-                    --embedding_method $EMBEDDING_METHOD \
-                    --encoder_type mlp \
-                    --encoder_num_layers $ENCODER_NUM_LAYERS \
-                    --encoder_hidden_dim 100 \
-                    --predictor_num_layers $PREDICTOR_NUM_LAYERS \
-                    --predictor_hidden_dim 100 \
-                    --batch_size 100
-            done
-        done
+        python scripts/probe.py \
+            --project_name probing \
+            --proteins_path data/pdb_single_chain_protein_30_identity/proteins.pt \
+            --embeddings_path data/pdb_single_chain_protein_30_identity/embeddings/esm2_t33_650M_UR50D.pt \
+            --save_dir results/pdb_single_chain_protein_30_identity \
+            --concepts_dir data/pdb_single_chain_protein_30_identity/concepts \
+            --concept $CONCEPT \
+            --embedding_method $EMBEDDING_METHOD \
+            --encoder_type mlp \
+            --encoder_num_layers 0 \
+            --encoder_hidden_dim 100 \
+            --predictor_num_layers 2 \
+            --predictor_hidden_dim 100 \
+            --batch_size 100
     done
 done
 ```
 
-Probe structure models (currently just EGNN, later TFN and IPA) for concepts.
+Probe structure models (currently EGNN and TFN, later IPA) for concepts.
 ```bash
 #!/bin/bash
 
-for CONCEPT in residue_sasa secondary_structure bond_angles dihedral_angles residue_distances residue_contacts
+for CONCEPT in residue_sasa secondary_structure bond_angles dihedral_angles residue_distances residue_distances_by_residue residue_contacts residue_contacts_by_residue residue_locations
 do
     for EMBEDDING_METHOD in baseline plm
     do
-        for ENCODER_NUM_LAYERS in 3
+        for ENCODER_TYPE in egnn tfn
         do
-            for PREDICTOR_NUM_LAYERS in 1 2
-            do
-                python scripts/probe.py \
-                    --project_name probing \
-                    --proteins_path data/pdb_single_chain_protein_30_identity/proteins.pt \
-                    --embeddings_path data/pdb_single_chain_protein_30_identity/embeddings/esm2_t33_650M_UR50D.pt \
-                    --save_dir results/pdb_single_chain_protein_30_identity \
-                    --concepts_dir data/pdb_single_chain_protein_30_identity/concepts \
-                    --concept $CONCEPT \
-                    --embedding_method $EMBEDDING_METHOD \
-                    --encoder_type egnn \
-                    --encoder_num_layers $ENCODER_NUM_LAYERS \
-                    --encoder_hidden_dim 16 \
-                    --predictor_num_layers $PREDICTOR_NUM_LAYERS \
-                    --predictor_hidden_dim 100 \
-                    --batch_size 16 \
-                    --max_neighbors 24
-            done
+            python scripts/probe.py \
+                --project_name probing \
+                --proteins_path data/pdb_single_chain_protein_30_identity/proteins.pt \
+                --embeddings_path data/pdb_single_chain_protein_30_identity/embeddings/esm2_t33_650M_UR50D.pt \
+                --save_dir results/pdb_single_chain_protein_30_identity \
+                --concepts_dir data/pdb_single_chain_protein_30_identity/concepts \
+                --concept $CONCEPT \
+                --embedding_method $EMBEDDING_METHOD \
+                --encoder_type $ENCODER_TYPE \
+                --encoder_num_layers 3 \
+                --encoder_hidden_dim 16 \
+                --predictor_num_layers 2 \
+                --predictor_hidden_dim 100 \
+                --batch_size 16 \
+                --max_neighbors 24
         done
     done
 done
@@ -177,31 +168,25 @@ for CONCEPT in solubility
 do
     for EMBEDDING_METHOD in plm baseline
     do
-        for ENCODER_NUM_LAYERS in 0 1 2
-        do
-            for PREDICTOR_NUM_LAYERS in 1 2
-            do
-                python scripts/probe.py \
-                    --project_name probing \
-                    --proteins_path data/downstream_tasks/${CONCEPT}_proteins.pt \
-                    --embeddings_path data/downstream_tasks/${CONCEPT}_esm2_t33_650M_UR50D.pt \
-                    --save_dir results/downstream_tasks \
-                    --concepts_dir data/downstream_tasks \
-                    --concept $CONCEPT \
-                    --embedding_method $EMBEDDING_METHOD \
-                    --encoder_type mlp \
-                    --encoder_num_layers $ENCODER_NUM_LAYERS \
-                    --encoder_hidden_dim 100 \
-                    --predictor_num_layers $PREDICTOR_NUM_LAYERS \
-                    --predictor_hidden_dim 100 \
-                    --batch_size 100
-            done
-        done
+        python scripts/probe.py \
+            --project_name probing \
+            --proteins_path data/downstream_tasks/computational/${CONCEPT}_proteins.pt \
+            --embeddings_path data/downstream_tasks/computational/${CONCEPT}_esm2_t33_650M_UR50D.pt \
+            --save_dir results/downstream_tasks/computational \
+            --concepts_dir data/downstream_tasks/computational \
+            --concept $CONCEPT \
+            --embedding_method $EMBEDDING_METHOD \
+            --encoder_type mlp \
+            --encoder_num_layers 0 \
+            --encoder_hidden_dim 100 \
+            --predictor_num_layers 2 \
+            --predictor_hidden_dim 100 \
+            --batch_size 100
     done
 done
 ```
 
-Train structure models (currently just EGNN, later TFN and IPA) for downstream tasks.
+Train structure models (currently EGNN and TFN, later IPA) for downstream tasks.
 ```bash
 #!/bin/bash
 
@@ -209,26 +194,23 @@ for CONCEPT in solubility
 do
     for EMBEDDING_METHOD in baseline plm
     do
-        for ENCODER_NUM_LAYERS in 3
+        for ENCODER_TYPE in egnn tfn
         do
-            for PREDICTOR_NUM_LAYERS in 1 2
-            do
-                python scripts/probe.py \
-                    --project_name probing \
-                    --proteins_path data/downstream_tasks/${CONCEPT}_proteins.pt \
-                    --embeddings_path data/downstream_tasks/${CONCEPT}_esm2_t33_650M_UR50D.pt \
-                    --save_dir results/downstream_tasks \
-                    --concepts_dir data/downstream_tasks \
-                    --concept $CONCEPT \
-                    --embedding_method $EMBEDDING_METHOD \
-                    --encoder_type egnn \
-                    --encoder_num_layers $ENCODER_NUM_LAYERS \
-                    --encoder_hidden_dim 16 \
-                    --predictor_num_layers $PREDICTOR_NUM_LAYERS \
-                    --predictor_hidden_dim 100 \
-                    --batch_size 16 \
-                    --max_neighbors 24
-            done
+            python scripts/probe.py \
+                --project_name probing \
+                --proteins_path data/downstream_tasks/computational/${CONCEPT}_proteins.pt \
+                --embeddings_path data/downstream_tasks/computational/${CONCEPT}_esm2_t33_650M_UR50D.pt \
+                --save_dir results/downstream_tasks/computational \
+                --concepts_dir data/downstream_tasks/computational \
+                --concept $CONCEPT \
+                --embedding_method $EMBEDDING_METHOD \
+                --encoder_type $ENCODER_TYPE \
+                --encoder_num_layers 3 \
+                --encoder_hidden_dim 16 \
+                --predictor_num_layers 2 \
+                --predictor_hidden_dim 100 \
+                --batch_size 16 \
+                --max_neighbors 24
         done
     done
 done

@@ -69,7 +69,7 @@ def probe(
     :param run_name_suffix: A suffix to append to the run name.
     """
     # Create save directory
-    run_name = f'{concept}_{embedding_method}_{encoder_type}_{encoder_num_layers}L_{predictor_num_layers}L'
+    run_name = f'{concept}_{embedding_method}_{encoder_type}_{encoder_num_layers}L_{predictor_num_layers}L_split_{split_seed}'
     if run_name_suffix:
         run_name += f'_{run_name_suffix}'
 
