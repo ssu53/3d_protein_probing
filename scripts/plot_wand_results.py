@@ -1,7 +1,7 @@
 """Plot results using W&B output CSV file."""
 from collections import defaultdict
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
@@ -25,7 +25,40 @@ ENCODER_TYPE_TO_COLOR = {
     'egnn': 'tab:orange',
     'tfn': 'tab:red'
 }
+METRIC_SHORT_TO_LONG = {
+    'ap': 'Average Precision',
+    'accuracy': 'Accuracy',
+    'r2': 'R^2'
+}
 OFFSET = 1
+CONCEPT_TO_NAME = {
+    'residue_sasa': 'SASA',
+    'secondary_structure': 'Secondary Structure',
+    'residue_locations': 'Locations',
+    'residue_distances': 'Distances',
+    'residue_distances_by_residue': 'Distances By Residue',
+    'residue_contacts': 'Contacts',
+    'residue_contacts_by_residue': 'Contacts By Residue',
+    'bond_angles': 'Bond Angles',
+    'dihedral_angles': 'Dihedral Angles',
+    'solubility': 'Solubility'
+}
+CONCEPT_SUBSET_ORDER = {
+    'geometry': [
+        'SASA',
+        'Secondary Structure',
+        'Locations',
+        'Distances',
+        'Distances By Residue',
+        'Contacts',
+        'Contacts By Residue',
+        'Bond Angles',
+        'Dihedral Angles'
+    ],
+    'downstream': [
+        'Solubility'
+    ]
+}
 
 
 def default_dict_to_regular(obj: Any) -> dict:
@@ -36,65 +69,48 @@ def default_dict_to_regular(obj: Any) -> dict:
 
 
 def plot_wand_results(
-        data_paths: list[Path],
-        metrics: list[str],
-        save_path: Path
+        data_path: Path,
+        save_path: Path,
+        metrics: tuple[str] = ('ap', 'accuracy', 'r2'),
+        concept_subset: Literal['geometry', 'downstream'] | None = None
 ) -> None:
     """Plot results using W&B output CSV file."""
-    # Check input sizes
-    assert len(data_paths) == len(metrics)
+    # Load data
+    data = pd.read_csv(data_path)
 
     # Extract results
     concept_to_embedding_to_encoder_to_results = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
     concept_to_metric = {}
 
-    for data_path, metric in zip(data_paths, metrics):
-        # Load data
-        data = pd.read_csv(data_path)
+    for metric in metrics:
+        metric_data = data[data[f'test_{metric}'].notna()]
 
-        # Extract run information
-        runs = data.columns[1::3]
-        concepts, run_names, embedding_methods, encoder_types = [], [], [], []
-
-        for run in runs:
-            # Get concept
-            concept = None
-            for embedding_method in EMBEDDING_METHODS:
-                if embedding_method in run:
-                    concept = run[:run.index(embedding_method)].strip('_')
-                    break
-
-            if concept is None:
-                raise ValueError(f'Could not find concept in {run}')
-
-            # Get run information
-            run_name = run.split('-')[0].strip().replace(f'{concept}_', '')
-            run_names.append(run_name)
-
-            concept = concept.replace('_', ' ').title()
-            concepts.append(concept)
-
-            embedding_methods.append(run_name.split('_')[0])
-            encoder_types.append(run_name.split('_')[1])
-
-            concept_to_metric[concept] = metric
-
-        # Merge results across splits
-        for run, concept, embedding_method, encoder_type in zip(runs, concepts, embedding_methods, encoder_types):
-            results = data[run].dropna()
-
-            if len(results) > 1:
-                raise ValueError(f'Found more than one result for {run}')
-
-            concept_to_embedding_to_encoder_to_results[concept][embedding_method][encoder_type].append(results.iloc[0])
+        for concept, embedding_method, encoder_type, result in zip(
+                metric_data['concept'],
+                metric_data['embedding_method'],
+                metric_data['encoder_type'],
+                metric_data[f'test_{metric}']
+        ):
+            concept = CONCEPT_TO_NAME[concept]
+            concept_to_embedding_to_encoder_to_results[concept][embedding_method][encoder_type].append(result)
+            concept_to_metric[concept] = METRIC_SHORT_TO_LONG[metric]
 
     # Convert defaultdict to regular dict
     concept_to_embedding_to_encoder_to_results = default_dict_to_regular(concept_to_embedding_to_encoder_to_results)
 
     # Set up subplots
-    concepts = sorted(concept_to_embedding_to_encoder_to_results)
+    concepts = set(concept_to_embedding_to_encoder_to_results)
+
+    if concept_subset is not None:
+        concepts = [concept for concept in CONCEPT_SUBSET_ORDER[concept_subset] if concept in concepts]
+    else:
+        concepts = sorted(concepts)
+
     num_plots = len(concepts)
     fig, axes = plt.subplots(nrows=1, ncols=num_plots, sharey=True, figsize=(4 * num_plots, 4))
+
+    if not isinstance(axes, np.ndarray):
+        axes = [axes]
 
     # Plot each set of results
     for ax, concept in tqdm(zip(axes, concepts), total=num_plots):
