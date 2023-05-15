@@ -187,20 +187,15 @@ def probe(
     trainer.test(datamodule=data_module, ckpt_path='best')
 
     # Make test predictions
-    test_preds, test_targets = zip(*trainer.predict(datamodule=data_module, ckpt_path='best'))
-    test_preds = torch.cat(test_preds)
+    test_targets, test_preds = zip(*trainer.predict(datamodule=data_module, ckpt_path='best'))
     test_targets = torch.cat(test_targets)
-
-    # Remove NaNs
-    keep_mask = ~torch.isnan(test_targets)
-    test_preds = test_preds[keep_mask]
-    test_targets = test_targets[keep_mask]
+    test_preds = torch.cat(test_preds)
 
     # Save test targets and predictions
     print(f'Saving test targets and predictions to {save_dir}')
     torch.save({
-        'prediction': test_preds,
-        'target': test_targets
+        'target': test_targets,
+        'prediction': test_preds
     }, save_dir / 'target_and_prediction.pt')
 
     # Plot predictions vs targets

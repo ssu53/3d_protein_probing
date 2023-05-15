@@ -8,6 +8,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from sklearn.metrics import (
     average_precision_score,
     mean_absolute_error,
+    mean_absolute_percentage_error,
     mean_squared_error,
     r2_score,
     roc_auc_score
@@ -76,6 +77,13 @@ class Model(pl.LightningModule):
         self.concept_level = concept_level
         self.pair_class_balance = pair_class_balance
 
+        self.train_y = []
+        self.train_y_hat = []
+        self.val_y = []
+        self.val_y_hat = []
+        self.test_y = []
+        self.test_y_hat = []
+
         if encoder_type == 'mlp':
             self.encoder = MLP(
                 input_dim=self.input_dim,
@@ -136,7 +144,7 @@ class Model(pl.LightningModule):
             coords: torch.Tensor,
             padding_mask: torch.Tensor,
             keep_mask: torch.Tensor = None
-    ) -> torch.Tensor:
+    ) -> list[torch.Tensor]:
         """Runs the model on the data.
 
         :param embeddings: A tensor containing an embedding.
@@ -145,6 +153,10 @@ class Model(pl.LightningModule):
         :param keep_mask: A tensor containing the target mask.
         :return: A tensor containing the model's prediction.
         """
+        # Get dimensions
+        num_proteins, num_residues = padding_mask.shape
+
+        # Encode embeddings
         encodings = self.encoder(embeddings, coords, padding_mask)
 
         # If needed, modify embedding structure based on concept level
@@ -154,13 +166,8 @@ class Model(pl.LightningModule):
 
             # Average over all residues
             encodings = (encodings * padding_mask.unsqueeze(dim=-1)).sum(dim=1) / pad_sum
-
-            if keep_mask is not None:
-                encodings = encodings[keep_mask]
         elif self.concept_level == 'residue_pair':
-            # Create pair embeddings
-            num_proteins, num_residues = padding_mask.shape
-
+            # Create pairs of residue embeddings
             if keep_mask is not None:
                 keep_mask_indices = torch.nonzero(keep_mask.view(num_proteins, num_residues, num_residues))
             else:
@@ -172,37 +179,33 @@ class Model(pl.LightningModule):
         elif self.concept_level == 'residue_triplet':
             # Create adjacent triples of residue embeddings
             encodings = torch.cat([encodings[:, :-2], encodings[:, 1:-1], encodings[:, 2:]], dim=-1)
-
-            if keep_mask is not None:
-                encodings = encodings[keep_mask]
         elif self.concept_level == 'residue_quadruplet':
             # Create adjacent quadruples of residue embeddings
             encodings = torch.cat([encodings[:, :-3], encodings[:, 1:-2], encodings[:, 2:-1], encodings[:, 3:]], dim=-1)
-
-            if keep_mask is not None:
-                encodings = encodings[keep_mask]
-        elif self.concept_level == 'residue':
-            if keep_mask is not None:
-                encodings = encodings[keep_mask]
-        else:
+        elif self.concept_level != 'residue':
             raise ValueError(f'Invalid concept level: {self.concept_level}')
 
-        encodings = self.predictor(encodings)
+        # Select encodings using keep mask
+        if keep_mask is not None and self.concept_level != 'residue_pair':
+            encodings = encodings[keep_mask]
 
-        return encodings
+        # Predict using MLP
+        output = self.predictor(encodings)
+
+        return output
 
     def step(
             self,
             batch: BATCH_TYPE,
             batch_idx: int,
             step_type: str
-    ) -> float:
+    ) -> tuple[float, list[np.ndarray], list[np.ndarray]]:
         """Runs a training, validation, or test step.
 
         :param batch: A tuple containing the inputs and target.
         :param batch_idx: The index of the batch.
         :param step_type: The type of step (train, val, or test).
-        :return: The loss.
+        :return: The loss, targets, and predictions (both per protein).
         """
         # Unpack batch
         embeddings, coords, y, padding_mask = batch
@@ -289,10 +292,10 @@ class Model(pl.LightningModule):
             y_hat = y_hat_scaled * self.target_std + self.target_mean
         elif self.target_type == 'binary_classification':
             y_scaled = y.float()
-            y_hat = y_hat_scaled
+            y_hat = torch.sigmoid(y_hat_scaled)
         elif self.target_type == 'multi_classification':
             y_scaled = F.one_hot(y, num_classes=self.output_dim).float()
-            y_hat = y_hat_scaled
+            y_hat = torch.softmax(y_hat_scaled, dim=-1)
         else:
             raise ValueError(f'Invalid target type: {self.target_type}')
 
@@ -301,27 +304,47 @@ class Model(pl.LightningModule):
         loss = (loss / keep_sum).sum() / num_proteins
 
         # Convert target and predictions to NumPy
-        y_np = y.detach().cpu().numpy()
-        y_hat_np = y_hat.detach().cpu().numpy()
+        y = y.detach().cpu().numpy()
+        y_hat = y_hat.detach().cpu().numpy()
 
-        # Log metrics
-        self.log(f'{step_type}_loss', loss)
+        # Separate y and y_hat by protein
+        # TODO: check this
+        y_per_protein = keep_mask.sum(dim=1)
+        y_per_protein_cumsum = [0] + y_per_protein.cumsum(dim=0).tolist()
+
+        y = [
+            y[y_per_protein_cumsum[i]:y_per_protein_cumsum[i + 1]]
+            for i in range(num_proteins)
+        ]
+        y_hat = [
+            y_hat[y_per_protein_cumsum[i]:y_per_protein_cumsum[i + 1]]
+            for i in range(num_proteins)
+        ]
+
+        return loss, y, y_hat
+
+    def evaluate(
+            self,
+            y: list[np.ndarray],
+            y_hat: list[np.ndarray],
+            step_type: str
+    ) -> None:
+        # TODO: macro and micro metrics
 
         if self.target_type == 'regression':
-            # TODO: add MAPE (mean average percentage error)
-            self.log(f'{step_type}_mae', mean_absolute_error(y_np, y_hat_np))
-            self.log(f'{step_type}_rmse', np.sqrt(mean_squared_error(y_np, y_hat_np)))
-            self.log(f'{step_type}_r2', r2_score(y_np, y_hat_np))
+            self.log(f'{step_type}_mape', mean_absolute_percentage_error(y, y_hat))
+            self.log(f'{step_type}_mae', mean_absolute_error(y, y_hat))
+            self.log(f'{step_type}_rmse', np.sqrt(mean_squared_error(y, y_hat)))
+            self.log(f'{step_type}_r2', r2_score(y, y_hat))
         elif self.target_type == 'binary_classification':
-            if y_np.ndim == 1:
-                y_np = y_np[:, None]
-                y_hat_np = y_hat_np[:, None]
+            if y.ndim == 1:
+                y = y[:, None]
+                y_hat = y_hat[:, None]
 
             roc_aucs, aps = [], []
-            for i in range(y_np.shape[1]):
-                if len(np.unique(y_np[:, i])) == 2:
-                    roc_aucs.append(roc_auc_score(y_np[:, i], y_hat_np[:, i]))
-                    aps.append(average_precision_score(y_np[:, i], y_hat_np[:, i]))
+            for i in range(y.shape[1]):
+                roc_aucs.append(roc_auc_score(y[:, i], y_hat[:, i]))
+                aps.append(average_precision_score(y[:, i], y_hat[:, i]))
 
             self.log(f'{step_type}_num_valid_targets', float(len(roc_aucs)))
 
@@ -329,11 +352,9 @@ class Model(pl.LightningModule):
                 self.log(f'{step_type}_auc', float(np.mean(roc_aucs)))
                 self.log(f'{step_type}_ap', float(np.mean(aps)))
         elif self.target_type == 'multi_classification':
-            self.log(f'{step_type}_accuracy', (y_np == np.argmax(y_hat_np, axis=1)).mean())
+            self.log(f'{step_type}_accuracy', (y == np.argmax(y_hat, axis=1)).mean())
         else:
             raise ValueError(f'Invalid target type: {self.target_type}')
-
-        return loss
 
     def training_step(
             self,
@@ -346,84 +367,116 @@ class Model(pl.LightningModule):
         :param batch_idx: The index of the batch.
         :return: The loss.
         """
-        return self.step(
+        loss, y, y_hat = self.step(
             batch=batch,
             batch_idx=batch_idx,
             step_type='train'
         )
 
+        self.log('train_loss', loss)
+
+        self.train_y += y
+        self.train_y_hat += y_hat
+
+        return loss
+
+    def on_train_epoch_end(self) -> None:
+        """Evaluate train predictions at the end of an epoch."""
+        self.evaluate(
+            y=self.train_y,
+            y_hat=self.train_y_hat,
+            step_type='train'
+        )
+
+        self.train_y = []
+        self.train_y_hat = []
+
     def validation_step(
             self,
             batch: BATCH_TYPE,
             batch_idx: int
-    ) -> float:
+    ) -> None:
         """Runs a validation step.
 
         :param batch: A tuple containing the input and target.
         :param batch_idx: The index of the batch.
         :return: The loss.
         """
-        return self.step(
+        loss, y, y_hat = self.step(
             batch=batch,
             batch_idx=batch_idx,
             step_type='val'
         )
 
+        self.log('val_loss', loss)
+
+        self.val_y += y
+        self.val_y_hat += y_hat
+
+    def on_validation_epoch_end(self) -> None:
+        """Evaluate validation predictions at the end of an epoch."""
+        self.evaluate(
+            y=self.val_y,
+            y_hat=self.val_y_hat,
+            step_type='val'
+        )
+
+        self.val_y = []
+        self.val_y_hat = []
+
     def test_step(
             self,
             batch: BATCH_TYPE,
             batch_idx: int
-    ) -> float:
+    ) -> None:
         """Runs a test step.
 
         :param batch: A tuple containing the input and target.
         :param batch_idx: The index of the batch.
         :return: The loss.
         """
-        return self.step(
+        loss, y, y_hat = self.step(
             batch=batch,
             batch_idx=batch_idx,
             step_type='test'
         )
+
+        self.log('test_loss', loss)
+
+        self.test_y += y
+        self.test_y_hat += y_hat
+
+    def on_test_epoch_end(self) -> None:
+        """Evaluate test predictions at the end of an epoch."""
+        self.evaluate(
+            y=self.test_y,
+            y_hat=self.test_y_hat,
+            step_type='test'
+        )
+
+        self.test_y = []
+        self.test_y_hat = []
 
     def predict_step(
             self,
             batch: BATCH_TYPE,
             batch_idx: int,
             dataloader_idx: int = 0
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+    ) -> tuple[list[np.ndarray], list[np.ndarray]]:
         """Runs a prediction step.
 
         :param batch: A tuple containing the input and target.
         :param batch_idx: The index of the batch.
         :param dataloader_idx: The index of the dataloader.
-        :return: A tensor of predictions and true values for the batch.
+        :return: A tuple of lists of true and predicted values for the batch.
         """
-        # Unpack batch
-        embeddings, coords, y, padding_mask = batch
+        loss, y, y_hat = self.step(
+            batch=batch,
+            batch_idx=batch_idx,
+            step_type='test'
+        )
 
-        # Make predictions
-        y_hat_scaled = self(embeddings, coords, padding_mask).squeeze(dim=1)
-
-        # Unscale predictions
-        if self.target_type == 'regression':
-            y_hat = y_hat_scaled * self.target_std + self.target_mean
-        elif self.target_type == 'binary_classification':
-            y_hat = torch.sigmoid(y_hat_scaled)
-        elif self.target_type == 'multi_classification':
-            y_hat = torch.softmax(y_hat_scaled, dim=-1)
-        else:
-            raise ValueError(f'Invalid target type: {self.target_type}')
-
-        # Reshape predictions and targets
-        y = y.view(-1)
-
-        if self.target_type == 'multi_classification':
-            y_hat = y_hat.view(-1, y_hat.shape[-1])
-        else:
-            y_hat = y_hat.view(-1)
-
-        return y_hat, y
+        return y, y_hat
 
     def configure_optimizers(self) -> dict[str, torch.optim.Optimizer | ReduceLROnPlateau | str]:
         """Configures the optimizer and scheduler."""
@@ -433,11 +486,8 @@ class Model(pl.LightningModule):
             weight_decay=self.weight_decay
         )
 
-        # scheduler = ReduceLROnPlateau(optimizer, mode='min')
-
         return {
             'optimizer': optimizer,
-            # 'lr_scheduler': scheduler,
             'monitor': 'val_loss'
         }
 
