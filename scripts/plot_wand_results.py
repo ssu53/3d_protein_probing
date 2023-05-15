@@ -2,19 +2,35 @@
 from collections import defaultdict
 from pathlib import Path
 
+import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
 
+EMBEDDING_METHODS_ORDER = ['baseline', 'plm']
+EMBEDDING_METHOD_TO_HATCH = {
+    'baseline': '',
+    'plm': '/'
+}
+EMBEDDING_METHOD_TO_UPPER = {
+    'baseline': 'Baseline',
+    'plm': 'PLM'
+}
 ENCODER_TYPES_ORDER = ['mlp', 'egnn', 'tfn']
+ENCODER_TYPE_TO_COLOR = {
+    'mlp': 'tab:blue',
+    'egnn': 'tab:orange',
+    'tfn': 'tab:red'
+}
+OFFSET = 1
 
 
 def plot_wand_results(
         data_path: Path,
         concept: str,
         metric: str,
-        save_dir: Path
+        save_path: Path
 ) -> None:
     """Plot results using W&B output CSV file."""
     # Load data
@@ -29,30 +45,53 @@ def plot_wand_results(
     # Merge results across splits
     experiment_to_results = defaultdict(list)
     for run, embedding_method, encoder_type in zip(runs, embedding_methods, encoder_types):
-        experiment_to_results[f'{encoder_type} {embedding_method}'].append(data[run].dropna().iloc[0])
+        experiment_to_results[f'{embedding_method} {encoder_type}'].append(data[run].dropna().iloc[0])
 
     # Set up encoder type order
     assert set(encoder_types) <= set(ENCODER_TYPES_ORDER)
     encoder_types_order = [encoder_type for encoder_type in ENCODER_TYPES_ORDER if encoder_type in encoder_types]
-    encoder_types_order_upper = [encoder_type.upper() for encoder_type in encoder_types_order]
+
+    # Set up embedding method order
+    assert set(embedding_methods) <= set(EMBEDDING_METHODS_ORDER)
+    embedding_methods_order = [embedding_method for embedding_method in EMBEDDING_METHODS_ORDER if embedding_method in embedding_methods]
 
     # Plot results
-    save_dir.mkdir(parents=True, exist_ok=True)
+    save_path.parent.mkdir(parents=True, exist_ok=True)
 
-    for embedding_method in embedding_methods:
-        experiments = [f'{encoder_type} {embedding_method}' for encoder_type in encoder_types_order]
+    fig, ax = plt.subplots(figsize=(8, 6))
 
-        plt.clf()
-        for i, experiment in enumerate(experiments):
-            results = experiment_to_results[experiment]
-            plt.bar(i, np.mean(results), yerr=np.std(results), capsize=5)
+    xticks, xticklabels, legend_items = [], [], []
+    for embedding_method_idx, embedding_method in enumerate(embedding_methods_order):
+        legend_items.append(
+            mpatches.Patch(
+                facecolor='lightgray',
+                hatch=EMBEDDING_METHOD_TO_HATCH[embedding_method],
+                label=EMBEDDING_METHOD_TO_UPPER[embedding_method]
+            )
+        )
 
-        plt.xticks(range(len(encoder_types_order_upper)), encoder_types_order_upper, rotation=45)
-        plt.ylabel(metric)
-        plt.title(f'{embedding_method} {concept}')
+        for encoder_type_idx, encoder_type in enumerate(encoder_types_order):
+            results = experiment_to_results[f'{embedding_method} {encoder_type}']
+            xtick = encoder_type_idx + embedding_method_idx * (len(encoder_types_order) + OFFSET)
+            xticks.append(xtick)
+            xticklabels.append(encoder_type.upper())
+            ax.bar(
+                xtick,
+                np.mean(results),
+                yerr=np.std(results),
+                color=ENCODER_TYPE_TO_COLOR[encoder_type],
+                capsize=5,
+                hatch=EMBEDDING_METHOD_TO_HATCH[embedding_method]
+            )
 
-        # Save plot
-        plt.savefig(save_dir / f'{embedding_method}.pdf', bbox_inches='tight')
+    ax.set_xticks(xticks, rotation=45)
+    ax.set_xticklabels(xticklabels, rotation=45)
+    ax.set_ylabel('Metric')
+    ax.set_xlabel(f'{concept} {metric}')
+    ax.legend(handles=legend_items)
+
+    # Save plot
+    plt.savefig(save_path, bbox_inches='tight')
 
 
 if __name__ == '__main__':
