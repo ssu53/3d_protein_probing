@@ -318,16 +318,16 @@ class Model(pl.LightningModule):
                 y_hat_np = y_hat_np[:, None]
 
             roc_aucs, aps = [], []
-            num_valid_targets = 0
             for i in range(y_np.shape[1]):
                 if len(np.unique(y_np[:, i])) == 2:
-                    num_valid_targets += 1
                     roc_aucs.append(roc_auc_score(y_np[:, i], y_hat_np[:, i]))
                     aps.append(average_precision_score(y_np[:, i], y_hat_np[:, i]))
 
-            self.log(f'{step_type}_num_valid_targets', float(num_valid_targets))
-            self.log(f'{step_type}_auc', float(np.mean(roc_aucs)))
-            self.log(f'{step_type}_ap', float(np.mean(aps)))
+            self.log(f'{step_type}_num_valid_targets', float(len(roc_aucs)))
+
+            if len(roc_aucs) > 0:
+                self.log(f'{step_type}_auc', float(np.mean(roc_aucs)))
+                self.log(f'{step_type}_ap', float(np.mean(aps)))
         elif self.target_type == 'multi_classification':
             self.log(f'{step_type}_accuracy', (y_np == np.argmax(y_hat_np, axis=1)).mean())
         else:
