@@ -214,6 +214,11 @@ class Model(pl.LightningModule):
         # Set up masks
         if self.concept_level == 'protein':
             keep_mask = y_mask
+
+            # Handle multiple targets per protein
+            if keep_mask.ndim == 2:
+                keep_mask = keep_mask.all(dim=1)
+
             keep_sum = 1
         elif self.concept_level == 'residue':
             # Keep mask
@@ -308,9 +313,21 @@ class Model(pl.LightningModule):
             self.log(f'{step_type}_rmse', np.sqrt(mean_squared_error(y_np, y_hat_np)))
             self.log(f'{step_type}_r2', r2_score(y_np, y_hat_np))
         elif self.target_type == 'binary_classification':
-            if len(np.unique(y_np)) == 2:
-                self.log(f'{step_type}_auc', roc_auc_score(y_np, y_hat_np))
-                self.log(f'{step_type}_ap', average_precision_score(y_np, y_hat_np))
+            if y_np.ndim == 1:
+                y_np = y_np[:, None]
+                y_hat_np = y_hat_np[:, None]
+
+            roc_aucs, aps = [], []
+            num_valid_targets = 0
+            for i in range(y_np.shape[1]):
+                if len(np.unique(y_np[:, i])) == 2:
+                    num_valid_targets += 1
+                    roc_aucs.append(roc_auc_score(y_np[:, i], y_hat_np[:, i]))
+                    aps.append(average_precision_score(y_np[:, i], y_hat_np[:, i]))
+
+            self.log(f'{step_type}_num_valid_targets', num_valid_targets)
+            self.log(f'{step_type}_auc', float(np.mean(roc_aucs)))
+            self.log(f'{step_type}_ap', float(np.mean(aps)))
         elif self.target_type == 'multi_classification':
             self.log(f'{step_type}_accuracy', (y_np == np.argmax(y_hat_np, axis=1)).mean())
         else:
