@@ -146,5 +146,8 @@ data
 # Results
 results
 
+# Plots
+plots
+
 # Mac
 .DS_Store
