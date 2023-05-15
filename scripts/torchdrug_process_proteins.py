@@ -55,3 +55,9 @@ def torchdrug_process_proteins(
     # Save proteins
     save_dir.mkdir(parents=True, exist_ok=True)
     torch.save(pdb_id_to_protein, save_dir / f'{dataset_name}_proteins.pt')
+
+
+if __name__ == '__main__':
+    from tap import tapify
+
+    tapify(torchdrug_process_proteins)
