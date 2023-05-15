@@ -24,13 +24,19 @@ from pp3.utils.pdb import get_residue_coordinates
 CONCEPT_FUNCTION_TYPE = Callable[[AtomArray], Any]
 CONCEPT_TO_FUNCTION = {}
 CONCEPT_TO_LEVEL = {
-    'solubility': 'protein'
+    'solubility': 'protein',
+    'enzyme_commission': 'protein',
+    'gene_ontology': 'protein'
 }
 CONCEPT_TO_TYPE = {
-    'solubility': 'binary_classification'
+    'solubility': 'binary_classification',
+    'enzyme_commission': 'binary_classification',
+    'gene_ontology': 'binary_classification'
 }
 CONCEPT_TO_OUTPUT_DIM = {
-    'solubility': 1
+    'solubility': 1,
+    'enzyme_commission': 10,
+    'gene_ontology': 364
 }
 
 

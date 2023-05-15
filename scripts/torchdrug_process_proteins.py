@@ -28,7 +28,10 @@ def torchdrug_process_proteins(
     train = list((dataset_dir / 'train').glob('*.pdb'))
     valid = list((dataset_dir / 'valid').glob('*.pdb'))
     test = list((dataset_dir / 'test').glob('*.pdb'))
-    pdb_id_to_path = {path.stem: path for path in train + valid + test}
+    pdb_id_to_path = {
+        path.stem.split('_')[0]: path
+        for path in train + valid + test
+    }
 
     # Convert PDB to PyTorch
     pdb_id_to_protein = {}

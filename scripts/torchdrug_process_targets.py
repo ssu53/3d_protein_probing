@@ -64,6 +64,8 @@ def load_annotation_go(tsv_file: str, branch: str) -> dict[str, torch.Tensor]:
 
 
 # TODO: clean this up
+# TODO: filtering based on proteins that pass validity check
+# TODO: filtering by only targets that have at least 250 active proteins
 def torchdrug_process_targets(dataset: Literal['ec', 'go']) -> None:
     if dataset == 'ec':
         pos_targets = load_annotation_ec('nrPDB-EC_annot.tsv')
