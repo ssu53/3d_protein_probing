@@ -72,7 +72,8 @@ def plot_wand_results(
         data_path: Path,
         save_path: Path,
         metrics: tuple[str] = ('ap', 'accuracy', 'r2'),
-        concept_subset: Literal['geometry', 'downstream'] | None = None
+        concept_subset: Literal['geometry', 'downstream'] | None = None,
+        num_rows: int = 1
 ) -> None:
     """Plot results using W&B output CSV file."""
     # Load data
@@ -107,48 +108,54 @@ def plot_wand_results(
         concepts = sorted(concepts)
 
     num_plots = len(concepts)
-    fig, axes = plt.subplots(nrows=1, ncols=num_plots, sharey=True, figsize=(4 * num_plots, 4))
+    num_cols = num_plots // num_rows + (num_plots % num_rows > 0)
+    fig, axes = plt.subplots(nrows=num_rows, ncols=num_cols, sharey=True, figsize=(num_cols * 4, num_rows * 3))
 
     if not isinstance(axes, np.ndarray):
-        axes = [axes]
+        axes = np.array([[axes]])
 
     # Plot each set of results
-    for ax, concept in tqdm(zip(axes, concepts), total=num_plots):
-        xticks, xticklabels = [], []
+    for row_idx, axes_row in enumerate(tqdm(axes)):
+        # Set up row of axes
+        axes_row[0].set_ylabel('Metric')
+        axes_row[0].legend(handles=[
+            mpatches.Patch(
+                facecolor='lightgray',
+                hatch=EMBEDDING_METHOD_TO_HATCH[embedding_method],
+                label=EMBEDDING_METHOD_TO_UPPER[embedding_method]
+            )
+            for embedding_method in EMBEDDING_METHODS
+        ], loc='upper left')
 
-        for embedding_method_idx, embedding_method in enumerate(EMBEDDING_METHODS):
-            for encoder_type_idx, encoder_type in enumerate(ENCODER_TYPES):
-                results = concept_to_embedding_to_encoder_to_results[concept][embedding_method][encoder_type]
-                xtick = encoder_type_idx + embedding_method_idx * (len(ENCODER_TYPES) + OFFSET)
-                xticks.append(xtick)
-                xticklabels.append(encoder_type.upper())
-                ax.bar(
-                    xtick,
-                    np.mean(results),
-                    yerr=np.std(results),
-                    color=ENCODER_TYPE_TO_COLOR[encoder_type],
-                    capsize=5,
-                    hatch=EMBEDDING_METHOD_TO_HATCH[embedding_method]
-                )
+        for ax in axes_row[1:]:
+            ax.tick_params(axis='y', which='both', length=0)
 
-        ax.set_xticks(xticks)
-        ax.set_xticklabels(xticklabels)
-        ax.set_xlabel(f'{concept}\n({concept_to_metric[concept]})', weight='bold')
+        # Plot results for each concept in subplots
+        concepts_row = concepts[row_idx * axes.shape[1]: (row_idx + 1) * axes.shape[1]]
+        for ax, concept in tqdm(zip(axes_row, concepts_row), total=num_plots, leave=False):
+            xticks, xticklabels = [], []
+
+            for embedding_method_idx, embedding_method in enumerate(EMBEDDING_METHODS):
+                for encoder_type_idx, encoder_type in enumerate(ENCODER_TYPES):
+                    results = concept_to_embedding_to_encoder_to_results[concept][embedding_method][encoder_type]
+                    xtick = encoder_type_idx + embedding_method_idx * (len(ENCODER_TYPES) + OFFSET)
+                    xticks.append(xtick)
+                    xticklabels.append(encoder_type.upper())
+                    ax.bar(
+                        xtick,
+                        np.mean(results),
+                        yerr=np.std(results),
+                        color=ENCODER_TYPE_TO_COLOR[encoder_type],
+                        capsize=5,
+                        hatch=EMBEDDING_METHOD_TO_HATCH[embedding_method]
+                    )
+
+            ax.set_xticks(xticks)
+            ax.set_xticklabels(xticklabels)
+            ax.set_xlabel(f'{concept}\n({concept_to_metric[concept]})', weight='bold')
 
     # Add plot-wide details
-    fig.subplots_adjust(wspace=0)
-    axes[0].set_ylabel('Metric')
-    axes[0].legend(handles=[
-        mpatches.Patch(
-            facecolor='lightgray',
-            hatch=EMBEDDING_METHOD_TO_HATCH[embedding_method],
-            label=EMBEDDING_METHOD_TO_UPPER[embedding_method]
-        )
-        for embedding_method in EMBEDDING_METHODS
-    ], loc='upper left')
-
-    for ax in axes[1:]:
-        ax.tick_params(axis='y', which='both', length=0)
+    fig.subplots_adjust(wspace=0, hspace=0.5)
 
     # Save plot
     save_path.parent.mkdir(parents=True, exist_ok=True)
