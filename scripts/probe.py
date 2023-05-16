@@ -1,8 +1,8 @@
 """Probe a model for 3D geometric protein concepts."""
+import pickle
 from pathlib import Path
 from typing import Literal
 
-import torch
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import EarlyStopping, LearningRateMonitor, ModelCheckpoint
 
@@ -188,15 +188,17 @@ def probe(
 
     # Make test predictions
     test_targets, test_preds = zip(*trainer.predict(datamodule=data_module, ckpt_path='best'))
-    test_targets = torch.cat(test_targets)
-    test_preds = torch.cat(test_preds)
+    test_targets = sum(test_targets, start=[])
+    test_preds = sum(test_preds, start=[])
 
     # Save test targets and predictions
     print(f'Saving test targets and predictions to {save_dir}')
-    torch.save({
-        'target': test_targets,
-        'prediction': test_preds
-    }, save_dir / 'target_and_prediction.pt')
+
+    with open(save_dir / 'target_and_prediction.pkl', 'wb') as f:
+        pickle.dump({
+            'target': test_targets,
+            'prediction': test_preds
+        }, f)
 
     # Plot predictions vs targets
     print(f'Plotting predictions vs targets to {save_dir}')
