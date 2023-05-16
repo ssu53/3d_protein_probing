@@ -8,21 +8,25 @@ from sklearn.metrics import ConfusionMatrixDisplay, r2_score
 
 
 def plot_preds_vs_targets(
-        preds: torch.Tensor,
-        targets: torch.Tensor,
+        preds: list[np.ndarray],
+        targets: list[np.ndarray],
         target_type: str,
         concept: str,
         save_path: Path
 ) -> None:
     """Plot predicted values against targets.
 
-    :param preds: The predicted values.
-    :param targets: The true values.
+    :param preds: The predicted values per protein.
+    :param targets: The true values per protein.
     :param target_type: The type of the targets.
     :param concept: The concept being predicted.
     :param save_path: The path to save the plot to.
     """
     plt.clf()
+
+    # Flatten preds and targets
+    preds = np.concatenate(preds)
+    targets = np.concatenate(targets)
 
     if target_type == 'regression':
         # Randomly sample large datasets to avoid memory issues
