@@ -41,7 +41,9 @@ CONCEPT_TO_NAME = {
     'residue_contacts_by_residue': 'Contacts By Residue',
     'bond_angles': 'Bond Angles',
     'dihedral_angles': 'Dihedral Angles',
-    'solubility': 'Solubility'
+    'solubility': 'Solubility',
+    'enzyme_commission': 'Enzyme Commission',
+    'gene_ontology': 'Gene Ontology'
 }
 CONCEPT_SUBSET_ORDER = {
     'geometry': [
@@ -56,7 +58,9 @@ CONCEPT_SUBSET_ORDER = {
         'Dihedral Angles'
     ],
     'downstream': [
-        'Solubility'
+        'Solubility',
+        'Enzyme Commission',
+        'Gene Ontology'
     ]
 }
 
@@ -113,6 +117,8 @@ def plot_wand_results(
 
     if not isinstance(axes, np.ndarray):
         axes = np.array([[axes]])
+    elif axes.ndim == 1:
+        axes = axes.reshape(1, -1)
 
     # Plot each set of results
     for row_idx, axes_row in enumerate(tqdm(axes)):
@@ -153,6 +159,7 @@ def plot_wand_results(
             ax.set_xticks(xticks)
             ax.set_xticklabels(xticklabels)
             ax.set_xlabel(f'{concept}\n({concept_to_metric[concept]})', weight='bold')
+            ax.set_ylim(0, 1)
 
     # Add plot-wide details
     fig.subplots_adjust(wspace=0, hspace=0.5)
