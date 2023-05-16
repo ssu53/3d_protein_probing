@@ -310,7 +310,11 @@ class Model(pl.LightningModule):
         y_hat = y_hat.detach().cpu().numpy()
 
         # Separate y and y_hat by protein
-        y_per_protein = keep_mask.sum(dim=1)
+        if self.concept_level == 'protein':
+            y_per_protein = torch.ones(num_proteins, dtype=torch.long)
+        else:
+            y_per_protein = keep_mask.sum(dim=-1)
+
         y_per_protein_cumsum = [0] + y_per_protein.cumsum(dim=0).tolist()
 
         assert y_per_protein_cumsum[-1] == y.shape[0]
@@ -346,20 +350,23 @@ class Model(pl.LightningModule):
             results = defaultdict(list)
 
             for y_arr, y_hat_arr in zip(y_arrs, y_hat_arrs):
+                if len(y_arr) == 0:
+                    continue
+
                 if self.target_type == 'regression':
                     results['mape'].append(mean_absolute_percentage_error(y_arr, y_hat_arr))
                     results['mae'].append(mean_absolute_error(y_arr, y_hat_arr))
                     results['rmse'].append(np.sqrt(mean_squared_error(y_arr, y_hat_arr)))
                     results['r2'].append(r2_score(y_arr, y_hat_arr))
                 elif self.target_type == 'binary_classification':
-                    if y.ndim == 1:
-                        y = y[:, None]
-                        y_hat = y_hat[:, None]
+                    if y_arr.ndim == 1:
+                        y_arr = y_arr[:, None]
+                        y_hat_arr = y_hat_arr[:, None]
 
                     roc_aucs, aps = [], []
-                    for i in range(y.shape[1]):
-                        roc_aucs.append(roc_auc_score(y[:, i], y_hat[:, i]))
-                        aps.append(average_precision_score(y[:, i], y_hat[:, i]))
+                    for i in range(y_arr.shape[1]):
+                        roc_aucs.append(roc_auc_score(y_arr[:, i], y_hat_arr[:, i]))
+                        aps.append(average_precision_score(y_arr[:, i], y_hat_arr[:, i]))
 
                     results['num_valid_targets'].append(len(roc_aucs))
                     results['auc'].append(np.mean(roc_aucs))
