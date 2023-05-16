@@ -57,7 +57,11 @@ def plot_preds_vs_targets(
         if target_type == 'binary_classification':
             preds = preds > 0.5
         elif target_type == 'multi_classification':
-            preds = torch.argmax(preds, dim=1)
+            preds = torch.argmax(preds, dim=-1)
+
+        if preds.ndim == 2:
+            preds = preds.flatten()
+            targets = targets.flatten()
 
         ConfusionMatrixDisplay.from_predictions(targets, preds)
         plt.savefig(save_path, bbox_inches='tight')

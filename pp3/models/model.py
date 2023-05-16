@@ -347,6 +347,9 @@ class Model(pl.LightningModule):
                 [y_flat, y],
                 [y_hat_flat, y_hat]
         ):
+            if self.concept_level == 'protein' and metric_level == 'macro':
+                continue
+
             results = defaultdict(list)
 
             for y_arr, y_hat_arr in zip(y_arrs, y_hat_arrs):
