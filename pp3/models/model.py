@@ -1,4 +1,6 @@
 """A class for a multilayer perceptron model."""
+from collections import defaultdict
+
 import numpy as np
 import pytorch_lightning as pl
 import torch
@@ -308,9 +310,11 @@ class Model(pl.LightningModule):
         y_hat = y_hat.detach().cpu().numpy()
 
         # Separate y and y_hat by protein
-        # TODO: check this
         y_per_protein = keep_mask.sum(dim=1)
         y_per_protein_cumsum = [0] + y_per_protein.cumsum(dim=0).tolist()
+
+        assert y_per_protein_cumsum[-1] == y.shape[0]
+        assert len(y_per_protein_cumsum) - 1 == num_proteins
 
         y = [
             y[y_per_protein_cumsum[i]:y_per_protein_cumsum[i + 1]]
@@ -329,32 +333,45 @@ class Model(pl.LightningModule):
             y_hat: list[np.ndarray],
             step_type: str
     ) -> None:
-        # TODO: macro and micro metrics
+        # Flatten y and y_hat for micro metrics
+        y_flat = [np.concatenate(y)]
+        y_hat_flat = [np.concatenate(y_hat)]
 
-        if self.target_type == 'regression':
-            self.log(f'{step_type}_mape', mean_absolute_percentage_error(y, y_hat))
-            self.log(f'{step_type}_mae', mean_absolute_error(y, y_hat))
-            self.log(f'{step_type}_rmse', np.sqrt(mean_squared_error(y, y_hat)))
-            self.log(f'{step_type}_r2', r2_score(y, y_hat))
-        elif self.target_type == 'binary_classification':
-            if y.ndim == 1:
-                y = y[:, None]
-                y_hat = y_hat[:, None]
+        # Compute metrics
+        for metric_level, y_arrs, y_hat_arrs in zip(
+                ['micro', 'macro'],
+                [y_flat, y],
+                [y_hat_flat, y_hat]
+        ):
+            results = defaultdict(list)
 
-            roc_aucs, aps = [], []
-            for i in range(y.shape[1]):
-                roc_aucs.append(roc_auc_score(y[:, i], y_hat[:, i]))
-                aps.append(average_precision_score(y[:, i], y_hat[:, i]))
+            for y_arr, y_hat_arr in zip(y_arrs, y_hat_arrs):
+                if self.target_type == 'regression':
+                    results['mape'].append(mean_absolute_percentage_error(y_arr, y_hat_arr))
+                    results['mae'].append(mean_absolute_error(y_arr, y_hat_arr))
+                    results['rmse'].append(np.sqrt(mean_squared_error(y_arr, y_hat_arr)))
+                    results['r2'].append(r2_score(y_arr, y_hat_arr))
+                elif self.target_type == 'binary_classification':
+                    if y.ndim == 1:
+                        y = y[:, None]
+                        y_hat = y_hat[:, None]
 
-            self.log(f'{step_type}_num_valid_targets', float(len(roc_aucs)))
+                    roc_aucs, aps = [], []
+                    for i in range(y.shape[1]):
+                        roc_aucs.append(roc_auc_score(y[:, i], y_hat[:, i]))
+                        aps.append(average_precision_score(y[:, i], y_hat[:, i]))
 
-            if len(roc_aucs) > 0:
-                self.log(f'{step_type}_auc', float(np.mean(roc_aucs)))
-                self.log(f'{step_type}_ap', float(np.mean(aps)))
-        elif self.target_type == 'multi_classification':
-            self.log(f'{step_type}_accuracy', (y == np.argmax(y_hat, axis=1)).mean())
-        else:
-            raise ValueError(f'Invalid target type: {self.target_type}')
+                    results['num_valid_targets'].append(len(roc_aucs))
+                    results['auc'].append(np.mean(roc_aucs))
+                    results['ap'].append(np.mean(aps))
+                elif self.target_type == 'multi_classification':
+                    results['accuracy'].append((y_arr == np.argmax(y_hat_arr, axis=1)).mean())
+                else:
+                    raise ValueError(f'Invalid target type: {self.target_type}')
+
+            # Compute mean of metric values
+            for metric_name, metric_values in results.items():
+                self.log(f'{step_type}_{metric_level}_{metric_name}', float(np.mean(metric_values)))
 
     def training_step(
             self,
