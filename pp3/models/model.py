@@ -381,7 +381,7 @@ class Model(pl.LightningModule):
 
             # Compute mean of metric values
             for metric_name, metric_values in results.items():
-                self.log(f'{step_type}_{metric_level}_{metric_name}', float(np.mean(metric_values)))
+                self.log(f'{step_type}_{metric_level}_{metric_name}', float(np.nanmean(metric_values)))
 
     def training_step(
             self,
