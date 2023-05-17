@@ -27,8 +27,14 @@ ENCODER_TYPE_TO_COLOR = {
 }
 METRIC_SHORT_TO_LONG = {
     'ap': 'Average Precision',
+    'macro_ap': 'Macro Average Precision',
+    'micro_ap': 'Micro Average Precision',
     'accuracy': 'Accuracy',
-    'r2': 'R^2'
+    'macro_accuracy': 'Macro Accuracy',
+    'micro_accuracy': 'Micro Accuracy',
+    'r2': 'R^2',
+    'macro_r2': 'Macro R^2',
+    'micro_r2': 'Micro R^2'
 }
 OFFSET = 1
 CONCEPT_TO_NAME = {
@@ -75,11 +81,18 @@ def default_dict_to_regular(obj: Any) -> dict:
 def plot_wand_results(
         data_path: Path,
         save_path: Path,
-        metrics: tuple[str] = ('ap', 'accuracy', 'r2'),
+        metrics: tuple[str, ...] = ('ap', 'accuracy', 'r2'),
         concept_subset: Literal['geometry', 'downstream'] | None = None,
         num_rows: int = 1
 ) -> None:
-    """Plot results using W&B output CSV file."""
+    """Plot results using W&B output CSV file.
+
+    :param data_path: Path to W&B output CSV file.
+    :param save_path: Path to save plot.
+    :param metrics: Metrics to plot (each concept can have at most one metric).
+    :param concept_subset: Subset of concepts to plot.
+    :param num_rows: Number of rows of subplots.
+    """
     # Load data
     data = pd.read_csv(data_path)
 
@@ -143,7 +156,11 @@ def plot_wand_results(
 
             for embedding_method_idx, embedding_method in enumerate(EMBEDDING_METHODS):
                 for encoder_type_idx, encoder_type in enumerate(ENCODER_TYPES):
-                    results = concept_to_embedding_to_encoder_to_results[concept][embedding_method][encoder_type]
+                    try:
+                        results = concept_to_embedding_to_encoder_to_results[concept][embedding_method][encoder_type]
+                    except KeyError:
+                        results = [0]
+
                     xtick = encoder_type_idx + embedding_method_idx * (len(ENCODER_TYPES) + OFFSET)
                     xticks.append(xtick)
                     xticklabels.append(encoder_type.upper())
