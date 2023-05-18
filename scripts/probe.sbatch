@@ -7,9 +7,8 @@
 #SBATCH --gpus=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=30G
-#SBATCH --array=0-215
+#SBATCH --array=0-171
 #SBATCH --partition=jamesz
-#SBATCH --exclude=sh03-16n11
 #SBATCH --output=output/probe_crossval/%a.out
 #SBATCH --error=error/probe_crossval/%a.err
 #SBATCH --time=168:00:00
@@ -190,6 +189,8 @@ done
 command=${experiments[SLURM_ARRAY_TASK_ID]}
 echo $command
 eval "$command"
+echo "Task ID = $SLURM_ARRAY_TASK_ID"
+echo "Number of experiments = ${#experiments[@]}"
 
 echo "Done"
 exit 0
