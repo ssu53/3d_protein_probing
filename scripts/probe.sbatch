@@ -77,7 +77,7 @@ do
                 --encoder_hidden_dim 16 \
                 --predictor_num_layers 2 \
                 --predictor_hidden_dim 100 \
-                --batch_size 16 \
+                --batch_size 10 \
                 --max_neighbors 24 \
                 --split_path data/torchdrug/${CONCEPT}_split_to_pdb_id_30.json \
                 --run_id_number $SLURM_ARRAY_TASK_ID \
@@ -132,7 +132,7 @@ do
                 --encoder_hidden_dim 16 \
                 --predictor_num_layers 2 \
                 --predictor_hidden_dim 100 \
-                --batch_size 16 \
+                --batch_size 10 \
                 --max_neighbors 24 \
                 --split_seed $SPLIT_SEED \
                 --run_id_number $SLURM_ARRAY_TASK_ID"
