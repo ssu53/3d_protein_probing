@@ -373,7 +373,6 @@ class Model(pl.LightningModule):
                         # Skip if there is only one class
                         if np.unique(y_arr[:, i]) != 2:
                             continue
-
                         roc_aucs.append(roc_auc_score(y_arr[:, i], y_hat_arr[:, i]))
                         aps.append(average_precision_score(y_arr[:, i], y_hat_arr[:, i]))
 
