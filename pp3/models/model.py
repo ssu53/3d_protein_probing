@@ -171,8 +171,8 @@ class Model(pl.LightningModule):
         encodings = self.encoder(embeddings, coords, padding_mask)
 
         # Modeling the interactions
-        if self.interaction_model == "transformer":
-            encoding = self.interaction_model(embeddings)
+        if self.interaction_model is not None:
+            encoding = self.interaction_model(encodings)
 
         # If needed, modify embedding structure based on concept level
         if self.concept_level == 'protein':
@@ -373,7 +373,6 @@ class Model(pl.LightningModule):
                         # Skip if there is only one class
                         if set(np.unique(y_arr[:, i])) != {0, 1}:
                             continue
-
                         roc_aucs.append(roc_auc_score(y_arr[:, i], y_hat_arr[:, i]))
                         aps.append(average_precision_score(y_arr[:, i], y_hat_arr[:, i]))
 
