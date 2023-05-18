@@ -357,7 +357,6 @@ class Model(pl.LightningModule):
                         roc_aucs.append(roc_auc_score(y_arr[:, i], y_hat_arr[:, i]))
                         aps.append(average_precision_score(y_arr[:, i], y_hat_arr[:, i]))
 
-                    results['num_valid_targets'].append(len(roc_aucs))
                     results['auc'].append(np.mean(roc_aucs))
                     results['ap'].append(np.mean(aps))
                 elif self.target_type == 'multi_classification':
