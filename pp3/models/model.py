@@ -171,8 +171,8 @@ class Model(pl.LightningModule):
         encodings = self.encoder(embeddings, coords, padding_mask)
 
         # Modeling the interactions
-        if self.interaction_model == "transformer":
-            encoding = self.interaction_model(embeddings)
+        if self.interaction_model is not None:
+            encoding = self.interaction_model(encodings)
 
         # If needed, modify embedding structure based on concept level
         if self.concept_level == 'protein':
