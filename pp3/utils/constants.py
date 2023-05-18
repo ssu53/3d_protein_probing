@@ -53,3 +53,6 @@ MAX_SEQ_LEN = 512
 # Types
 ENCODER_TYPES = Literal['mlp', 'egnn', 'tfn']
 BATCH_TYPE = tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
+
+# Embedding sizes
+ONE_EMBEDDING_SIZE = 48

@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader, Dataset
 
 from pp3.baseline_embeddings import get_baseline_residue_embedding
 from pp3.concepts import get_concept_level, get_concept_type
-from pp3.utils.constants import BATCH_TYPE
+from pp3.utils.constants import BATCH_TYPE, ONE_EMBEDDING_SIZE
 
 
 def collate_fn(
@@ -226,9 +226,12 @@ class ProteinConceptDataModule(pl.LightningDataModule):
                 for pdb_id, protein in pdb_id_to_proteins.items()
             }
         
-        elif self.embedding_method == 'zero':
-            pdb_id_to_embeddings = {pdb_id : torch.ones(len(protein['sequence']), 48) for pdb_id, protein in pdb_id_to_proteins.items()}
-        
+        elif self.embedding_method == 'one':
+            pdb_id_to_embeddings = {
+                pdb_id: torch.ones(len(protein['sequence']), ONE_EMBEDDING_SIZE)
+                for pdb_id, protein in pdb_id_to_proteins.items()
+            }
+
         # Other embedding methods
         else:
             raise ValueError(f'Invalid embedding method: {self.embedding_method}')

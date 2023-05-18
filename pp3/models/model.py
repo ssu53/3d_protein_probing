@@ -1,5 +1,6 @@
 """A class for a multilayer perceptron model."""
 from collections import defaultdict
+from typing import Literal
 
 import numpy as np
 import pytorch_lightning as pl
@@ -42,7 +43,7 @@ class Model(pl.LightningModule):
         weight_decay: float = 0.0,
         dropout: float = 0.0,
         max_neighbors: int | None = None,
-        interaction_model: str | None = None,
+        interaction_model: Literal['transformer'] | None = None,
         num_interaction_layers: int = 2,
         interaction_hidden_dims: int = 64,
     ) -> None:
@@ -131,9 +132,11 @@ class Model(pl.LightningModule):
             raise ValueError(f'Invalid concept level: {self.concept_level}')
 
         if self.interaction_model == 'transformer':
-            self.interaction_model = Transformer(input_dim=input_dim,
-                                                 num_layers=num_interaction_layers,
-                                                 interaction_hidden_dims=interaction_hidden_dims)
+            self.interaction_model = Transformer(
+                input_dim=input_dim,
+                num_layers=num_interaction_layers,
+                interaction_hidden_dims=interaction_hidden_dims
+            )
         else:
             self.interaction_model = None
         
@@ -172,7 +175,7 @@ class Model(pl.LightningModule):
 
         # Modeling the interactions
         if self.interaction_model is not None:
-            encoding = self.interaction_model(encodings)
+            encodings = self.interaction_model(encodings)
 
         # If needed, modify embedding structure based on concept level
         if self.concept_level == 'protein':

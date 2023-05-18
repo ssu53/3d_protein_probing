@@ -20,7 +20,7 @@ def probe(
     save_dir: Path,
     concepts_dir: Path,
     concept: str,
-    embedding_method: Literal['plm', 'baseline', 'zero'],
+    embedding_method: Literal['plm', 'baseline', 'one'],
     encoder_type: ENCODER_TYPES,
     encoder_num_layers: int,
     encoder_hidden_dim: int,
@@ -41,7 +41,7 @@ def probe(
     run_name_suffix: str = '',
     run_id_number: int | None = None,
     num_sanity_val_steps: int = 2,
-    interaction_model: str | None = None
+    interaction_model: Literal['transformer'] | None = None
 ) -> None:
     """Probe a model for a 3D geometric protein concepts.
 
