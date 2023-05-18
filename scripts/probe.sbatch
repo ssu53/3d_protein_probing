@@ -104,7 +104,8 @@ do
             --predictor_hidden_dim 100 \
             --batch_size 100 \
             --split_path data/torchdrug/${CONCEPT}_split_to_pdb_id_30.json \
-            --run_id_number $SLURM_ARRAY_TASK_ID")
+            --run_id_number $SLURM_ARRAY_TASK_ID \
+            --num_sanity_val_steps 0")
 
         # Structure
         for ENCODER_TYPE in egnn tfn
@@ -125,7 +126,8 @@ do
                 --batch_size 16 \
                 --max_neighbors 24 \
                 --split_path data/torchdrug/${CONCEPT}_split_to_pdb_id_30.json \
-                --run_id_number $SLURM_ARRAY_TASK_ID")
+                --run_id_number $SLURM_ARRAY_TASK_ID \
+                --num_sanity_val_steps 0")
         done
     done
 done

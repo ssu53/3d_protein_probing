@@ -368,16 +368,31 @@ class Model(pl.LightningModule):
                         y_arr = y_arr[:, None]
                         y_hat_arr = y_hat_arr[:, None]
 
-                    roc_aucs, aps = [], []
+                    roc_aucs, aps, indices = [], [], []
                     for i in range(y_arr.shape[1]):
-                        # Skip if there is only one class
+                        # Check if there is only one class
                         if set(np.unique(y_arr[:, i])) != {0, 1}:
-                            continue
+                            # Error if micro, skip if macro (skipping protein)
+                            if metric_level == 'micro':
+                                raise ValueError('Micro metrics cannot be computed when there is only one class')
+                            else:
+                                continue
+
                         roc_aucs.append(roc_auc_score(y_arr[:, i], y_hat_arr[:, i]))
                         aps.append(average_precision_score(y_arr[:, i], y_hat_arr[:, i]))
+                        indices.append(i)
 
-                    results['auc'].append(np.mean(roc_aucs))
-                    results['ap'].append(np.mean(aps))
+                    # Handle one or multiple labels
+                    if y_arr.shape[1] == 1:
+                        results['auc'].append(np.mean(roc_aucs))
+                        results['ap'].append(np.mean(aps))
+                    else:
+                        results['mean_auc'].append(np.mean(roc_aucs))
+                        results['mean_ap'].append(np.mean(aps))
+
+                        for roc_auc, ap, index in zip(roc_aucs, aps, indices):
+                            results[f'auc_{index}'].append(roc_auc)
+                            results[f'ap_{index}'].append(ap)
                 elif self.target_type == 'multi_classification':
                     results['accuracy'].append((y_arr == np.argmax(y_hat_arr, axis=1)).mean())
                 else:
