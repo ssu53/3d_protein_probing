@@ -1,4 +1,5 @@
 """Data classes and functions."""
+import json
 from pathlib import Path
 
 import numpy as np
@@ -169,7 +170,8 @@ class ProteinConceptDataModule(pl.LightningDataModule):
             embedding_method: str,
             batch_size: int,
             num_workers: int = 4,
-            split_seed: int = 0
+            split_seed: int = 0,
+            split_path: Path | None = None
     ) -> None:
         """Initialize the data module.
 
@@ -181,6 +183,8 @@ class ProteinConceptDataModule(pl.LightningDataModule):
         :param embedding_method: The method to use to compute the protein embedding from the residue embeddings.
         :param num_workers: The number of workers to use for data loading.
         :param split_seed: The random seed to use for the train/val/test split.
+        :param split_path: Optional path to a JSON file containing a dictionary mapping split to list of PDB IDs.
+                           If provided, used in place of split seed.
         """
         super().__init__()
         self.proteins_path = proteins_path
@@ -193,6 +197,7 @@ class ProteinConceptDataModule(pl.LightningDataModule):
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.split_seed = split_seed
+        self.split_path = split_path
 
         self.train_pdb_ids: list[str] | None = None
         self.val_pdb_ids: list[str] | None = None
@@ -236,18 +241,29 @@ class ProteinConceptDataModule(pl.LightningDataModule):
         # Load PDB ID to protein dictionary with sequence and structure
         pdb_id_to_proteins: dict[str, dict[str, torch.Tensor | str]] = torch.load(self.proteins_path)
 
-        # Split PDB IDs into train and test sets
+        # Get PDB IDs
         pdb_ids = sorted(pdb_id_to_proteins)
-        self.train_pdb_ids, val_test_pdb_ids = train_test_split(
-            pdb_ids,
-            test_size=0.2,
-            random_state=self.split_seed
-        )
-        self.val_pdb_ids, self.test_pdb_ids = train_test_split(
-            val_test_pdb_ids,
-            test_size=0.5,
-            random_state=self.split_seed
-        )
+
+        # Split PDB IDs into train and test sets
+        if self.split_path is not None:
+            with open(self.split_path) as f:
+                split_to_pdb_ids: dict[str, list[str]] = json.load(f)
+
+            pdb_ids_set = set(pdb_ids)
+            self.train_pdb_ids = sorted(set(split_to_pdb_ids['train']) & pdb_ids_set)
+            self.val_pdb_ids = sorted(set(split_to_pdb_ids['val']) & pdb_ids_set)
+            self.test_pdb_ids = sorted(set(split_to_pdb_ids['test']) & pdb_ids_set)
+        else:
+            self.train_pdb_ids, val_test_pdb_ids = train_test_split(
+                pdb_ids,
+                test_size=0.2,
+                random_state=self.split_seed
+            )
+            self.val_pdb_ids, self.test_pdb_ids = train_test_split(
+                val_test_pdb_ids,
+                test_size=0.5,
+                random_state=self.split_seed
+            )
 
         # Load or compute embeddings for proteins or residues
         pdb_id_to_embeddings = self.get_embeddings(pdb_id_to_proteins)

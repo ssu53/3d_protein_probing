@@ -35,6 +35,7 @@ def probe(
     ckpt_every_k_epochs: int = 10,
     num_workers: int = 4,
     split_seed: int = 0,
+    split_path: Path | None = None,
     max_neighbors: int | None = None,
     patience: int = 25,
     run_name_suffix: str = '',
@@ -63,6 +64,8 @@ def probe(
     :param ckpt_every_k_epochs: Save a checkpoint every k epochs.
     :param num_workers: The number of workers to use for data loading.
     :param split_seed: The random seed to use for the train/val/test split.
+    :param split_path: Optional path to a JSON file containing a dictionary mapping split to list of PDB IDs.
+                       If provided, used in place of split seed.
     :param max_neighbors: The maximum number of neighbors to use for the graph in EGNN.
     :param patience: The number of epochs to wait for validation loss to improve before early stopping.
     :param run_name_suffix: A suffix to append to the run name.
@@ -88,7 +91,8 @@ def probe(
         embedding_method=embedding_method,
         batch_size=batch_size,
         num_workers=num_workers,
-        split_seed=split_seed
+        split_seed=split_seed,
+        split_path=split_path
     )
     data_module.setup()
 
@@ -137,6 +141,7 @@ def probe(
             'ckpt_every_k_epochs': ckpt_every_k_epochs,
             'num_workers': num_workers,
             'split_seed': split_seed,
+            'split_path': str(split_path),
             'num_neighbors': max_neighbors,
             'patience': patience,
             'run_id_number': run_id_number
