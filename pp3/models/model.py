@@ -386,16 +386,17 @@ class Model(pl.LightningModule):
                         indices.append(i)
 
                     # Handle one or multiple labels
-                    if y_arr.shape[1] == 1:
-                        results['auc'].append(np.mean(roc_aucs))
-                        results['ap'].append(np.mean(aps))
-                    else:
-                        results['mean_auc'].append(np.mean(roc_aucs))
-                        results['mean_ap'].append(np.mean(aps))
+                    if len(roc_aucs) > 0:
+                        if y_arr.shape[1] == 1:
+                            results['auc'].append(np.mean(roc_aucs))
+                            results['ap'].append(np.mean(aps))
+                        else:
+                            results['mean_auc'].append(np.mean(roc_aucs))
+                            results['mean_ap'].append(np.mean(aps))
 
-                        for roc_auc, ap, index in zip(roc_aucs, aps, indices):
-                            results[f'auc_{index}'].append(roc_auc)
-                            results[f'ap_{index}'].append(ap)
+                            for roc_auc, ap, index in zip(roc_aucs, aps, indices):
+                                results[f'auc_{index}'].append(roc_auc)
+                                results[f'ap_{index}'].append(ap)
                 elif self.target_type == 'multi_classification':
                     results['accuracy'].append((y_arr == np.argmax(y_hat_arr, axis=1)).mean())
                 else:
