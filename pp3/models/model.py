@@ -17,6 +17,7 @@ from sklearn.metrics import (
 )
 from pp3.models.egnn import EGNN
 from pp3.models.mlp import MLP
+from pp3.models.transformer import Transformer
 from pp3.models.tfn import TFN
 from pp3.utils.constants import BATCH_TYPE, ENCODER_TYPES, MAX_SEQ_LEN
 
@@ -40,7 +41,9 @@ class Model(pl.LightningModule):
         learning_rate: float = 1e-4,
         weight_decay: float = 0.0,
         dropout: float = 0.0,
-        max_neighbors: int | None = None
+        max_neighbors: int | None = None,
+        interaction_model: str | None = None,
+        num_interaction_layers: int = 2
     ) -> None:
         """Initialize the model.
 
@@ -75,6 +78,7 @@ class Model(pl.LightningModule):
         self.weight_decay = weight_decay
         self.dropout = dropout
         self.concept_level = concept_level
+        self.interaction_model = interaction_model
 
         self.train_y = []
         self.train_y_hat = []
@@ -125,6 +129,12 @@ class Model(pl.LightningModule):
         else:
             raise ValueError(f'Invalid concept level: {self.concept_level}')
 
+        if self.interaction_model == 'transformer':
+            self.interaction_model = Transformer(input_dim=input_dim,
+                                                 num_layers=num_interaction_layers)
+        else:
+            self.interaction_model = None
+        
         self.predictor = MLP(
             input_dim=last_hidden_dim * predictor_dim_multiplier,
             hidden_dim=self.predictor_hidden_dim,
@@ -157,6 +167,10 @@ class Model(pl.LightningModule):
 
         # Encode embeddings
         encodings = self.encoder(embeddings, coords, padding_mask)
+
+        # Modeling the interactions
+        if self.interaction_model == "transformer":
+            encoding = self.interaction_model(embeddings)
 
         # If needed, modify embedding structure based on concept level
         if self.concept_level == 'protein':
