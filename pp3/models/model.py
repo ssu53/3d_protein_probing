@@ -44,8 +44,8 @@ class Model(pl.LightningModule):
         dropout: float = 0.0,
         max_neighbors: int | None = None,
         interaction_model: Literal['transformer'] | None = None,
-        num_interaction_layers: int = 2,
-        interaction_hidden_dims: int = 64,
+        interaction_num_layers: int = 2,
+        interaction_hidden_dim: int = 64
     ) -> None:
         """Initialize the model.
 
@@ -64,6 +64,8 @@ class Model(pl.LightningModule):
         :param weight_decay: The weight decay.
         :param dropout: The dropout rate.
         :param max_neighbors: The maximum number of neighbors to consider for each residue.
+        :param interaction_num_layers: The number of layers in the interaction model.
+        :param interaction_hidden_dim: The hidden dimension of the interaction model.
         """
         super(Model, self).__init__()
 
@@ -134,8 +136,8 @@ class Model(pl.LightningModule):
         if self.interaction_model == 'transformer':
             self.interaction_model = Transformer(
                 input_dim=input_dim,
-                num_layers=num_interaction_layers,
-                interaction_hidden_dims=interaction_hidden_dims
+                num_layers=interaction_num_layers,
+                interaction_hidden_dims=interaction_hidden_dim
             )
         else:
             self.interaction_model = None

@@ -41,7 +41,9 @@ def probe(
     run_name_suffix: str = '',
     run_id_number: int | None = None,
     num_sanity_val_steps: int = 2,
-    interaction_model: Literal['transformer'] | None = None
+    interaction_model: Literal['transformer'] | None = None,
+    interaction_num_layers: int = 2,
+    interaction_hidden_dim: int = 64
 ) -> None:
     """Probe a model for a 3D geometric protein concepts.
 
@@ -74,9 +76,12 @@ def probe(
     :param run_id_number: Optional run ID number (e.g., slurm task ID) for W&B logging.
     :param num_sanity_val_steps: The number of validation steps to run during the sanity check.
     :param interaction_model: Whether to have an explicit model for interactions.
+    :param interaction_num_layers: The number of layers in the interaction model.
+    :param interaction_hidden_dim: The hidden dimension of the interaction model.
     """
     # Create save directory
-    run_name = f'{concept}_{embedding_method}_{encoder_type}_{encoder_num_layers}L_{predictor_num_layers}L_split_{split_seed}'
+    interaction_str = f'_{interaction_model}_{interaction_num_layers}L' if interaction_model else ''
+    run_name = f'{concept}_{embedding_method}_{encoder_type}_{encoder_num_layers}L{interaction_str}_mlp_{predictor_num_layers}L_split_{split_seed}'
     if run_name_suffix:
         run_name += f'_{run_name_suffix}'
 
@@ -117,7 +122,9 @@ def probe(
         weight_decay=weight_decay,
         dropout=dropout,
         max_neighbors=max_neighbors,
-        interaction_model=interaction_model
+        interaction_model=interaction_model,
+        interaction_num_layers=interaction_num_layers,
+        interaction_hidden_dim=interaction_hidden_dim,
     )
 
     print(model)
@@ -149,7 +156,11 @@ def probe(
             'split_path': str(split_path),
             'num_neighbors': max_neighbors,
             'patience': patience,
-            'run_id_number': run_id_number
+            'run_id_number': run_id_number,
+            'num_sanity_val_steps': num_sanity_val_steps,
+            'interaction_model': interaction_model,
+            'interaction_num_layers': interaction_num_layers,
+            'interaction_hidden_dim': interaction_hidden_dim
         })
     elif logger_type == 'tensorboard':
         from pytorch_lightning.loggers import TensorBoardLogger
