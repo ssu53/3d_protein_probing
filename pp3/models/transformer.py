@@ -10,10 +10,8 @@ class Transformer(nn.Module):
     def __init__(
         self,
         input_dim: int,
-        hidden_dim: int,
-        output_dim: int,
         num_layers: int,
-        last_layer_activation: bool = False,
+        interaction_hidden_dims: int = 64,
         dropout: float = 0.0,
         nhead: int = 4,
     ) -> None:
@@ -31,7 +29,7 @@ class Transformer(nn.Module):
         encoder_layer = TransformerEncoderLayer(
             d_model = input_dim,
             nhead = nhead,
-            dim_feedforward = hidden_dim,
+            dim_feedforward = interaction_hidden_dims,
             dropout = dropout,
             batch_first = True
         )
@@ -40,8 +38,6 @@ class Transformer(nn.Module):
             encoder_layer = encoder_layer,
             num_layers = num_layers,
         )
-
-        self.last_layer_activation = last_layer_activation
 
     def forward(
             self,

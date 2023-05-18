@@ -43,7 +43,8 @@ class Model(pl.LightningModule):
         dropout: float = 0.0,
         max_neighbors: int | None = None,
         interaction_model: str | None = None,
-        num_interaction_layers: int = 2
+        num_interaction_layers: int = 2,
+        interaction_hidden_dims: int = 64,
     ) -> None:
         """Initialize the model.
 
@@ -131,7 +132,8 @@ class Model(pl.LightningModule):
 
         if self.interaction_model == 'transformer':
             self.interaction_model = Transformer(input_dim=input_dim,
-                                                 num_layers=num_interaction_layers)
+                                                 num_layers=num_interaction_layers,
+                                                 interaction_hidden_dims=interaction_hidden_dims)
         else:
             self.interaction_model = None
         
