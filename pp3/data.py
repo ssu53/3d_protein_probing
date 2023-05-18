@@ -225,6 +225,10 @@ class ProteinConceptDataModule(pl.LightningDataModule):
                 pdb_id: get_baseline_residue_embedding(protein['sequence'])
                 for pdb_id, protein in pdb_id_to_proteins.items()
             }
+        
+        elif self.embedding_method == 'zero':
+            pdb_id_to_embeddings = {pdb_id : torch.ones(len(protein['sequence']), 48) for pdb_id, protein in pdb_id_to_proteins.items()}
+        
         # Other embedding methods
         else:
             raise ValueError(f'Invalid embedding method: {self.embedding_method}')
