@@ -39,7 +39,8 @@ def probe(
     max_neighbors: int | None = None,
     patience: int = 25,
     run_name_suffix: str = '',
-    run_id_number: int | None = None
+    run_id_number: int | None = None,
+    num_sanity_val_steps: int = 2
 ) -> None:
     """Probe a model for a 3D geometric protein concepts.
 
@@ -70,6 +71,7 @@ def probe(
     :param patience: The number of epochs to wait for validation loss to improve before early stopping.
     :param run_name_suffix: A suffix to append to the run name.
     :param run_id_number: Optional run ID number (e.g., slurm task ID) for W&B logging.
+    :param num_sanity_val_steps: The number of validation steps to run during the sanity check.
     """
     # Create save directory
     run_name = f'{concept}_{embedding_method}_{encoder_type}_{encoder_num_layers}L_{predictor_num_layers}L_split_{split_seed}'
@@ -179,7 +181,8 @@ def probe(
         deterministic=True,
         max_epochs=max_epochs,
         log_every_n_steps=25,
-        callbacks=[ckpt_callback, early_stopping, lr_monitor]
+        callbacks=[ckpt_callback, early_stopping, lr_monitor],
+        num_sanity_val_steps=num_sanity_val_steps
     )
 
     # Train model
