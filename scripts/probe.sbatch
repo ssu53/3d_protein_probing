@@ -187,10 +187,10 @@ do
 done
 
 command=${experiments[SLURM_ARRAY_TASK_ID]}
-echo $command
-eval "$command"
 echo "Task ID = $SLURM_ARRAY_TASK_ID"
 echo "Number of experiments = ${#experiments[@]}"
+echo $command
+eval "$command"
 
 echo "Done"
 exit 0

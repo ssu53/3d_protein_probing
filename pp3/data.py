@@ -251,7 +251,7 @@ class ProteinConceptDataModule(pl.LightningDataModule):
 
             pdb_ids_set = set(pdb_ids)
             self.train_pdb_ids = sorted(set(split_to_pdb_ids['train']) & pdb_ids_set)
-            self.val_pdb_ids = sorted(set(split_to_pdb_ids['val']) & pdb_ids_set)
+            self.val_pdb_ids = sorted(set(split_to_pdb_ids['valid']) & pdb_ids_set)
             self.test_pdb_ids = sorted(set(split_to_pdb_ids['test']) & pdb_ids_set)
         else:
             self.train_pdb_ids, val_test_pdb_ids = train_test_split(
