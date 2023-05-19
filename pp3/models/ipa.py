@@ -20,18 +20,15 @@ def flatten_final_dims(t, no_dims):
     return t.reshape(t.shape[:-no_dims] + (-1,))
 
 
-def rot_vec_mul(
-    r: torch.Tensor,
-    t: torch.Tensor
-) -> torch.Tensor:
+def rot_vec_mul(r: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
     """
-        Applies a rotation to a vector. Written out by hand to avoid transfer
-        to avoid AMP downcasting.
-        Args:
-            r: [*, 3, 3] rotation matrices
-            t: [*, 3] coordinate tensors
-        Returns:
-            [*, 3] rotated coordinates
+    Applies a rotation to a vector. Written out by hand to avoid transfer
+    to avoid AMP downcasting.
+    Args:
+        r: [*, 3, 3] rotation matrices
+        t: [*, 3] coordinate tensors
+    Returns:
+        [*, 3] rotated coordinates
     """
     x, y, z = torch.unbind(t, dim=-1)
     return torch.stack(
@@ -42,6 +39,25 @@ def rot_vec_mul(
         ],
         dim=-1,
     )
+
+
+def init_frames(coords, eps=1e-8):
+    p_neg_x_axis = coords[:, :, 0]
+    origin = coords[:, :, 1]
+    p_xy_plane = coords[:, :, 2]
+
+    e0 = origin - p_neg_x_axis
+    e1 = p_xy_plane - origin
+
+    e0 = e0 / (torch.norm(e0, dim=-1, keepdim=True) + eps)
+    dot = (e0 * e1).sum(dim=-1, keepdim=True)
+
+    e1 = e1 - e0 * dot
+    e1 = e1 / (torch.norm(e1, dim=-1, keepdim=True) + eps)
+
+    e2 = torch.cross(e0, e1, dim=-1)
+    rots = torch.stack([e0, e1, e2], dim=-1)
+    return rots, origin
 
 
 class IPA(nn.Module):
@@ -64,14 +80,14 @@ class IPA(nn.Module):
         self.eps = eps
 
         hc = self.c_hidden * self.no_heads
-        self.linear_q = Linear(self.c_s, hc)
-        self.linear_kv = Linear(self.c_s, 2 * hc)
+        self.linear_q = nn.Linear(self.c_s, hc)
+        self.linear_kv = nn.Linear(self.c_s, 2 * hc)
 
         hpq = self.no_heads * self.no_qk_points * 3
-        self.linear_q_points = Linear(self.c_s, hpq)
+        self.linear_q_points = nn.Linear(self.c_s, hpq)
 
         hpkv = self.no_heads * (self.no_qk_points + self.no_v_points) * 3
-        self.linear_kv_points = Linear(self.c_s, hpkv)
+        self.linear_kv_points = nn.Linear(self.c_s, hpkv)
 
         self.head_weights = nn.Parameter(torch.zeros((no_heads)))
         with torch.no_grad():
@@ -79,12 +95,11 @@ class IPA(nn.Module):
             self.head_weights.fill_(softplus_inverse_1)
 
         concat_out_dim = self.no_heads * (self.c_hidden + self.no_v_points * 4)
-        self.linear_out = Linear(concat_out_dim, self.c_s)
+        self.linear_out = nn.Linear(concat_out_dim, self.c_s)
         self.softmax = nn.Softmax(dim=-1)
         self.softplus = nn.Softplus()
 
-    def forward(self, s, R, t, mask) -> torch.Tensor:
-
+    def forward(self, s, R, t, pair_mask) -> torch.Tensor:
         # Compute query, key, value
         q = self.linear_q(s)
         kv = self.linear_kv(s)
@@ -125,7 +140,7 @@ class IPA(nn.Module):
 
         # [*, N_res, N_res, H, P_q, 3]
         pt_att = q_pts.unsqueeze(-4) - k_pts.unsqueeze(-5)
-        pt_att = pt_att ** 2
+        pt_att = pt_att**2
 
         # [*, N_res, N_res, H, P_q]
         pt_att = sum(torch.unbind(pt_att, dim=-1))
@@ -140,8 +155,7 @@ class IPA(nn.Module):
         # [*, N_res, N_res, H]
         pt_att = torch.sum(pt_att, dim=-1) * (-0.5)
         # [*, N_res, N_res]
-        square_mask = mask.unsqueeze(-1) * mask.unsqueeze(-2)
-        square_mask = 1e5 * (square_mask - 1)
+        square_mask = 1e5 * (pair_mask - 1)
 
         # [*, H, N_res, N_res]
         pt_att = permute_final_dims(pt_att, (2, 0, 1))
@@ -160,9 +174,12 @@ class IPA(nn.Module):
             dim=-2,
         )
         o_pt = permute_final_dims(o_pt, (2, 0, 3, 1))
-        o_pt = rot_vec_mul(R[:, :, None, None].transpose(-1, -2), o_pt) - t[:, :, None, None]
+        o_pt = (
+            rot_vec_mul(R[:, :, None, None].transpose(-1, -2), o_pt)
+            - t[:, :, None, None]
+        )
         o_pt_norm = flatten_final_dims(
-            torch.sqrt(torch.sum(o_pt ** 2, dim=-1) + self.eps), 2
+            torch.sqrt(torch.sum(o_pt**2, dim=-1) + self.eps), 2
         )
         o_pt = o_pt.reshape(*o_pt.shape[:-3], -1, 3)
 
@@ -178,7 +195,7 @@ class IPA(nn.Module):
 class BackboneUpdate(nn.Module):
     def __init__(self, dim):
         super().__init__()
-        self.linear = Linear(dim, 6, init="final")
+        self.linear = nn.Linear(dim, 6)
 
     def forward(self, s):
         # Compute update
@@ -209,10 +226,18 @@ class BackboneUpdate(nn.Module):
 
 
 class StructureModule(nn.Module):
-    def __init__(self, dim: int, layers: int):
+    def __init__(
+        self,
+        dim: int,
+        layers: int,
+        update_coords: bool = True,
+        max_neighbors: int = None,
+    ):
         super().__init__()
         self.dim = dim
         self.layers = layers
+        self.max_neighbors = max_neighbors
+        self.update_coords = update_coords
 
         self.input_fc = nn.Linear(dim, dim)
         self.input_ln = nn.LayerNorm(dim)
@@ -224,17 +249,36 @@ class StructureModule(nn.Module):
             nn.Linear(dim, dim),
         )
         self.transition_ln = nn.LayerNorm(dim)
-        self.backbone_update = BackboneUpdate(dim)
+        if self.update_coords:
+            self.backbone_update = BackboneUpdate(dim)
 
-    def forward(self, data, transform, mask):
+    def forward(self, data, coords, mask):
+        # TODO: implement efficient neighbors in attention
+        if self.max_neighbors is not None:
+            # Compute distances
+            B, N = coords.shape[:2]
+            ca = coords[:, :, 1]
+            rel_coors = ca.unsqueeze(2) - ca.unsqueeze(1)
+            rel_dist = torch.linalg.norm(rel_coors, dim=-1)
+
+            # set padding to max distance so they are always last
+            pad_mask = mask.unsqueeze(2) * mask.unsqueeze(1)
+            rel_dist = rel_dist + (1 - pad_mask) * rel_dist.max()
+            neighbor_ids = torch.argsort(rel_dist, dim=-1)
+
+            # Increment by 1 to ignore self
+            neighbor_ids = neighbor_ids[:, :, 1 : self.max_neighbors + 1]
+            pair_mask = torch.zeros_like(pad_mask)
+            pair_mask[
+                torch.arange(B)[:, None, None],
+                torch.arange(N)[None, :, None],
+                neighbor_ids,
+            ] = 1
+        else:
+            pair_mask = mask.unsqueeze(2) * mask.unsqueeze(1)
+
         # Initialize frames
-        R = torch.eye(3, device=data.device)
-        t = torch.zeros(3, device=data.device)
-
-        # Expand batch & sequence dimensions
-        B, N = data.shape[:2]
-        R = R[None, None, :, :].repeat(B, N, 1, 1)
-        t = t[None, None, :].repeat(B, N, 1)
+        R, t = init_frames(coords)
 
         # Compute input fc
         data = self.input_ln(data)
@@ -242,7 +286,7 @@ class StructureModule(nn.Module):
 
         for i in range(self.layers):
             # Compute IPA
-            data = data + self.ipa(data, R, t, mask=mask)
+            data = data + self.ipa(data, R, t, pair_mask=pair_mask)
             data = self.ipa_ln(data)
 
             # Compute transition
@@ -250,14 +294,14 @@ class StructureModule(nn.Module):
             data = self.transition_ln(data)
 
             # Update backbone
-            R_u, t_u = self.backbone_update(data)
+            if self.update_coords:
+                R_u, t_u = self.backbone_update(data)
 
-            # Compute new frames
-            R = R.matmul(R_u)
-            t = t + rot_vec_mul(R, t_u)
+                # Compute new frames
+                R = R.matmul(R_u)
+                t = t + rot_vec_mul(R, t_u)
 
-            if i < self.layers - 1:
-                R = R.detach()
+                if i < self.layers - 1:
+                    R = R.detach()
 
-        positions = rot_vec_mul(R[:, :, None], transform) + t[:, :, None]
-        return positions, R, t
+        return data
