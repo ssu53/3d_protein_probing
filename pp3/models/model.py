@@ -17,6 +17,7 @@ from sklearn.metrics import (
     roc_auc_score
 )
 from pp3.models.egnn import EGNN
+from pp3.models.ipa import StructureModule
 from pp3.models.mlp import MLP
 from pp3.models.transformer import Transformer
 from pp3.models.tfn import TFN
@@ -116,6 +117,13 @@ class Model(pl.LightningModule):
                 num_layers=self.encoder_num_layers,
                 max_neighbors=max_neighbors,
                 dropout=dropout
+            )
+            last_hidden_dim = self.input_dim
+        elif encoder_type == 'ipa':
+            self.encoder = StructureModule(
+                node_dim=self.input_dim,
+                num_layers=self.encoder_num_layers,
+                max_neighbors=max_neighbors
             )
             last_hidden_dim = self.input_dim
         else:

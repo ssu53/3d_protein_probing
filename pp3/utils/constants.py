@@ -51,7 +51,7 @@ BLOSUM62_AA_TO_VECTOR = {
 MAX_SEQ_LEN = 512
 
 # Types
-ENCODER_TYPES = Literal['mlp', 'egnn', 'tfn']
+ENCODER_TYPES = Literal['mlp', 'egnn', 'tfn', 'ipa']
 BATCH_TYPE = tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
 
 # Embedding sizes

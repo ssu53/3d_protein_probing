@@ -4,19 +4,19 @@ import torch
 import torch.nn as nn
 
 
-def is_fp16_enabled():
+def is_fp16_enabled() -> bool:
     fp16_enabled = torch.get_autocast_gpu_dtype() == torch.float16
     fp16_enabled = fp16_enabled and torch.is_autocast_enabled()
     return fp16_enabled
 
 
-def permute_final_dims(tensor, inds):
+def permute_final_dims(tensor: torch.Tensor, inds: tuple[int, ...]) -> torch.Tensor:
     zero_index = -1 * len(inds)
     first_inds = list(range(len(tensor.shape[:zero_index])))
     return tensor.permute(first_inds + [zero_index + i for i in inds])
 
 
-def flatten_final_dims(t, no_dims):
+def flatten_final_dims(t: torch.Tensor, no_dims: int) -> torch.Tensor:
     return t.reshape(t.shape[:-no_dims] + (-1,))
 
 
@@ -41,7 +41,7 @@ def rot_vec_mul(r: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
     )
 
 
-def init_frames(coords, eps=1e-8):
+def init_frames(coords: torch.Tensor, eps: float = 1e-8) -> tuple[torch.Tensor, torch.Tensor]:
     p_neg_x_axis = coords[:, :, 0]
     origin = coords[:, :, 1]
     p_xy_plane = coords[:, :, 2]
@@ -57,6 +57,7 @@ def init_frames(coords, eps=1e-8):
 
     e2 = torch.cross(e0, e1, dim=-1)
     rots = torch.stack([e0, e1, e2], dim=-1)
+
     return rots, origin
 
 
@@ -69,7 +70,7 @@ class IPA(nn.Module):
         no_qk_points: int = 4,
         no_v_points: int = 8,
         eps: float = 1e-8,
-    ):
+    ) -> None:
         super().__init__()
 
         self.c_s = c_s
@@ -99,7 +100,13 @@ class IPA(nn.Module):
         self.softmax = nn.Softmax(dim=-1)
         self.softplus = nn.Softplus()
 
-    def forward(self, s, R, t, pair_mask) -> torch.Tensor:
+    def forward(
+            self,
+            s: torch.Tensor,
+            R: torch.Tensor,
+            t: torch.Tensor,
+            pair_mask: torch.Tensor
+    ) -> torch.Tensor:
         # Compute query, key, value
         q = self.linear_q(s)
         kv = self.linear_kv(s)
@@ -189,15 +196,16 @@ class IPA(nn.Module):
                 dtype=s.dtype
             )
         )
+
         return s
 
 
 class BackboneUpdate(nn.Module):
-    def __init__(self, dim):
+    def __init__(self, dim: int) -> None:
         super().__init__()
         self.linear = nn.Linear(dim, 6)
 
-    def forward(self, s):
+    def forward(self, s: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         # Compute update
         update = self.linear(s)
 
@@ -222,37 +230,43 @@ class BackboneUpdate(nn.Module):
         row3 = torch.stack([2 * (bd - ac), 2 * (cd + ab), a2 - b2 - c2 + d2], dim=2)
 
         R = torch.stack([row1, row2, row3], dim=2)
+
         return R, t
 
 
 class StructureModule(nn.Module):
     def __init__(
         self,
-        dim: int,
-        layers: int,
+        node_dim: int,
+        num_layers: int,
         update_coords: bool = True,
-        max_neighbors: int = None,
-    ):
+        max_neighbors: int | None = None,
+    ) -> None:
         super().__init__()
-        self.dim = dim
-        self.layers = layers
+        self.node_dim = node_dim
+        self.num_layers = num_layers
         self.max_neighbors = max_neighbors
         self.update_coords = update_coords
 
-        self.input_fc = nn.Linear(dim, dim)
-        self.input_ln = nn.LayerNorm(dim)
-        self.ipa = IPA(dim, dim)
-        self.ipa_ln = nn.LayerNorm(dim)
+        self.input_fc = nn.Linear(node_dim, node_dim)
+        self.input_ln = nn.LayerNorm(node_dim)
+        self.ipa = IPA(node_dim, node_dim)
+        self.ipa_ln = nn.LayerNorm(node_dim)
         self.transition_fc = nn.Sequential(
-            nn.Linear(dim, dim),
+            nn.Linear(node_dim, node_dim),
             nn.ReLU(),
-            nn.Linear(dim, dim),
+            nn.Linear(node_dim, node_dim),
         )
-        self.transition_ln = nn.LayerNorm(dim)
+        self.transition_ln = nn.LayerNorm(node_dim)
         if self.update_coords:
-            self.backbone_update = BackboneUpdate(dim)
+            self.backbone_update = BackboneUpdate(node_dim)
 
-    def forward(self, data, coords, mask):
+    def forward(
+            self,
+            embeddings: torch.Tensor,
+            coords: torch.Tensor,
+            mask: torch.Tensor
+    ) -> torch.Tensor:
         # TODO: implement efficient neighbors in attention
         if self.max_neighbors is not None:
             # Compute distances
@@ -281,27 +295,27 @@ class StructureModule(nn.Module):
         R, t = init_frames(coords)
 
         # Compute input fc
-        data = self.input_ln(data)
-        data = self.input_fc(data)
+        embeddings = self.input_ln(embeddings)
+        embeddings = self.input_fc(embeddings)
 
-        for i in range(self.layers):
+        for i in range(self.num_layers):
             # Compute IPA
-            data = data + self.ipa(data, R, t, pair_mask=pair_mask)
-            data = self.ipa_ln(data)
+            embeddings = embeddings + self.ipa(embeddings, R, t, pair_mask=pair_mask)
+            embeddings = self.ipa_ln(embeddings)
 
             # Compute transition
-            data = data + self.transition_fc(data)
-            data = self.transition_ln(data)
+            embeddings = embeddings + self.transition_fc(embeddings)
+            embeddings = self.transition_ln(embeddings)
 
             # Update backbone
             if self.update_coords:
-                R_u, t_u = self.backbone_update(data)
+                R_u, t_u = self.backbone_update(embeddings)
 
                 # Compute new frames
                 R = R.matmul(R_u)
                 t = t + rot_vec_mul(R, t_u)
 
-                if i < self.layers - 1:
+                if i < self.num_layers - 1:
                     R = R.detach()
 
-        return data
+        return embeddings
