@@ -31,7 +31,7 @@ def probe(
     learning_rate: float = 1e-4,
     weight_decay: float = 0.0,
     dropout: float = 0.0,
-    max_epochs: int = 1000,
+    max_epochs: int = 500,
     ckpt_every_k_epochs: int = 10,
     num_workers: int = 4,
     split_seed: int = 0,

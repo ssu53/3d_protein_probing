@@ -10,43 +10,56 @@ import pandas as pd
 from tqdm import tqdm
 
 
-EMBEDDING_METHODS = ['baseline', 'plm']
-ENCODER_TYPES = ['mlp', 'egnn', 'tfn']
+EMBEDDING_METHODS = [
+    # 'one',
+    'baseline',
+    'plm'
+]
+ENCODER_TYPES = [
+    'mlp',
+    'egnn',
+    'tfn',
+    'ipa'
+]
 EMBEDDING_METHOD_TO_HATCH = {
+    # 'one': '-',
     'baseline': '',
     'plm': '/'
 }
 EMBEDDING_METHOD_TO_UPPER = {
-    'baseline': 'Baseline',
+    # 'one': 'Constant',
+    'baseline': 'Raw',
     'plm': 'PLM'
 }
 ENCODER_TYPE_TO_COLOR = {
     'mlp': 'tab:blue',
     'egnn': 'tab:orange',
-    'tfn': 'tab:red'
+    'tfn': 'tab:red',
+    'ipa': 'tab:yellow'
 }
 METRIC_SHORT_TO_LONG = {
     'ap': 'Average Precision',
-    'macro_ap': 'Macro Average Precision',
-    'micro_ap': 'Micro Average Precision',
+    'macro_ap': 'Average Precision',
+    'micro_ap': 'Average Precision',
+    'micro_mean_ap': 'Average Precision',
     'accuracy': 'Accuracy',
-    'macro_accuracy': 'Macro Accuracy',
-    'micro_accuracy': 'Micro Accuracy',
+    'macro_accuracy': 'Accuracy',
+    'micro_accuracy': 'Accuracy',
     'r2': 'R^2',
-    'macro_r2': 'Macro R^2',
-    'micro_r2': 'Micro R^2'
+    'macro_r2': r'R$^{\mathbf{2}}$',
+    'micro_r2': r'R$^{\mathbf{2}}$'
 }
 OFFSET = 1
 CONCEPT_TO_NAME = {
     'residue_sasa': 'SASA',
     'secondary_structure': 'Secondary Structure',
-    'residue_locations': 'Locations',
-    'residue_distances': 'Distances',
-    'residue_distances_by_residue': 'Distances By Residue',
-    'residue_contacts': 'Contacts',
-    'residue_contacts_by_residue': 'Contacts By Residue',
-    'bond_angles': 'Bond Angles',
-    'dihedral_angles': 'Dihedral Angles',
+    # 'residue_locations': 'Locations',
+    'residue_distances': 'Pair Distance',
+    'residue_distances_by_residue': 'Average Pair Distance',
+    'residue_contacts': 'Pair Contact',
+    'residue_contacts_by_residue': 'Any Pair Contact',
+    'bond_angles': 'Bond Angle',
+    'dihedral_angles': 'Dihedral Angle',
     'solubility': 'Solubility',
     'enzyme_commission': 'Enzyme Commission',
     'gene_ontology': 'Gene Ontology'
@@ -55,13 +68,13 @@ CONCEPT_SUBSET_ORDER = {
     'geometry': [
         'SASA',
         'Secondary Structure',
-        'Locations',
-        'Distances',
-        'Distances By Residue',
-        'Contacts',
-        'Contacts By Residue',
-        'Bond Angles',
-        'Dihedral Angles'
+        # 'Locations',
+        'Pair Distance',
+        'Average Pair Distance',
+        'Pair Contact',
+        'Any Pair Contact',
+        'Bond Angle',
+        'Dihedral Angle'
     ],
     'downstream': [
         'Solubility',
@@ -69,6 +82,26 @@ CONCEPT_SUBSET_ORDER = {
         'Gene Ontology'
     ]
 }
+ENCODER_TO_EMBEDDING_TO_X = {
+    'mlp': {
+        'baseline': 0,
+        'plm': 2
+    },
+    'egnn': {
+        'baseline': 4,
+        'plm': 8
+    },
+    'tfn': {
+        'baseline': 5,
+        'plm': 9
+    },
+    'ipa': {
+        'baseline': 6,
+        'plm': 10
+    }
+}
+XTICKS = [0, 2, 5, 9]
+XTICK_LABELS = ['Baseline', 'Sequence', 'Structure', 'Seq & Struct']
 
 
 def default_dict_to_regular(obj: Any) -> dict:
@@ -102,6 +135,8 @@ def plot_wand_results(
 
     for metric in metrics:
         metric_data = data[data[f'test_{metric}'].notna()]
+        metric_data = metric_data[metric_data['interaction_model'].isna()]
+        metric_data = metric_data[metric_data['concept'] != 'residue_locations']
 
         for concept, embedding_method, encoder_type, result in zip(
                 metric_data['concept'],
@@ -126,7 +161,7 @@ def plot_wand_results(
 
     num_plots = len(concepts)
     num_cols = num_plots // num_rows + (num_plots % num_rows > 0)
-    fig, axes = plt.subplots(nrows=num_rows, ncols=num_cols, sharey=True, figsize=(num_cols * 4, num_rows * 3))
+    fig, axes = plt.subplots(nrows=num_rows, ncols=num_cols, sharey=True, figsize=(num_cols * 4 * 1.2, num_rows * 3 * 1.2))
 
     if not isinstance(axes, np.ndarray):
         axes = np.array([[axes]])
@@ -137,14 +172,14 @@ def plot_wand_results(
     for row_idx, axes_row in enumerate(tqdm(axes)):
         # Set up row of axes
         axes_row[0].set_ylabel('Metric')
-        axes_row[0].legend(handles=[
-            mpatches.Patch(
-                facecolor='lightgray',
-                hatch=EMBEDDING_METHOD_TO_HATCH[embedding_method],
-                label=EMBEDDING_METHOD_TO_UPPER[embedding_method]
-            )
-            for embedding_method in EMBEDDING_METHODS
-        ], loc='upper left')
+        # axes_row[0].legend(handles=[
+        #     mpatches.Patch(
+        #         facecolor='lightgray',
+        #         hatch=EMBEDDING_METHOD_TO_HATCH[embedding_method],
+        #         label=EMBEDDING_METHOD_TO_UPPER[embedding_method]
+        #     )
+        #     for embedding_method in EMBEDDING_METHODS
+        # ], loc='upper left')
 
         for ax in axes_row[1:]:
             ax.tick_params(axis='y', which='both', length=0)
@@ -152,31 +187,44 @@ def plot_wand_results(
         # Plot results for each concept in subplots
         concepts_row = concepts[row_idx * axes.shape[1]: (row_idx + 1) * axes.shape[1]]
         for ax, concept in tqdm(zip(axes_row, concepts_row), total=num_plots, leave=False):
-            xticks, xticklabels = [], []
+            # xticks, xticklabels = [], []
 
-            for embedding_method_idx, embedding_method in enumerate(EMBEDDING_METHODS):
-                for encoder_type_idx, encoder_type in enumerate(ENCODER_TYPES):
+            for encoder_type_idx, encoder_type in enumerate(ENCODER_TYPES):
+                for embedding_method_idx, embedding_method in enumerate(EMBEDDING_METHODS):
                     try:
                         results = concept_to_embedding_to_encoder_to_results[concept][embedding_method][encoder_type]
                     except KeyError:
                         results = [0]
 
-                    xtick = encoder_type_idx + embedding_method_idx * (len(ENCODER_TYPES) + OFFSET)
-                    xticks.append(xtick)
-                    xticklabels.append(encoder_type.upper())
+                    x = ENCODER_TO_EMBEDDING_TO_X[encoder_type][embedding_method]
+                    # xtick = embedding_method_idx + encoder_type_idx * (len(EMBEDDING_METHODS) + OFFSET)
+                    # xticks.append(xtick)
+                    # xticklabels.append(encoder_type.upper())
                     ax.bar(
-                        xtick,
+                        x,
                         np.mean(results),
-                        yerr=np.std(results),
+                        # yerr=np.std(results),
                         color=ENCODER_TYPE_TO_COLOR[encoder_type],
                         capsize=5,
-                        hatch=EMBEDDING_METHOD_TO_HATCH[embedding_method]
+                        hatch=EMBEDDING_METHOD_TO_HATCH[embedding_method],
+                        label=encoder_type.upper() if embedding_method == 'baseline' else None
                     )
 
-            ax.set_xticks(xticks)
-            ax.set_xticklabels(xticklabels)
+            # xticks = np.array(xticks)
+            ax.set_xticks(XTICKS)
+            ax.set_xticklabels(XTICK_LABELS)
             ax.set_xlabel(f'{concept}\n({concept_to_metric[concept]})', weight='bold')
             ax.set_ylim(0, 1)
+
+        handles, labels = axes_row[0].get_legend_handles_labels()
+        axes_row[0].legend(loc='upper left', handles=[
+            mpatches.Patch(
+                facecolor='lightgray',
+                hatch=EMBEDDING_METHOD_TO_HATCH[embedding_method],
+                label=EMBEDDING_METHOD_TO_UPPER[embedding_method]
+            )
+            for embedding_method in EMBEDDING_METHODS
+        ] + handles)
 
     # Add plot-wide details
     fig.subplots_adjust(wspace=0, hspace=0.5)

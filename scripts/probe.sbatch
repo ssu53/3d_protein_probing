@@ -36,7 +36,7 @@ experiments=()
 for CONCEPT in enzyme_commission gene_ontology
 do
     # Sequence
-    for EMBEDDING_METHOD in baseline plm
+    for EMBEDDING_METHOD in baseline plm one
     do
         no_interaction="python scripts/probe.py \
             --project_name $PROJECT_NAME \
@@ -62,7 +62,7 @@ do
     # Structure
     for EMBEDDING_METHOD in baseline plm one
     do
-        for ENCODER_TYPE in egnn tfn
+        for ENCODER_TYPE in egnn tfn ipa
         do
             no_interaction="python scripts/probe.py \
                 --project_name $PROJECT_NAME \
@@ -92,7 +92,7 @@ done
 for CONCEPT in residue_sasa secondary_structure bond_angles dihedral_angles residue_distances residue_distances_by_residue residue_contacts residue_contacts_by_residue residue_locations
 do
     # Sequence
-    for EMBEDDING_METHOD in plm baseline
+    for EMBEDDING_METHOD in plm baseline one
     do
         no_interaction="python scripts/probe.py \
             --project_name $PROJECT_NAME \
@@ -108,7 +108,6 @@ do
             --predictor_num_layers 2 \
             --predictor_hidden_dim 100 \
             --batch_size 100 \
-            --split_seed $SPLIT_SEED \
             --run_id_number $SLURM_ARRAY_TASK_ID"
         interaction="${no_interaction} --interaction_model transformer"
         experiments+=("$no_interaction" "$interaction")
@@ -117,7 +116,7 @@ do
     # Structure
     for EMBEDDING_METHOD in baseline plm one
     do
-        for ENCODER_TYPE in egnn tfn
+        for ENCODER_TYPE in egnn tfn ipa
         do
             no_interaction="python scripts/probe.py \
                 --project_name $PROJECT_NAME \
@@ -134,7 +133,6 @@ do
                 --predictor_hidden_dim 100 \
                 --batch_size 10 \
                 --max_neighbors 24 \
-                --split_seed $SPLIT_SEED \
                 --run_id_number $SLURM_ARRAY_TASK_ID"
             interaction="${no_interaction} --interaction_model transformer"
             experiments+=("$no_interaction" "$interaction")
