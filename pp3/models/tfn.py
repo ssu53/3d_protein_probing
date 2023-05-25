@@ -261,6 +261,9 @@ class TFN(torch.nn.Module):
         coords: torch.Tensor,
         padding_mask: torch.Tensor,
     ) -> torch.Tensor:
+        # Use only the c-a for now
+        coords = coords[:, :, 1]
+
         # Compute pairwise distances in original coordinates
         B, N = embeddings.shape[:2]
         rel_coors = coords.unsqueeze(2) - coords.unsqueeze(1)

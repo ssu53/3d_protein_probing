@@ -20,11 +20,11 @@ def collate_fn(
 
     :param batch: A batch of items at the residue level, where each element of the batch is a tuple containing:
                     - Embeddings (num_residues, embedding_dim)
-                    - Coordinates (num_residues, 3)
+                    - Coordinates (num_residues, 3, 3)
                     - Y value (num_residues,)
     :return: A collated batch with:
                 - Embeddings (batch_size, max_num_residues, embedding_dim)
-                - Coordinates (batch_size, max_num_residues, 3)
+                - Coordinates (batch_size, max_num_residues, 3, 3)
                 - Y value (batch_size, max_num_residues)
                 - Padding mask (batch_size, max_num_residues)
     """

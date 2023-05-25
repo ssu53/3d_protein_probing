@@ -2,6 +2,7 @@
 from pathlib import Path
 
 import torch
+import numpy as np
 from biotite.structure import (
     AtomArray,
     check_bond_continuity,
@@ -156,13 +157,22 @@ def get_residue_coordinates(structure: AtomArray) -> torch.Tensor:
     :raises ValueError: If the protein structure does not contain coordinates for all residues.
 
     :param structure: The protein structure.
-    :return: A numpy array with the coordinates of the residues (CA atoms) in the protein structure.
+    :return: A numpy array with the coordinates of the residues (N, CA, C atoms) in the protein structure.
     """
-    residue_coords = structure[structure.atom_name == 'CA'].coord
+    n_coords = structure[structure.atom_name == 'N'].coord
+    ca_coords = structure[structure.atom_name == 'CA'].coord
+    c_coords = structure[structure.atom_name == 'C'].coord
 
-    if len(residue_coords) != get_residue_count(structure):
-        raise ValueError('Structure does not contain coordinates for all residues')
+    if len(n_coords) != get_residue_count(structure):
+        raise ValueError('Structure does not contain N coordinates for all residues')
 
+    if len(ca_coords) != get_residue_count(structure):
+        raise ValueError('Structure does not contain CA coordinates for all residues')
+
+    if len(c_coords) != get_residue_count(structure):
+        raise ValueError('Structure does not contain C coordinates for all residues')
+
+    residue_coords = np.stack((n_coords, ca_coords, c_coords), axis=1)
     return torch.from_numpy(residue_coords)
 
 
