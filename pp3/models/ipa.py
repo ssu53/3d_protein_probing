@@ -265,7 +265,7 @@ class StructureModule(nn.Module):
             self,
             embeddings: torch.Tensor,
             coords: torch.Tensor,
-            mask: torch.Tensor
+            padding_mask: torch.Tensor
     ) -> torch.Tensor:
         # TODO: implement efficient neighbors in attention
         if self.max_neighbors is not None:
@@ -276,20 +276,20 @@ class StructureModule(nn.Module):
             rel_dist = torch.linalg.norm(rel_coors, dim=-1)
 
             # set padding to max distance so they are always last
-            pad_mask = mask.unsqueeze(2) * mask.unsqueeze(1)
-            rel_dist = rel_dist + (1 - pad_mask) * rel_dist.max()
+            padding_mask = padding_mask.unsqueeze(2) * padding_mask.unsqueeze(1)
+            rel_dist = rel_dist + (1 - padding_mask) * rel_dist.max()
             neighbor_ids = torch.argsort(rel_dist, dim=-1)
 
             # Increment by 1 to ignore self
             neighbor_ids = neighbor_ids[:, :, 1 : self.max_neighbors + 1]
-            pair_mask = torch.zeros_like(pad_mask)
+            pair_mask = torch.zeros_like(padding_mask)
             pair_mask[
                 torch.arange(B)[:, None, None],
                 torch.arange(N)[None, :, None],
                 neighbor_ids,
             ] = 1
         else:
-            pair_mask = mask.unsqueeze(2) * mask.unsqueeze(1)
+            pair_mask = padding_mask.unsqueeze(2) * padding_mask.unsqueeze(1)
 
         # Initialize frames
         R, t = init_frames(coords)
