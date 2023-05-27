@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 
 EMBEDDING_METHODS = [
-    # 'one',
+    'one',
     'baseline',
     'plm'
 ]
@@ -19,15 +19,15 @@ ENCODER_TYPES = [
     'mlp',
     'egnn',
     'tfn',
-    'ipa'
+    # 'ipa'
 ]
 EMBEDDING_METHOD_TO_HATCH = {
-    # 'one': '-',
+    'one': 'o',
     'baseline': '',
     'plm': '/'
 }
 EMBEDDING_METHOD_TO_UPPER = {
-    # 'one': 'Constant',
+    'one': 'Constant',
     'baseline': 'Raw',
     'plm': 'PLM'
 }
@@ -35,7 +35,7 @@ ENCODER_TYPE_TO_COLOR = {
     'mlp': 'tab:blue',
     'egnn': 'tab:orange',
     'tfn': 'tab:red',
-    'ipa': 'tab:yellow'
+    # 'ipa': 'tab:yellow'
 }
 METRIC_SHORT_TO_LONG = {
     'ap': 'Average Precision',
@@ -84,24 +84,27 @@ CONCEPT_SUBSET_ORDER = {
 }
 ENCODER_TO_EMBEDDING_TO_X = {
     'mlp': {
-        'baseline': 0,
-        'plm': 2
+        'one': 0,
+        'baseline': 1,
+        'plm': 3
     },
     'egnn': {
-        'baseline': 4,
-        'plm': 8
+        'one': 5,
+        'baseline': 8,
+        'plm': 11
     },
     'tfn': {
-        'baseline': 5,
-        'plm': 9
+        'one': 6,
+        'baseline': 9,
+        'plm': 12
     },
-    'ipa': {
-        'baseline': 6,
-        'plm': 10
-    }
+    # 'ipa': {
+    #     'baseline': 6,
+    #     'plm': 10
+    # }
 }
-XTICKS = [0, 2, 5, 9]
-XTICK_LABELS = ['Baseline', 'Sequence', 'Structure', 'Seq & Struct']
+XTICKS = [0.5, 3, 5.5, 8.5, 11.5]
+XTICK_LABELS = ['Baseline', 'Sequence', 'Coords', 'Structure', 'Seq & Struct']
 
 
 def default_dict_to_regular(obj: Any) -> dict:
