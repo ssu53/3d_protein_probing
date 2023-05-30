@@ -19,7 +19,7 @@ ENCODER_TYPES = [
     'mlp',
     'egnn',
     'tfn',
-    # 'ipa'
+    'ipa'
 ]
 EMBEDDING_METHOD_TO_HATCH = {
     'one': 'o',
@@ -35,7 +35,7 @@ ENCODER_TYPE_TO_COLOR = {
     'mlp': 'tab:blue',
     'egnn': 'tab:orange',
     'tfn': 'tab:red',
-    # 'ipa': 'tab:yellow'
+    'ipa': 'tab:brown'
 }
 METRIC_SHORT_TO_LONG = {
     'ap': 'Average Precision',
@@ -90,21 +90,22 @@ ENCODER_TO_EMBEDDING_TO_X = {
     },
     'egnn': {
         'one': 5,
-        'baseline': 8,
-        'plm': 11
+        'baseline': 9,
+        'plm': 13
     },
     'tfn': {
         'one': 6,
-        'baseline': 9,
-        'plm': 12
+        'baseline': 10,
+        'plm': 14
     },
-    # 'ipa': {
-    #     'baseline': 6,
-    #     'plm': 10
-    # }
+    'ipa': {
+        'one': 7,
+        'baseline': 11,
+        'plm': 15
+    }
 }
-XTICKS = [0.5, 3, 5.5, 8.5, 11.5]
-XTICK_LABELS = ['Baseline', 'Sequence', 'Coords', 'Structure', 'Seq & Struct']
+XTICKS = [0.5, 3, 6, 10, 14]
+XTICK_LABELS = ['Baseline', 'Seq', 'Coords', 'Struct', 'Seq & Struct']
 
 
 def default_dict_to_regular(obj: Any) -> dict:
