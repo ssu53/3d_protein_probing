@@ -1,16 +1,17 @@
 #!/bin/bash
 #
-#SBATCH --job-name=probe_penultimate
+#SBATCH --job-name=probe
 #
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --gpus=1
+#SBATCH --constraint=GPU_SKU:RTX_2080Ti|GPU_SKU:TITAN_V|GPU_SKU:TITAN_Xp
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=30G
-#SBATCH --array=0-175
+#SBATCH --array=0-175%8
 #SBATCH --partition=jamesz
-#SBATCH --output=output/probe_penultimate/%a.out
-#SBATCH --error=error/probe_penultimate/%a.err
+#SBATCH --output=output/probe/%a.out
+#SBATCH --error=error/probe/%a.err
 #SBATCH --time=168:00:00
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=swansonk@stanford.edu
@@ -28,7 +29,7 @@ conda activate 3d_protein_probing
 
 cd /oak/stanford/groups/jamesz/swansonk/3d_protein_probing
 
-PROJECT_NAME=probe_penultimate
+PROJECT_NAME=probe
 
 experiments=()
 
@@ -77,7 +78,7 @@ do
                 --encoder_hidden_dim 16 \
                 --predictor_num_layers 2 \
                 --predictor_hidden_dim 100 \
-                --batch_size 10 \
+                --batch_size 2 \
                 --max_neighbors 24 \
                 --split_path data/torchdrug/${CONCEPT}_split_to_pdb_id_30.json \
                 --run_id_number $SLURM_ARRAY_TASK_ID \
@@ -131,7 +132,7 @@ do
                 --encoder_hidden_dim 16 \
                 --predictor_num_layers 2 \
                 --predictor_hidden_dim 100 \
-                --batch_size 10 \
+                --batch_size 2 \
                 --max_neighbors 24 \
                 --run_id_number $SLURM_ARRAY_TASK_ID"
             interaction="${no_interaction} --interaction_model transformer"
