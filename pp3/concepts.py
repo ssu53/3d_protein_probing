@@ -172,18 +172,23 @@ def secondary_structure(structure: AtomArray) -> torch.Tensor:
     return torch.from_numpy(sse)
 
 
-@register_concept(concept_level='residue_triplet', concept_type='regression', output_dim=1)
-def bond_angles(structure: AtomArray) -> torch.Tensor:
+@register_concept(concept_level='residue_triplet_1', concept_type='regression', output_dim=1)
+def bond_angles(structure: AtomArray, residue_distance: int = 1) -> torch.Tensor:
     """Get the angle between residue triplets.
 
     :param structure: The protein structure.
-    :return: A PyTorch tensor with the angles between residue triplets (length N - 2).
+    :param residue_distance: The distance (# of amino acids) between residues in the triplet.
+    :return: A PyTorch tensor with the angles between residue triplets (length N - 2 * residue_distance).
     """
     # Get CA indices
     indices = np.arange(0, len(structure))[structure.atom_name == 'CA']
 
     # Set up index triples
-    index = np.stack([indices[:-2], indices[1:-1], indices[2:]]).T
+    index = np.stack([
+        indices[:-2 * residue_distance],
+        indices[residue_distance:-residue_distance],
+        indices[2 * residue_distance:]]
+    ).T
 
     # Get bond angles
     angles = index_angle(structure, index)
@@ -191,23 +196,49 @@ def bond_angles(structure: AtomArray) -> torch.Tensor:
     return torch.from_numpy(angles)
 
 
-@register_concept(concept_level='residue_quadruplet', concept_type='regression', output_dim=1)
-def dihedral_angles(structure: AtomArray) -> torch.Tensor:
+@register_concept(concept_level='residue_triplet_24', concept_type='regression', output_dim=1)
+def bond_angles_distant(structure: AtomArray) -> torch.Tensor:
+    """Get the angle between residue triplets that are 24 AA apart.
+
+    :param structure: The protein structure.
+    :return: A PyTorch tensor with the angles between residue triplets (length N - 48).
+    """
+    return bond_angles(structure, residue_distance=24)
+
+
+@register_concept(concept_level='residue_quadruplet_1', concept_type='regression', output_dim=1)
+def dihedral_angles(structure: AtomArray, residue_distance: int = 1) -> torch.Tensor:
     """Get the dihedral angles between residue quadruplets.
 
     :param structure: The protein structure.
-    :return: A PyTorch tensor with the dihedral angles between residue quadruplets (length N - 3).
+    :param residue_distance: The distance (# of amino acids) between residues in the quadruplet.
+    :return: A PyTorch tensor with the dihedral angles between residue quadruplets (length N - 3 * residue_distance).
     """
     # Get CA indices
     indices = np.arange(0, len(structure))[structure.atom_name == 'CA']
 
     # Set up index quadruples
-    index = np.stack([indices[:-3], indices[1:-2], indices[2:-1], indices[3:]]).T
+    index = np.stack([
+        indices[:-3 * residue_distance],
+        indices[residue_distance:-2 * residue_distance],
+        indices[2 * residue_distance:-residue_distance],
+        indices[3 * residue_distance:]]
+    ).T
 
     # Get dihedral angles
     angles = index_dihedral(structure, index)
 
     return torch.from_numpy(angles)
+
+
+@register_concept(concept_level='residue_quadruplet_24', concept_type='regression', output_dim=1)
+def dihedral_angles_distant(structure: AtomArray) -> torch.Tensor:
+    """Get the dihedral angles between residue quadruplets that are 24 AA apart.
+
+    :param structure: The protein structure.
+    :return: A PyTorch tensor with the dihedral angles between residue quadruplets (length N - 72).
+    """
+    return dihedral_angles(structure, residue_distance=24)
 
 
 @register_concept(concept_level='residue_pair', concept_type='regression', output_dim=1)

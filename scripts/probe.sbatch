@@ -93,7 +93,7 @@ done
 for CONCEPT in residue_sasa secondary_structure bond_angles dihedral_angles residue_distances residue_distances_by_residue residue_contacts residue_contacts_by_residue residue_locations
 do
     # Sequence
-    for EMBEDDING_METHOD in plm baseline one
+    for EMBEDDING_METHOD in baseline plm one
     do
         no_interaction="python scripts/probe.py \
             --project_name $PROJECT_NAME \
