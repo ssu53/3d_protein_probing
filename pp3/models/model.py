@@ -149,7 +149,7 @@ class Model(pl.LightningModule):
             )
         else:
             self.interaction_model = None
-        
+
         self.predictor = MLP(
             input_dim=last_hidden_dim * predictor_dim_multiplier,
             hidden_dim=self.predictor_hidden_dim,

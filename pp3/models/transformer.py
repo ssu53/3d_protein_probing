@@ -39,6 +39,7 @@ class Transformer(nn.Module):
             num_layers = num_layers,
         )
 
+    # TODO: add positional encoding and padding
     def forward(
             self,
             embeddings: torch.Tensor,

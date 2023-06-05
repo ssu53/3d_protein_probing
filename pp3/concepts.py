@@ -225,7 +225,10 @@ def residue_distances(
     residue_coordinates = get_residue_coordinates(structure=structure)
 
     # Compute pairwise distances
-    distances = torch.cdist(residue_coordinates, residue_coordinates, p=2)
+    distances = torch.cdist(residue_coordinates, residue_coordinates, p=2, compute_mode='donot_use_mm_for_euclid_dist')
+
+    # Set self distances to NaN
+    distances[torch.eye(distances.shape[0], dtype=torch.bool)] = torch.nan
 
     # Set distances above max_distance to NaN
     if max_distance is not None:
