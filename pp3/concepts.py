@@ -215,14 +215,14 @@ def residue_distances(
         structure: AtomArray,
         max_distance: float | None = 25.0
 ) -> torch.Tensor:
-    """Get the distances between residue pairs within a maximum distance window.
+    """Get the distances between the alpha carbons of residue pairs within a maximum distance window.
 
     :param structure: The protein structure.
     :param max_distance: The maximum distance between residue pairs (in Angstroms) to include (NaN otherwise).
-    :return: A PyTorch tensor with the distances between residue pairs.
+    :return: A PyTorch tensor with the distances between the alpha carbons of residue pairs.
     """
-    # Get residue coordinates
-    residue_coordinates = get_residue_coordinates(structure=structure)
+    # Get alpha carbon residue coordinates
+    residue_coordinates = get_residue_coordinates(structure=structure)[:, :, 1]
 
     # Compute pairwise distances
     distances = torch.cdist(residue_coordinates, residue_coordinates, p=2, compute_mode='donot_use_mm_for_euclid_dist')
@@ -242,11 +242,11 @@ def residue_distances_by_residue(
         structure: AtomArray,
         max_distance: float | None = 25.0
 ) -> torch.Tensor:
-    """Get the average distance from a residue to all other residues within a maximum distance window.
+    """Get the average distance from a residue to all other residues (using alpha carbons) within a maximum distance window.
 
     :param structure: The protein structure.
     :param max_distance: The maximum distance between residue pairs (in Angstroms) to include.
-    :return: A PyTorch tensor with average distance from each residue to all other residues within max_distance.
+    :return: A PyTorch tensor with average distance from each residue to all other residues (using alpha carbons) within max_distance.
     """
     # Get residue distances
     distances = residue_distances(
