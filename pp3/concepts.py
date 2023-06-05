@@ -268,6 +268,16 @@ def residue_distances(
     return distances
 
 
+@register_concept(concept_level='residue_pair', concept_type='regression', output_dim=1)
+def residue_distances_all(structure: AtomArray) -> torch.Tensor:
+    """Get the distances between the alpha carbons of all residue pairs.
+
+    :param structure: The protein structure.
+    :return: A PyTorch tensor with the distances between the alpha carbons of all residue pairs.
+    """
+    return residue_distances(structure=structure, max_distance=None)
+
+
 @register_concept(concept_level='residue', concept_type='regression', output_dim=1)
 def residue_distances_by_residue(
         structure: AtomArray,
