@@ -299,7 +299,7 @@ class Model(pl.LightningModule):
             keep_mask = (y_mask * triplet_padding_mask).bool()
 
             # Keep sum (for normalization per protein)
-            keep_sum = keep_mask.sum(dim=1, keepdim=True).repeat(1, num_residues - 2 * residue_distance)
+            keep_sum = keep_mask.sum(dim=1, keepdim=True).repeat(1, keep_mask.shape[1])
             keep_sum = keep_sum[keep_mask]
         elif self.concept_level.startswith('residue_quadruplet'):
             # Keep mask
@@ -311,7 +311,7 @@ class Model(pl.LightningModule):
             keep_mask = (y_mask * quadruplet_padding_mask).bool()
 
             # Keep sum (for normalization per protein)
-            keep_sum = keep_mask.sum(dim=1, keepdim=True).repeat(1, num_residues - 3 * residue_distance)
+            keep_sum = keep_mask.sum(dim=1, keepdim=True).repeat(1, keep_mask.shape[1])
             keep_sum = keep_sum[keep_mask]
         else:
             raise ValueError(f'Invalid concept level: {self.concept_level}')
