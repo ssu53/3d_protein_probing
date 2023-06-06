@@ -274,8 +274,7 @@ class TFN(torch.nn.Module):
         # Create neighbors list, with max_neighbors neighbors
         neighbor_ids = None
         padding_mask = padding_mask.float()
-        if self.max_neighbors is not None:
-            assert self.max_neighbors < N
+        if self.max_neighbors is not None and self.max_neighbors > N:
             # set padding to max distance so they are always last
             pair_mask = padding_mask.unsqueeze(2) * padding_mask.unsqueeze(1)
             rel_dist = rel_dist + (1 - pair_mask) * rel_dist.max()
