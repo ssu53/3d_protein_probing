@@ -145,7 +145,7 @@ class Model(pl.LightningModule):
             self.interaction_model = Transformer(
                 input_dim=input_dim,
                 num_layers=interaction_num_layers,
-                interaction_hidden_dims=interaction_hidden_dim
+                hidden_dim=interaction_hidden_dim
             )
         else:
             self.interaction_model = None
@@ -185,7 +185,10 @@ class Model(pl.LightningModule):
 
         # Modeling the interactions
         if self.interaction_model is not None:
-            encodings = self.interaction_model(encodings)
+            encodings = self.interaction_model(
+                embeddings=encodings,
+                padding_mask=padding_mask
+            )
 
         # If needed, modify embedding structure based on concept level
         if self.concept_level == 'protein':
