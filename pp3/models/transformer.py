@@ -7,6 +7,9 @@ from torch.nn import TransformerEncoder, TransformerEncoderLayer
 
 from pp3.utils.constants import MAX_SEQ_LEN
 
+# TODO: make this a real model rather than an interaction model
+# TODO: add embedding layer for one-hot amino acid embeddings
+
 
 class PositionalEncoding(nn.Module):
     """A class for positional encoding for Transformers."""
@@ -38,33 +41,35 @@ class Transformer(nn.Module):
 
     def __init__(
             self,
-            input_dim: int,
+            vocab_size: int,
+            hidden_dim: int,
             num_layers: int,
-            hidden_dim: int = 64,
             dropout: float = 0.0,
-            nhead: int = 4,
+            nhead: int = 4
     ) -> None:
         """Initialize the model.
 
-        :param input_dim: The dimensionality of the input to the model.
-        :param num_layers: The number of layers.
+        :param vocab_size: The size of the vocabulary (i.e., number of amino acids).
         :param hidden_dim: The dimensionality of the hidden layers.
+        :param num_layers: The number of layers.
         :param dropout: The dropout rate.
         :param nhead: The number of heads in the multihead attention models.
         """
         super(Transformer, self).__init__()
 
+        self.embedding = nn.Embedding(vocab_size, hidden_dim)
+
+        self.positional_encoding = PositionalEncoding(
+            emb_size=hidden_dim,
+            dropout=dropout
+        )
+
         encoder_layer = TransformerEncoderLayer(
-            d_model=input_dim,
+            d_model=hidden_dim,
             nhead=nhead,
             dim_feedforward=hidden_dim,
             dropout=dropout,
             batch_first=True
-        )
-
-        self.positional_encoding = PositionalEncoding(
-            emb_size=input_dim,
-            dropout=dropout
         )
 
         self.model = TransformerEncoder(
@@ -75,18 +80,26 @@ class Transformer(nn.Module):
     def forward(
             self,
             embeddings: torch.Tensor,
+            coords: torch.Tensor,
             padding_mask: torch.Tensor
     ) -> torch.Tensor:
         """Runs the Transformer model on the data.
 
         :param embeddings: A tensor containing an embedding.
+        :param coords: A tensor containing the coordinates.
         :param padding_mask: A tensor containing a padding mask.
         :return: A tensor containing the model's updated embedding.
         """
+        # Embed the amino acids
+        embeddings = self.embedding(embeddings)
+
         # Apply positional encodings
         embeddings = self.positional_encoding(embeddings)
 
+        # Set up padding mask
+        src_key_padding_mask = (1 - padding_mask).bool()
+
         # Apply Transformer encoder layers
-        embeddings = self.model(embeddings, src_key_padding_mask=padding_mask)
+        embeddings = self.model(embeddings, src_key_padding_mask=src_key_padding_mask)
 
         return embeddings

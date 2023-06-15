@@ -43,10 +43,7 @@ class Model(pl.LightningModule):
         learning_rate: float = 1e-4,
         weight_decay: float = 0.0,
         dropout: float = 0.0,
-        max_neighbors: int | None = None,
-        interaction_model: Literal['transformer'] | None = None,
-        interaction_num_layers: int = 2,
-        interaction_hidden_dim: int = 64
+        max_neighbors: int | None = None
     ) -> None:
         """Initialize the model.
 
@@ -65,8 +62,6 @@ class Model(pl.LightningModule):
         :param weight_decay: The weight decay.
         :param dropout: The dropout rate.
         :param max_neighbors: The maximum number of neighbors to consider for each residue.
-        :param interaction_num_layers: The number of layers in the interaction model.
-        :param interaction_hidden_dim: The hidden dimension of the interaction model.
         """
         super(Model, self).__init__()
 
@@ -83,7 +78,6 @@ class Model(pl.LightningModule):
         self.weight_decay = weight_decay
         self.dropout = dropout
         self.concept_level = concept_level
-        self.interaction_model = interaction_model
 
         self.train_y = []
         self.train_y_hat = []
@@ -102,6 +96,14 @@ class Model(pl.LightningModule):
                 dropout=dropout
             )
             last_hidden_dim = self.encoder_hidden_dim if self.encoder_num_layers > 0 else self.input_dim
+        elif encoder_type == 'transformer':
+            self.encoder = Transformer(
+                vocab_size=self.input_dim,
+                hidden_dim=self.encoder_hidden_dim,
+                num_layers=self.encoder_num_layers,
+                dropout=dropout
+            )
+            last_hidden_dim = self.encoder_hidden_dim
         elif encoder_type == 'egnn':
             self.encoder = EGNN(
                 node_dim=self.input_dim,
@@ -141,15 +143,6 @@ class Model(pl.LightningModule):
         else:
             raise ValueError(f'Invalid concept level: {self.concept_level}')
 
-        if self.interaction_model == 'transformer':
-            self.interaction_model = Transformer(
-                input_dim=input_dim,
-                num_layers=interaction_num_layers,
-                hidden_dim=interaction_hidden_dim
-            )
-        else:
-            self.interaction_model = None
-
         self.predictor = MLP(
             input_dim=last_hidden_dim * predictor_dim_multiplier,
             hidden_dim=self.predictor_hidden_dim,
@@ -182,13 +175,6 @@ class Model(pl.LightningModule):
 
         # Encode embeddings
         encodings = self.encoder(embeddings, coords, padding_mask)
-
-        # Modeling the interactions
-        if self.interaction_model is not None:
-            encodings = self.interaction_model(
-                embeddings=encodings,
-                padding_mask=padding_mask
-            )
 
         # If needed, modify embedding structure based on concept level
         if self.concept_level == 'protein':

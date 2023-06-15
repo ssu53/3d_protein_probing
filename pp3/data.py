@@ -8,7 +8,7 @@ import torch
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset
 
-from pp3.baseline_embeddings import get_baseline_residue_embedding
+from pp3.baseline_embeddings import get_baseline_residue_embedding, get_one_hot_residue_embedding
 from pp3.concepts import get_concept_level, get_concept_type
 from pp3.utils.constants import BATCH_TYPE, ONE_EMBEDDING_SIZE
 
@@ -220,7 +220,6 @@ class ProteinConceptDataModule(pl.LightningDataModule):
 
         # Baseline embeddings
         elif self.embedding_method == 'baseline':
-            # Compute baseline embeddings
             pdb_id_to_embeddings = {
                 pdb_id: get_baseline_residue_embedding(protein['sequence'])
                 for pdb_id, protein in pdb_id_to_proteins.items()
@@ -229,6 +228,12 @@ class ProteinConceptDataModule(pl.LightningDataModule):
         elif self.embedding_method == 'one':
             pdb_id_to_embeddings = {
                 pdb_id: torch.ones(len(protein['sequence']), ONE_EMBEDDING_SIZE)
+                for pdb_id, protein in pdb_id_to_proteins.items()
+            }
+
+        elif self.embedding_method == 'one-hot':
+            pdb_id_to_embeddings = {
+                pdb_id: get_one_hot_residue_embedding(protein['sequence'])
                 for pdb_id, protein in pdb_id_to_proteins.items()
             }
 

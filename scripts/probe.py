@@ -20,7 +20,7 @@ def probe(
     save_dir: Path,
     concepts_dir: Path,
     concept: str,
-    embedding_method: Literal['plm', 'baseline', 'one'],
+    embedding_method: Literal['plm', 'baseline', 'one', 'one-hot'],
     encoder_type: ENCODER_TYPES,
     encoder_num_layers: int,
     encoder_hidden_dim: int,
@@ -40,10 +40,7 @@ def probe(
     patience: int = 25,
     run_name_suffix: str = '',
     run_id_number: int | None = None,
-    num_sanity_val_steps: int = 2,
-    interaction_model: Literal['transformer'] | None = None,
-    interaction_num_layers: int = 2,
-    interaction_hidden_dim: int = 64
+    num_sanity_val_steps: int = 2
 ) -> None:
     """Probe a model for a 3D geometric protein concepts.
 
@@ -75,13 +72,13 @@ def probe(
     :param run_name_suffix: A suffix to append to the run name.
     :param run_id_number: Optional run ID number (e.g., slurm task ID) for W&B logging.
     :param num_sanity_val_steps: The number of validation steps to run during the sanity check.
-    :param interaction_model: Whether to have an explicit model for interactions.
-    :param interaction_num_layers: The number of layers in the interaction model.
-    :param interaction_hidden_dim: The hidden dimension of the interaction model.
     """
+    # Argument validation
+    if encoder_type == 'transformer' and embedding_method != 'one-hot':
+        raise ValueError('Transformer encoder only works with one-hot embeddings.')
+
     # Create save directory
-    interaction_str = f'_{interaction_model}_{interaction_num_layers}L' if interaction_model else ''
-    run_name = f'{concept}_{embedding_method}_{encoder_type}_{encoder_num_layers}L{interaction_str}_mlp_{predictor_num_layers}L_split_{split_seed}'
+    run_name = f'{concept}_{embedding_method}_{encoder_type}_{encoder_num_layers}L_mlp_{predictor_num_layers}L_split_{split_seed}'
     if run_name_suffix:
         run_name += f'_{run_name_suffix}'
 
@@ -121,10 +118,7 @@ def probe(
         learning_rate=learning_rate,
         weight_decay=weight_decay,
         dropout=dropout,
-        max_neighbors=max_neighbors,
-        interaction_model=interaction_model,
-        interaction_num_layers=interaction_num_layers,
-        interaction_hidden_dim=interaction_hidden_dim,
+        max_neighbors=max_neighbors
     )
 
     print(model)
@@ -157,10 +151,7 @@ def probe(
             'num_neighbors': max_neighbors,
             'patience': patience,
             'run_id_number': run_id_number,
-            'num_sanity_val_steps': num_sanity_val_steps,
-            'interaction_model': interaction_model,
-            'interaction_num_layers': interaction_num_layers,
-            'interaction_hidden_dim': interaction_hidden_dim
+            'num_sanity_val_steps': num_sanity_val_steps
         })
     elif logger_type == 'tensorboard':
         from pytorch_lightning.loggers import TensorBoardLogger
