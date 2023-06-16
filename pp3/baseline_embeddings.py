@@ -55,15 +55,16 @@ def get_baseline_residue_embedding(sequence: str) -> torch.Tensor:
     return residue_embeddings
 
 
-def get_one_hot_residue_embedding(sequence: str) -> torch.Tensor:
-    """Get the one-hot residue embeddings from a protein sequence.
+def get_residue_tokens_embedding(sequence: str) -> torch.Tensor:
+    """Get the residue tokens embeddings from a protein sequence.
 
     :param sequence: The amino acid sequence of a protein.
-    :return: A tensor of residue one-hot embeddings. (num_residues, embedding_size)
+    :return: A tensor of residue tokens embeddings. (num_residues,)
     """
-    # Get the residue one-hot embeddings
-    residue_embeddings = torch.zeros((len(sequence), len(AA_1)))
-    for index in range(len(sequence)):
-        residue_embeddings[index, AA_1_TO_INDEX[sequence[index]]] = 1
+    # Get the residue tokens embeddings
+    residue_embeddings = torch.tensor([
+        AA_1_TO_INDEX[sequence[index]]
+        for index in range(len(sequence))
+    ], dtype=torch.long)
 
     return residue_embeddings

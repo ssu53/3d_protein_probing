@@ -20,7 +20,7 @@ def probe(
     save_dir: Path,
     concepts_dir: Path,
     concept: str,
-    embedding_method: Literal['plm', 'baseline', 'one', 'one-hot'],
+    embedding_method: Literal['plm', 'baseline', 'one', 'residue-tokens'],
     encoder_type: ENCODER_TYPES,
     encoder_num_layers: int,
     encoder_hidden_dim: int,
@@ -74,8 +74,8 @@ def probe(
     :param num_sanity_val_steps: The number of validation steps to run during the sanity check.
     """
     # Argument validation
-    if encoder_type == 'transformer' and embedding_method != 'one-hot':
-        raise ValueError('Transformer encoder only works with one-hot embeddings.')
+    if (encoder_type == 'transformer') != (embedding_method == 'residue-tokens'):
+        raise ValueError('Encoder type must be transformer if embedding method is residue-tokens and vice versa.')
 
     # Create save directory
     run_name = f'{concept}_{embedding_method}_{encoder_type}_{encoder_num_layers}L_mlp_{predictor_num_layers}L_split_{split_seed}'
