@@ -231,7 +231,7 @@ class ProteinConceptDataModule(pl.LightningDataModule):
                 for pdb_id, protein in pdb_id_to_proteins.items()
             }
 
-        elif self.embedding_method == 'one-hot':
+        elif self.embedding_method == 'residue-tokens':
             pdb_id_to_embeddings = {
                 pdb_id: get_residue_tokens_embedding(protein['sequence'])
                 for pdb_id, protein in pdb_id_to_proteins.items()
