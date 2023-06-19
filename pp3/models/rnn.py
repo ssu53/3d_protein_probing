@@ -58,7 +58,7 @@ class RNN(nn.Module):
         embeddings = embeddings[perm_idx]
 
         # Pack the sequences
-        embeddings = pack_padded_sequence(embeddings, seq_lengths, batch_first=True)
+        embeddings = pack_padded_sequence(embeddings, seq_lengths.cpu(), batch_first=True)
 
         # Apply RNN
         embeddings, _ = self.model(embeddings)
