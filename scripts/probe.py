@@ -74,7 +74,7 @@ def probe(
     :param num_sanity_val_steps: The number of validation steps to run during the sanity check.
     """
     # Argument validation
-    if (encoder_type == 'transformer') != (embedding_method == 'residue-tokens'):
+    if (encoder_type in {'rnn', 'transformer'}) != (embedding_method == 'residue-tokens'):
         raise ValueError('Encoder type must be transformer if embedding method is residue-tokens and vice versa.')
 
     # Create save directory

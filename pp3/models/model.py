@@ -19,6 +19,7 @@ from sklearn.metrics import (
 from pp3.models.egnn import EGNN
 from pp3.models.ipa import StructureModule
 from pp3.models.mlp import MLP
+from pp3.models.rnn import RNN
 from pp3.models.transformer import Transformer
 from pp3.models.tfn import TFN
 from pp3.utils.constants import BATCH_TYPE, ENCODER_TYPES, MAX_SEQ_LEN
@@ -96,6 +97,14 @@ class Model(pl.LightningModule):
                 dropout=dropout
             )
             last_hidden_dim = self.encoder_hidden_dim if self.encoder_num_layers > 0 else self.input_dim
+        elif encoder_type == 'rnn':
+            self.encoder = RNN(
+                vocab_size=self.input_dim,
+                hidden_dim=self.encoder_hidden_dim,
+                num_layers=self.encoder_num_layers,
+                dropout=dropout
+            )
+            last_hidden_dim = self.encoder_hidden_dim
         elif encoder_type == 'transformer':
             self.encoder = Transformer(
                 vocab_size=self.input_dim,
