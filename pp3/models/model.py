@@ -104,7 +104,7 @@ class Model(pl.LightningModule):
                 num_layers=self.encoder_num_layers,
                 dropout=dropout
             )
-            last_hidden_dim = self.encoder_hidden_dim
+            last_hidden_dim = 2 * self.encoder_hidden_dim
         elif encoder_type == 'transformer':
             self.encoder = Transformer(
                 vocab_size=self.input_dim,
