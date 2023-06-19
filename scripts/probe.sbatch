@@ -10,8 +10,8 @@
 #SBATCH --mem=30G
 #SBATCH --array=0-175%8
 #SBATCH --partition=jamesz
-#SBATCH --output=output/probe/%a.out
-#SBATCH --error=error/probe/%a.err
+#SBATCH --output=/oak/stanford/groups/jamesz/swansonk/slurm/output/probe/%a.out
+#SBATCH --error=/oak/stanford/groups/jamesz/swansonk/slurm/error/probe/%a.err
 #SBATCH --time=168:00:00
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=swansonk@stanford.edu

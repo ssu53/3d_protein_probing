@@ -7,9 +7,6 @@ from torch.nn import TransformerEncoder, TransformerEncoderLayer
 
 from pp3.utils.constants import MAX_SEQ_LEN
 
-# TODO: make this a real model rather than an interaction model
-# TODO: add embedding layer for one-hot amino acid embeddings
-
 
 class PositionalEncoding(nn.Module):
     """A class for positional encoding for Transformers."""
@@ -57,7 +54,7 @@ class Transformer(nn.Module):
         """
         super(Transformer, self).__init__()
 
-        self.embedding = nn.Embedding(vocab_size, hidden_dim)
+        self.embedding = nn.Embedding(vocab_size + 1, hidden_dim, padding_idx=0)
 
         self.positional_encoding = PositionalEncoding(
             emb_size=hidden_dim,

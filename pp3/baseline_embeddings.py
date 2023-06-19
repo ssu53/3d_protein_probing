@@ -63,7 +63,7 @@ def get_residue_tokens_embedding(sequence: str) -> torch.Tensor:
     """
     # Get the residue tokens embeddings
     residue_embeddings = torch.tensor([
-        AA_1_TO_INDEX[sequence[index]]
+        AA_1_TO_INDEX[sequence[index]] + 1
         for index in range(len(sequence))
     ], dtype=torch.long)
 
