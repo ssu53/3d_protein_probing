@@ -26,17 +26,20 @@ CONCEPT_TO_FUNCTION = {}
 CONCEPT_TO_LEVEL = {
     'solubility': 'protein',
     'enzyme_commission': 'protein',
-    'gene_ontology': 'protein'
+    'gene_ontology': 'protein',
+    'scop': 'protein'
 }
 CONCEPT_TO_TYPE = {
     'solubility': 'binary_classification',
     'enzyme_commission': 'binary_classification',
-    'gene_ontology': 'binary_classification'
+    'gene_ontology': 'binary_classification',
+    'scop': 'multiclass_classification'
 }
 CONCEPT_TO_OUTPUT_DIM = {
     'solubility': 1,
     'enzyme_commission': 10,
-    'gene_ontology': 364
+    'gene_ontology': 364,
+    'scop': 10
 }
 
 
