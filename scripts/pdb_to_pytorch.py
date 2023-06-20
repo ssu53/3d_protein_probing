@@ -23,7 +23,9 @@ def convert_pdb_to_pytorch(
         pdb_path: Path,
         max_protein_length: int,
         one_chain_only: bool = False,
-        chain_id: str | None = None
+        chain_id: str | None = None,
+        domain_start: int | None = None,
+        domain_end: int | None = None
 ) -> dict[str, torch.Tensor | str] | None:
     """Parses PDB file and converts structure and sequence to PyTorch format while removing invalid structures.
 
@@ -31,6 +33,8 @@ def convert_pdb_to_pytorch(
     :param max_protein_length: The maximum length of a protein structure.
     :param one_chain_only: Whether to only allow proteins with one chain.
     :param chain_id: The chain ID of the protein structure to extract. Used if one_chain_only is False.
+    :param domain_start: The start of the domain to extract.
+    :param domain_end: The end of the domain to extract.
     :return: A dictionary containing the structure and sequence or an error message if the structure is invalid.
     """
     # Load PDB structure
@@ -38,7 +42,9 @@ def convert_pdb_to_pytorch(
         structure = load_structure(
             pdb_path=pdb_path,
             one_chain_only=one_chain_only,
-            chain_id=chain_id
+            chain_id=chain_id,
+            domain_start=domain_start,
+            domain_end=domain_end
         )
     except (BadStructureError, FileNotFoundError, InvalidFileError, ValueError, TypeError) as e:
         return {'error': repr(e)}

@@ -21,14 +21,14 @@ def scop_to_pytorch(
         scop_path: Path,
         pdb_dir: Path,
         save_dir: Path,
-        num_super_families: int = 10
+        min_proteins_per_super_family: int = 250
 ) -> None:
     """Process SCOP data and convert to PyTorch tensors.
 
     :param scop_path: The path to the SCOP data TXT file.
     :param pdb_dir: The directory where PDB files are stored.
     :param save_dir: The directory where the PyTorch tensors and concept values will be saved.
-    :param num_super_families: The number of super families to include.
+    :param min_proteins_per_super_family: The minimum number of proteins per super family.
     """
     # Load SCOP data
     data = pd.read_csv(scop_path, sep=' ', comment='#', names=SCOP_HEADER)
@@ -38,34 +38,64 @@ def scop_to_pytorch(
     # Filter to only include proteins with a PDB file
     data = data[[
         get_pdb_path_experimental(pdb_id=pdb_id, pdb_dir=pdb_dir).exists()
-        for pdb_id in data[SCOP_SF_PDBID_COLUMN]
+        for pdb_id in tqdm(data[SCOP_SF_PDBID_COLUMN])
     ]]
 
     print(f'Filtered to {len(data):,} SCOP entries with PDB files')
 
     # Determine super families
-    data['super_family'] = data[SCOP_CLASS_COLUMN].apply(lambda x: str(x)[:3])
+    data['super_family'] = data[SCOP_CLASS_COLUMN].apply(lambda scop_class: scop_class.split(',')[-2])
 
     # Get most common super families
-    top_super_families = data['super_family'].value_counts().index.tolist()[:num_super_families]
-    breakpoint()
+    super_family_counts = Counter(data['super_family'])
+    keep_super_families = [
+        super_family
+        for super_family, count in super_family_counts.most_common()
+        if count >= min_proteins_per_super_family
+    ]
+
+    print(f'Keeping {len(keep_super_families):,} super families with at least {min_proteins_per_super_family:,} proteins')
+
+    # Restrict data to those super families
+    data = data[data['super_family'].isin(keep_super_families)]
+
+    print(f'Filtered to {len(data):,} SCOP entries in those {len(keep_super_families):,} super families')
+
+    # Map super family to index
+    super_family_to_index = {
+        super_family: index
+        for index, super_family in enumerate(keep_super_families)
+    }
 
     # Extract concepts
-    # TODO
-    pdb_id_to_concept = {}
+    pdb_id_to_concept = {
+        f'{pdb_id}.{pdb_reg}': super_family_to_index[super_family]
+        for pdb_id, pdb_reg, super_family in zip(
+            data[SCOP_SF_PDBID_COLUMN],
+            data[SCOP_SF_PDBREG_COLUMN],
+            data['super_family']
+        )
+    }
+
+    breakpoint()
 
     # Convert PDB files to PyTorch format, along with filtering for quality
     pdb_id_to_protein = {}
     error_counter = Counter()
 
     for pdb_id in tqdm(pdb_id_to_concept):
-        protein_id, chain_id = pdb_id.split('.')
+        # Get protein ID, chain ID, and domain range
+        protein_id, reg_id = pdb_id.split('.')
+        chain_id, domain_range = reg_id.split(':')
+        domain_start, domain_end = map(int, domain_range.split('-'))
 
         protein = convert_pdb_to_pytorch(
             pdb_path=pdb_dir / f'{protein_id}.pdb',
             max_protein_length=MAX_SEQ_LEN,
             one_chain_only=False,
-            chain_id=chain_id
+            chain_id=chain_id,
+            domain_start=domain_start,
+            domain_end=domain_end
         )
 
         if 'error' in protein:
@@ -90,3 +120,9 @@ def scop_to_pytorch(
     save_dir.mkdir(parents=True, exist_ok=True)
     torch.save(pdb_id_to_protein, save_dir / f'scop_proteins.pt')
     torch.save(pdb_id_to_concept, save_dir / f'scop.pt')
+
+
+if __name__ == '__main__':
+    from tap import tapify
+
+    tapify(scop_to_pytorch)

@@ -88,7 +88,9 @@ def verify_residues(structure: AtomArray) -> None:
 def load_structure(
         pdb_path: Path,
         one_chain_only: bool = False,
-        chain_id: str | None = None
+        chain_id: str | None = None,
+        domain_start: int | None = None,
+        domain_end: int | None = None
 ) -> AtomArray:
     """Load the protein structure from a PDB file.
 
@@ -103,6 +105,8 @@ def load_structure(
     :param pdb_path: The path to the PDB structure.
     :param one_chain_only: Whether to only allow proteins with one chain.
     :param chain_id: The chain ID of the protein structure to extract. Used if one_chain_only is False.
+    :param domain_start: The start of the domain to extract.
+    :param domain_end: The end of the domain to extract.
     :return: The loaded (and cleaned) protein structure.
     """
     # Check if chain ID is given when allowing multichain proteins
@@ -133,6 +137,10 @@ def load_structure(
     # Check if there are no residues
     if len(structure) == 0:
         raise ValueError('Structure does not contain any residues after cleaning')
+
+    # Restrict to domain
+    # TODO: Extract domain using PDB IDs
+    breakpoint()
 
     # Standardize atom order
     structure = structure[standardize_order(structure)]
