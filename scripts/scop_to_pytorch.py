@@ -93,8 +93,16 @@ def scop_to_pytorch(
         chain_id, domain_range = reg_id.split(':')
         domain_start, domain_end = domain_range.rsplit('-', maxsplit=1)  # maxsplit to allow negative indices
 
+        # If domain range is not an integer, skip
+        try:
+            domain_start = int(domain_start)
+            domain_end = int(domain_end)
+        except ValueError:
+            error_counter[repr(ValueError('Domain range is not an integer'))] += 1
+            continue
+
         protein = convert_pdb_to_pytorch(
-            pdb_path=get_pdb_path_experimental(pdb_id=pdb_id, pdb_dir=pdb_dir),
+            pdb_path=get_pdb_path_experimental(pdb_id=protein_id, pdb_dir=pdb_dir),
             max_protein_length=MAX_SEQ_LEN,
             one_chain_only=False,
             chain_id=chain_id,

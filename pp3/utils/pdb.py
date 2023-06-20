@@ -89,8 +89,8 @@ def load_structure(
         pdb_path: Path,
         one_chain_only: bool = False,
         chain_id: str | None = None,
-        domain_start: str | None = None,
-        domain_end: str | None = None
+        domain_start: int | None = None,
+        domain_end: int | None = None
 ) -> AtomArray:
     """Load the protein structure from a PDB file.
 
@@ -138,9 +138,12 @@ def load_structure(
     if len(structure) == 0:
         raise ValueError('Structure does not contain any residues after cleaning')
 
-    # Restrict to domain
-    # TODO: Extract domain using PDB IDs
-    breakpoint()
+    # Optionally, restrict to domain
+    if domain_start is not None:
+        structure = structure[structure.res_id >= domain_start]
+
+    if domain_end is not None:
+        structure = structure[structure.res_id <= domain_end]
 
     # Standardize atom order
     structure = structure[standardize_order(structure)]

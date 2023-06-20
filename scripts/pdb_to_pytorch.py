@@ -24,8 +24,8 @@ def convert_pdb_to_pytorch(
         max_protein_length: int,
         one_chain_only: bool = False,
         chain_id: str | None = None,
-        domain_start: str | None = None,
-        domain_end: str | None = None
+        domain_start: int | None = None,
+        domain_end: int | None = None
 ) -> dict[str, torch.Tensor | str] | None:
     """Parses PDB file and converts structure and sequence to PyTorch format while removing invalid structures.
 
