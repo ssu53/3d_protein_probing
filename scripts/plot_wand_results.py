@@ -12,27 +12,34 @@ from tqdm import tqdm
 
 EMBEDDING_METHODS = [
     'one',
+    'residue-tokens',
     'baseline',
     'plm'
 ]
 ENCODER_TYPES = [
     'mlp',
+    'rnn',
+    'transformer',
     'egnn',
     'tfn',
     'ipa'
 ]
 EMBEDDING_METHOD_TO_HATCH = {
     'one': 'o',
+    'residue-tokens': '',
     'baseline': '',
     'plm': '/'
 }
 EMBEDDING_METHOD_TO_UPPER = {
     'one': 'Constant',
+    'residue-tokens': 'One-Hot',
     'baseline': 'Raw',
     'plm': 'PLM'
 }
 ENCODER_TYPE_TO_COLOR = {
     'mlp': 'tab:blue',
+    'rnn': 'tab:purple',
+    'transformer': 'tab:pink',
     'egnn': 'tab:orange',
     'tfn': 'tab:red',
     'ipa': 'tab:brown'
@@ -86,25 +93,31 @@ ENCODER_TO_EMBEDDING_TO_X = {
     'mlp': {
         'one': 0,
         'baseline': 1,
-        'plm': 3
+        'plm': 5
+    },
+    'rnn': {
+        'residue-tokens': 3,
+    },
+    'transformer': {
+        'residue-tokens': 4,
     },
     'egnn': {
-        'one': 5,
-        'baseline': 9,
-        'plm': 13
-    },
-    'tfn': {
-        'one': 6,
-        'baseline': 10,
-        'plm': 14
-    },
-    'ipa': {
         'one': 7,
         'baseline': 11,
         'plm': 15
+    },
+    'tfn': {
+        'one': 8,
+        'baseline': 12,
+        'plm': 16
+    },
+    'ipa': {
+        'one': 9,
+        'baseline': 13,
+        'plm': 17
     }
 }
-XTICKS = [0.5, 3, 6, 10, 14]
+XTICKS = [0.5, 4, 8, 12, 16]
 XTICK_LABELS = ['Baseline', 'Seq', 'Coords', 'Struct', 'Seq & Struct']
 
 
@@ -195,6 +208,9 @@ def plot_wand_results(
 
             for encoder_type_idx, encoder_type in enumerate(ENCODER_TYPES):
                 for embedding_method_idx, embedding_method in enumerate(EMBEDDING_METHODS):
+                    if embedding_method not in ENCODER_TO_EMBEDDING_TO_X[encoder_type]:
+                        continue
+
                     try:
                         results = concept_to_embedding_to_encoder_to_results[concept][embedding_method][encoder_type]
                     except KeyError:

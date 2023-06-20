@@ -5,7 +5,6 @@ import torch
 from biotite.sequence.align import SubstitutionMatrix
 from biotite.structure.info import residue
 
-
 # Mapping from amino acid three-letter codes to one-letter codes
 AA_3_TO_1 = {
     'CYS': 'C', 'ASP': 'D', 'SER': 'S', 'GLN': 'Q', 'LYS': 'K',
@@ -28,7 +27,7 @@ AA_1_TO_INDEX = {aa: i for i, aa in enumerate(AA_1)}
 SS_LETTER_TO_INDEX = {
     'a': 0,  # alpha helix
     'b': 1,  # beta sheet
-    'c': 2   # coil
+    'c': 2  # coil
 }
 
 # Canonical amino acid atom names (without hydrogen atoms)
@@ -56,3 +55,21 @@ BATCH_TYPE = tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
 
 # Embedding sizes
 ONE_EMBEDDING_SIZE = 48
+
+# SCOP header
+SCOP_HEADER = [
+    'FA-DOMID',
+    'FA-PDBID',
+    'FA-PDBREG',
+    'FA-UNIID',
+    'FA-UNIREG',
+    'SF-DOMID',
+    'SF-PDBID',
+    'SF-PDBREG',
+    'SF-UNIID',
+    'SF-UNIREG',
+    'SCOPCLA'
+]
+SCOP_SF_PDBID_COLUMN = 'SF-PDBID'
+SCOP_SF_PDBREG_COLUMN = 'SF-PDBREG'
+SCOP_CLASS_COLUMN = 'SCOPCLA'

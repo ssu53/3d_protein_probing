@@ -85,6 +85,22 @@ python scripts/compute_esm_embeddings.py \
     --batch_size 5
 ```
 
+## Download and set up fold classification
+
+Download fold classification data from SCOP at https://scop.mrc-lmb.cam.ac.uk/download
+```bash
+wget https://scop.mrc-lmb.cam.ac.uk/files/scop-cla-latest.txt
+```
+
+Parse SCOP fold classification data and save in PyTorch format.
+```bash
+python scripts/scop_to_pytorch.py \
+    --scop_path scop-cla-latest.txt \
+    --save_path data/pdb_single_chain_protein_30_identity/fold_classification.pt
+```
+
+
+
 
 ## Probe sequence and structure models for concepts
 
