@@ -95,19 +95,47 @@ wget https://scop.mrc-lmb.cam.ac.uk/files/scop-cla-latest.txt
 Parse SCOP fold classification data and save in PyTorch format.
 ```bash
 python scripts/scop_to_pytorch.py \
-    --scop_path scop-cla-latest.txt \
-    --save_path data/pdb_single_chain_protein_30_identity/fold_classification.pt
+    --scop_path data/scop/scop-cla-latest.txt \
+    --pdb_dir pdb \
+    --save_dir data/scop
 ```
 
+2,756 protein domains with 13 most common super family classifications.
 
+Compute ESM embeddings for SCOP proteins.
+```bash
+python scripts/compute_esm_embeddings.py \
+    --proteins_path data/scop/scop_proteins.pt \
+    --hub_dir pretrained_models \
+    --esm_model esm2_t33_650M_UR50D \
+    --last_layer 33 \
+    --save_path data/scop/scop_esm2_t33_650M_UR50D.pt \
+    --batch_size 5
+```
+
+Example of probing sequence model for SCOP super family classification.
+```bash
+python scripts/probe.py \
+    --project_name probing \
+    --proteins_path data/scop/scop_proteins.pt \
+    --embeddings_path data/scop/scop_esm2_t33_650M_UR50D.pt \
+    --save_dir results/scop \
+    --concepts_dir data/scop \
+    --concept scop \
+    --embedding_method baseline \
+    --encoder_type mlp \
+    --encoder_num_layers 0 \
+    --encoder_hidden_dim 100 \
+    --predictor_num_layers 2 \
+    --predictor_hidden_dim 100 \
+    --batch_size 100
+````
 
 
 ## Probe sequence and structure models for concepts
 
 Probe sequence models for concepts.
 ```bash
-#!/bin/bash
-
 for CONCEPT in residue_sasa secondary_structure bond_angles dihedral_angles residue_distances residue_distances_by_residue residue_contacts residue_contacts_by_residue residue_locations
 do
     for EMBEDDING_METHOD in plm baseline
@@ -132,8 +160,6 @@ done
 
 Probe structure models (currently EGNN and TFN, later IPA) for concepts.
 ```bash
-#!/bin/bash
-
 for CONCEPT in residue_sasa secondary_structure bond_angles dihedral_angles residue_distances residue_distances_by_residue residue_contacts residue_contacts_by_residue residue_locations
 do
     for EMBEDDING_METHOD in baseline plm
@@ -178,8 +204,6 @@ done
 
 Train sequence models for downstream tasks.
 ```bash
-#!/bin/bash
-
 for CONCEPT in solubility
 do
     for EMBEDDING_METHOD in plm baseline
@@ -204,8 +228,6 @@ done
 
 Train structure models (currently EGNN and TFN, later IPA) for downstream tasks.
 ```bash
-#!/bin/bash
-
 for CONCEPT in solubility
 do
     for EMBEDDING_METHOD in baseline plm

@@ -33,13 +33,13 @@ CONCEPT_TO_TYPE = {
     'solubility': 'binary_classification',
     'enzyme_commission': 'binary_classification',
     'gene_ontology': 'binary_classification',
-    'scop': 'multiclass_classification'
+    'scop': 'multi_classification'
 }
 CONCEPT_TO_OUTPUT_DIM = {
     'solubility': 1,
     'enzyme_commission': 10,
     'gene_ontology': 364,
-    'scop': 10
+    'scop': 13
 }
 
 
