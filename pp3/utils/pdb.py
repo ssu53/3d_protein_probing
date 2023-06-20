@@ -89,8 +89,8 @@ def load_structure(
         pdb_path: Path,
         one_chain_only: bool = False,
         chain_id: str | None = None,
-        domain_start: int | None = None,
-        domain_end: int | None = None
+        domain_start: str | None = None,
+        domain_end: str | None = None
 ) -> AtomArray:
     """Load the protein structure from a PDB file.
 

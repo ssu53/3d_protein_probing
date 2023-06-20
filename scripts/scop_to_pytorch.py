@@ -59,7 +59,8 @@ def scop_to_pytorch(
     # Restrict data to those super families
     data = data[data['super_family'].isin(keep_super_families)]
 
-    print(f'Filtered to {len(data):,} SCOP entries in those {len(keep_super_families):,} super families')
+    print(f'Filtered to {len(data):,} SCOP entries in those {len(keep_super_families):,} super families '
+          f'with {data[SCOP_SF_PDBID_COLUMN].nunique():,} unique PDB entries')
 
     # Map super family to index
     super_family_to_index = {
@@ -77,8 +78,6 @@ def scop_to_pytorch(
         )
     }
 
-    breakpoint()
-
     # Convert PDB files to PyTorch format, along with filtering for quality
     pdb_id_to_protein = {}
     error_counter = Counter()
@@ -86,11 +85,16 @@ def scop_to_pytorch(
     for pdb_id in tqdm(pdb_id_to_concept):
         # Get protein ID, chain ID, and domain range
         protein_id, reg_id = pdb_id.split('.')
+
+        # Skip examples with multiple domains
+        if ',' in reg_id:
+            continue
+
         chain_id, domain_range = reg_id.split(':')
-        domain_start, domain_end = map(int, domain_range.split('-'))
+        domain_start, domain_end = domain_range.rsplit('-', maxsplit=1)  # maxsplit to allow negative indices
 
         protein = convert_pdb_to_pytorch(
-            pdb_path=pdb_dir / f'{protein_id}.pdb',
+            pdb_path=get_pdb_path_experimental(pdb_id=pdb_id, pdb_dir=pdb_dir),
             max_protein_length=MAX_SEQ_LEN,
             one_chain_only=False,
             chain_id=chain_id,
