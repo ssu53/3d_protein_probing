@@ -69,7 +69,8 @@ CONCEPT_TO_NAME = {
     'dihedral_angles': 'Dihedral Angle',
     'solubility': 'Solubility',
     'enzyme_commission': 'Enzyme Commission',
-    'gene_ontology': 'Gene Ontology'
+    'gene_ontology': 'Gene Ontology',
+    'scop': 'SCOP'
 }
 CONCEPT_SUBSET_ORDER = {
     'geometry': [
@@ -86,7 +87,8 @@ CONCEPT_SUBSET_ORDER = {
     'downstream': [
         'Solubility',
         'Enzyme Commission',
-        'Gene Ontology'
+        'Gene Ontology',
+        'SCOP'
     ]
 }
 ENCODER_TO_EMBEDDING_TO_X = {
@@ -152,8 +154,10 @@ def plot_wand_results(
 
     for metric in metrics:
         metric_data = data[data[f'test_{metric}'].notna()]
-        metric_data = metric_data[metric_data['interaction_model'].isna()]
         metric_data = metric_data[metric_data['concept'] != 'residue_locations']
+
+        if 'interaction_model' in metric_data.columns:
+            metric_data = metric_data[metric_data['interaction_model'].isna()]
 
         for concept, embedding_method, encoder_type, result in zip(
                 metric_data['concept'],
@@ -227,7 +231,7 @@ def plot_wand_results(
                         color=ENCODER_TYPE_TO_COLOR[encoder_type],
                         capsize=5,
                         hatch=EMBEDDING_METHOD_TO_HATCH[embedding_method],
-                        label=encoder_type.upper() if embedding_method == 'baseline' else None
+                        label=encoder_type.upper()[:5] if embedding_method in {'baseline', 'residue-tokens'} else None
                     )
 
             # xticks = np.array(xticks)
