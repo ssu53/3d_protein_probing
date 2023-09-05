@@ -39,6 +39,7 @@ def probe(
     max_neighbors: int | None = None,
     patience: int = 25,
     run_name_suffix: str = '',
+    entity: str = '3d-protein-prediction',
     run_id_number: int | None = None,
     num_sanity_val_steps: int = 2
 ) -> None:
@@ -70,6 +71,7 @@ def probe(
     :param max_neighbors: The maximum number of neighbors to use for the graph in EGNN.
     :param patience: The number of epochs to wait for validation loss to improve before early stopping.
     :param run_name_suffix: A suffix to append to the run name.
+    :param entity: The entity for W&B logging.
     :param run_id_number: Optional run ID number (e.g., slurm task ID) for W&B logging.
     :param num_sanity_val_steps: The number of validation steps to run during the sanity check.
     """
@@ -125,7 +127,12 @@ def probe(
 
     if logger_type == 'wandb':
         from pytorch_lightning.loggers import WandbLogger
-        logger = WandbLogger(project=project_name, save_dir=str(save_dir), name=run_name)
+        logger = WandbLogger(
+            project=project_name,
+            save_dir=str(save_dir),
+            name=run_name,
+            entity=entity
+        )
         logger.experiment.config.update({
             'project_name': project_name,
             'proteins_path': str(proteins_path),
