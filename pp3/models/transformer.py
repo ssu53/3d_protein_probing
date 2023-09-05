@@ -31,7 +31,7 @@ class PositionalEncoding(nn.Module):
 
     def forward(self, embeddings: torch.Tensor) -> torch.Tensor:
         # Assumes embeddings are (batch_size, sequence_length, emb_size)
-        return self.dropout(embeddings + self.pos_embedding[:, embeddings.size(1), :])
+        return self.dropout(embeddings + self.pos_embedding[:, :embeddings.size(1), :])
 
 
 class Transformer(nn.Module):
