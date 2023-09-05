@@ -22,9 +22,9 @@ dependencies:
   - scipy
   - tqdm
   - wandb
-  - einops
   - pip:
     - e3nn
     - fair-esm
     - tensorboardX
+    - torchdrug  # requires python 3.9
     - typed-argument-parser>=1.8.0

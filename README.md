@@ -85,7 +85,7 @@ python scripts/compute_esm_embeddings.py \
     --batch_size 5
 ```
 
-## Download and set up fold classification
+## Set up fold classification from SCOP
 
 Download fold classification data from SCOP at https://scop.mrc-lmb.cam.ac.uk/download
 ```bash
@@ -130,6 +130,35 @@ python scripts/probe.py \
     --predictor_hidden_dim 100 \
     --batch_size 100
 ````
+
+
+## Set up downstream tasks from TorchDrug
+
+Download the datasets from TorchDrug.
+
+Gene Ontology
+```bash
+wget https://zenodo.org/record/6622158/files/GeneOntology.zip
+unzip GeneOntology.zip
+```
+
+Enzyme Commission
+```bash
+wget https://zenodo.org/record/6622158/files/EnzymeCommission.zip
+unzip EnzymeCommission.zip
+```
+
+Solubility
+```bash
+wget https://miladeepgraphlearningproteindata.s3.us-east-2.amazonaws.com/peerdata/solubility.tar.gz
+tar -xvzf solubility.tar.gz
+rm solubility.tar.gz
+```
+
+
+## Download and set up Solubility and Subcellular Localization
+
+TODO
 
 
 ## Probe sequence and structure models for concepts

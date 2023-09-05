@@ -8,8 +8,9 @@ from einops import rearrange
 
 class SinusoidalEmbeddings(nn.Module):
     """A simple sinusoidal embedding layer."""
+    # TODO: what's the point of this embedding? (it's not positional)
 
-    def __init__(self, dim, theta: float = 10000.0) -> None:
+    def __init__(self, dim: int, theta: float = 10000.0) -> None:
         super().__init__()
         self.dim = dim
         self.theta = theta
@@ -90,6 +91,7 @@ class EGNN_Layer(nn.Module):
         M = neighbor_ids.shape[-1] if neighbor_ids is not None else N
 
         if neighbor_ids is not None:
+            # TODO: check the neighbor_ids reshape
             n_embeddings = embeddings[
                 torch.arange(B)[:, None], neighbor_ids.reshape(B, -1)
             ].reshape(B, N, M, -1)
@@ -102,6 +104,7 @@ class EGNN_Layer(nn.Module):
             n_coords = coords.unsqueeze(1)
             feats2 = n_embeddings.unsqueeze(1).expand(-1, N, -1, -1)
 
+        # TODO: why coords instead of n_coords?
         rel_coors = coords.unsqueeze(2) - n_coords
         rel_dist = torch.linalg.norm(rel_coors, dim=-1)
         dists = self.dist_embedding(rearrange(rel_dist, "b i j -> (b i j)"))
@@ -119,7 +122,7 @@ class EGNN_Layer(nn.Module):
         if neighbor_ids is not None:
             # Padding and self already ignored
             mask = torch.ones((B, N, M), device=m_ij.device)
-            mask_sum = M
+            mask_sum = M  # TODO: what if there is padding within M?
         else:
             mask = padding_mask.unsqueeze(1) * padding_mask.unsqueeze(2)
             mask = mask * (1.0 - torch.eye(N).view(1, N, N).to(m_ij))
@@ -135,6 +138,7 @@ class EGNN_Layer(nn.Module):
             coords = coords + delta
 
         # Compute feature update
+        # TODO: Is this a fully connected GNN? Just with distances added as features?
         if self.update_feats:
             m_ij = m_ij * padding_mask.view(B, N, 1, 1)
             m_ij = m_ij * mask.unsqueeze(-1)
@@ -179,7 +183,10 @@ class EGNN(nn.Module):
         self.layers = nn.ModuleList(layers)
 
     def forward(
-        self, embeddings: torch.Tensor, coords: torch.Tensor, padding_mask: torch.Tensor
+            self,
+            embeddings: torch.Tensor,
+            coords: torch.Tensor,
+            padding_mask: torch.Tensor
     ) -> torch.Tensor:
         # Use only the c-a for now
         coords = coords[:, :, 1]
@@ -196,6 +203,7 @@ class EGNN(nn.Module):
         padding_mask = padding_mask.float()
         if self.max_neighbors is not None:
             # set padding to max distance so they are always last
+            # TODO: check padding binary logic
             pair_mask = padding_mask.unsqueeze(2) * padding_mask.unsqueeze(1)
             rel_dist = rel_dist + (1 - pair_mask) * rel_dist.max()
             neighbor_ids = torch.argsort(rel_dist, dim=-1)

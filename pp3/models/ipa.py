@@ -295,6 +295,7 @@ class StructureModule(nn.Module):
         R, t = init_frames(coords)
 
         # Compute input fc
+        # TODO: should this do fc first, then ln?
         embeddings = self.input_ln(embeddings)
         embeddings = self.input_fc(embeddings)
 
