@@ -1,4 +1,4 @@
-name: 3d_protein_probing
+name: 3d_protein_probing_1
 
 channels:
   - conda-forge
@@ -8,7 +8,7 @@ channels:
 dependencies:
   - python=3.10
   - biotite
-  - cudatoolkit=11.3
+  - nvidia::cudatoolkit=11.3
   - einops
   - ipdb  # for debugging
   - ipython  # for debugging
@@ -16,7 +16,7 @@ dependencies:
   - numpy
   - pandas
   - pip
-  - pytorch
+  - pytorch::pytorch
   - pytorch-lightning
   - scikit-learn
   - scipy
