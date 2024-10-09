@@ -151,3 +151,10 @@ plots
 
 # Mac
 .DS_Store
+
+# Job logs
+slurm_error/
+slurm_output/
+
+# Scratch
+scratch/
