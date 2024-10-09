@@ -5,7 +5,7 @@ import torch
 import numpy as np
 from biotite.structure import (
     AtomArray,
-    check_bond_continuity,
+    check_backbone_continuity,
     check_duplicate_atoms,
     filter_canonical_amino_acids,
     get_chain_count,
@@ -156,7 +156,7 @@ def load_structure(
         raise ValueError('Structure contains duplicate atoms')
 
     # Check for backbone bond continuity
-    if len(check_bond_continuity(structure)) > 0:
+    if len(check_backbone_continuity(structure)) > 0:
         raise ValueError('Structure contains invalid backbone bonds')
 
     return structure

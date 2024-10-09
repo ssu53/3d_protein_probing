@@ -9,7 +9,7 @@ from biotite.structure import (
     AtomArray,
     get_chains,
     get_residue_count,
-    filter_backbone,
+    filter_peptide_backbone,
     index_angle,
     index_dihedral,
     residue_iter,
@@ -121,7 +121,7 @@ def get_backbone_residues(structure: AtomArray) -> AtomArray:
     structure = structure[standardize_order(structure)]
 
     # Filter to only backbone residues
-    structure = structure[filter_backbone(structure)]
+    structure = structure[filter_peptide_backbone(structure)]
 
     return structure
 
@@ -167,7 +167,7 @@ def secondary_structure(structure: AtomArray) -> torch.Tensor:
     :return: The secondary structure of all residues as indices (0 = alpha helix, 1 = beta sheet, 2 = coil).
     """
     # Get secondary structure
-    sse = annotate_sse(structure, get_chains(structure)[0])
+    sse = annotate_sse(structure)
 
     # Convert letters to indices
     sse = np.vectorize(SS_LETTER_TO_INDEX.get)(sse)
@@ -256,7 +256,8 @@ def residue_distances(
     :return: A PyTorch tensor with the distances between the alpha carbons of residue pairs.
     """
     # Get alpha carbon residue coordinates
-    residue_coordinates = get_residue_coordinates(structure=structure)[:, :, 1]
+    # residue_coordinates = get_residue_coordinates(structure=structure)[:, :, 1] # bug!!!
+    residue_coordinates = get_residue_coordinates(structure=structure)[:, 1, :]
 
     # Compute pairwise distances
     distances = torch.cdist(residue_coordinates, residue_coordinates, p=2, compute_mode='donot_use_mm_for_euclid_dist')
