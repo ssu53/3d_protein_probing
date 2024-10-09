@@ -221,7 +221,13 @@ class ProteinConceptDataModule(pl.LightningDataModule):
         # Baseline embeddings
         elif self.embedding_method == 'baseline':
             pdb_id_to_embeddings = {
-                pdb_id: get_baseline_residue_embedding(protein['sequence'])
+                pdb_id: get_baseline_residue_embedding(protein['sequence'], identify_residue=True)
+                for pdb_id, protein in pdb_id_to_proteins.items()
+            }
+        
+        elif self.embedding_method == 'baseline-basic':
+            pdb_id_to_embeddings = {
+                pdb_id: get_baseline_residue_embedding(protein['sequence'], identify_residue=False)
                 for pdb_id, protein in pdb_id_to_proteins.items()
             }
         

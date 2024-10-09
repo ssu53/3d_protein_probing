@@ -20,7 +20,7 @@ def probe(
     save_dir: Path,
     concepts_dir: Path,
     concept: str,
-    embedding_method: Literal['plm', 'baseline', 'one', 'residue-tokens'],
+    embedding_method: Literal['plm', 'baseline', 'baseline-basic', 'one', 'residue-tokens'],
     encoder_type: ENCODER_TYPES,
     encoder_num_layers: int,
     encoder_hidden_dim: int,

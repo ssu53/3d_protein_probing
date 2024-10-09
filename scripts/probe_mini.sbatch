@@ -25,7 +25,7 @@ echo "working directory="$SLURM_SUBMIT_DIR
 
 source /home/users/shiye/.bashrc
 
-conda activate 3d_protein_probing_1
+conda activate 3d_protein_probing
 
 cd /home/groups/jamesz/shiye/3d_protein_probing
 
@@ -39,7 +39,7 @@ for CONCEPT in residue_distances_by_residue
 do
 
     # Structure
-    for EMBEDDING_METHOD in baseline
+    for EMBEDDING_METHOD in baseline_basic
     do
         for ENCODER_TYPE in egnn
         do
@@ -47,7 +47,7 @@ do
                 --project_name $PROJECT_NAME \
                 --proteins_path data/pdb_single_chain_protein_30_identity/proteins.pt \
                 --embeddings_path data/pdb_single_chain_protein_30_identity/embeddings/esm2_t33_650M_UR50D.pt \
-                --save_dir results/pdb_single_chain_protein_30_identity \
+                --save_dir results/pdb_single_chain_protein_30_identity/basic_embed \
                 --concepts_dir data/pdb_single_chain_protein_30_identity/concepts \
                 --concept $CONCEPT \
                 --embedding_method $EMBEDDING_METHOD \
