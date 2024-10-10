@@ -74,10 +74,16 @@ def compute_concepts(
     )
 
     # Check which PDB IDs have structures
+
+    # Multi-threaded
     with Pool() as pool:
         concept_dicts = list(
             tqdm(pool.imap(compute_concepts_for_structure_fn, pdb_paths), total=len(pdb_paths))
         )
+    # Non-multithreaded alternative, if above errors
+    # concept_dicts = []
+    # for pdb_path in tqdm(pdb_paths):
+    #     concept_dicts.append(compute_concepts_for_structure_fn(pdb_path))
 
     # Map PDB IDs to concepts
     pdb_id_to_concepts = dict(zip(pdb_ids, concept_dicts))

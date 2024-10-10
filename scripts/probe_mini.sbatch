@@ -7,12 +7,12 @@
 #SBATCH --gpus=1
 #SBATCH --constraint=GPU_SKU:RTX_2080Ti|GPU_SKU:TITAN_V|GPU_SKU:TITAN_Xp
 #SBATCH --cpus-per-task=4
-#SBATCH --mem=16G
+#SBATCH --mem=8G
 #SBATCH --array=0-0%1
 #SBATCH --partition=jamesz
 #SBATCH --output=/home/groups/jamesz/shiye/3d_protein_probing/slurm_output/probe/%x.%j.%a.out
 #SBATCH --error=/home/groups/jamesz/shiye/3d_protein_probing/slurm_error/probe/%x.%j.%a.err
-#SBATCH --time=5:00:00
+#SBATCH --time=3:00:00
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=shiye@stanford.edu
 
@@ -35,11 +35,11 @@ experiments=()
 
 
 # Geometry
-for CONCEPT in residue_distances_by_residue
+for CONCEPT in residue_neighb_distances_5
 do
 
     # Structure
-    for EMBEDDING_METHOD in baseline_basic
+    for EMBEDDING_METHOD in baseline-basic
     do
         for ENCODER_TYPE in egnn
         do
@@ -57,6 +57,7 @@ do
                 --predictor_num_layers 2 \
                 --predictor_hidden_dim 100 \
                 --batch_size 8 \
+                --max_epochs 100 \
                 --max_neighbors 24 \
                 --run_id_number $SLURM_ARRAY_TASK_ID \
                 --entity ssu53"

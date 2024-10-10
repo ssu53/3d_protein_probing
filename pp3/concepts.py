@@ -3,6 +3,7 @@ from typing import Any, Callable
 
 import numpy as np
 import torch
+import einops
 from biotite.structure import (
     annotate_sse,
     apply_residue_wise,
@@ -209,6 +210,99 @@ def bond_angles_distant(structure: AtomArray) -> torch.Tensor:
     return bond_angles(structure, residue_distance=24)
 
 
+def residue_angles_(structure: AtomArray, num_neighbs: int) -> torch.Tensor:
+    """Get angles formed by residue backbone and the num_neighbs nearest neighbors.
+    :param structure: The protein structure.
+    :param num_neighbs: Number of nearest neighbors.
+    :returns: A PyTorch tensor of shape (num_residues, 1 + 2 * num_neighbs) with cosine of angles.
+    Angles are: 
+        - backbone angle at residue
+        - angle between left-adjacent residue and num_neighbs nearest residues
+        - angle between right-ajacent residue and num_neighbs nearest residues
+    """
+
+    # Get alpha carbon residue coordinates
+
+    residue_coordinates = get_residue_coordinates(structure=structure)[:, 1, :]
+    num_residues = residue_coordinates.size(0)
+    assert residue_coordinates.shape == (num_residues, 3)
+
+
+    # Compute pairwise distances
+
+    distances = torch.cdist(residue_coordinates, residue_coordinates, p=2, compute_mode='donot_use_mm_for_euclid_dist')
+
+
+    # Get argsort indices for the residues in order of distance away
+
+    indices = torch.argsort(distances, dim=1)
+
+    # closest residue is self
+    assert all(indices[:,0] == torch.arange(len(indices))) # itself is the closest
+
+    # next closest residue is either left or right along backbone
+    # assert all((indices[:,1] == torch.arange(len(indices)) -1) | (indices[:,1] == torch.arange(len(indices)) + 1))
+
+    # next closest residue is either left or right along backbone, unless is at either end of protien
+    # assert all((indices[1:-1,2] == torch.arange(len(indices)-2)) | (indices[1:-1,2] == torch.arange(len(indices)-2) + 2))
+
+    # exclude self
+    indices_top = indices[:,1:num_neighbs+1]
+
+
+    # Obtain noramlised vectors to nearest neighbours
+
+    indices_top_flat = einops.rearrange(indices_top, "r s -> (r s)")
+    residue_coordinates_top = residue_coordinates[indices_top_flat]
+    residue_coordinates_top = einops.rearrange(residue_coordinates_top, "(r s) d -> r s d", r=num_residues)
+    if indices_top.shape[1] < num_neighbs:
+        print(f"Small neighbourhood.")
+        assert residue_coordinates_top.shape == (num_residues, num_residues-1, 3)
+        residue_coordinates_top = torch.cat((residue_coordinates_top, torch.empty(num_residues, num_neighbs-num_residues+1, 3) * torch.nan), dim=1)
+    vec_local = residue_coordinates_top - einops.rearrange(residue_coordinates, "r d -> r 1 d")
+    vec_local = vec_local / vec_local.norm(p=2, dim=-1, keepdim=True)
+
+
+    # Obtain normalised backbone vectors. 
+
+    residue_left = residue_coordinates[:-2]    # truncated index (residues at end ignored)
+    residue_centre = residue_coordinates[1:-1]
+    residue_right = residue_coordinates[2:]
+
+    vec_left = residue_left - residue_centre
+    vec_right = residue_right - residue_centre
+    vec_left = vec_left / vec_left.norm(p=2, dim=-1, keepdim=True)
+    vec_right = vec_right / vec_right.norm(p=2, dim=-1, keepdim=True)
+
+    
+    # Get their dot products i.e. cosine angles
+    
+    angle_backbone = torch.einsum("r d, r d -> r", vec_left, vec_right)
+    angle_backbone = einops.rearrange(angle_backbone, "r -> r 1")
+    angle_left = torch.einsum("r d, r s d -> r s", vec_left, vec_local[1:-1])
+    angle_right = torch.einsum("r d, r s d -> r s", vec_right, vec_local[1:-1])
+
+    angle_local = torch.cat((angle_backbone, angle_left, angle_right), dim=1)
+    angle_local = torch.cat([                   # pad to native index (incl. residues at end)
+        torch.empty(1,angle_local.shape[-1]) * torch.nan, 
+        angle_local, 
+        torch.empty(1,angle_local.shape[-1]) * torch.nan], dim=0)
+
+    assert angle_local.shape == (num_residues, 1 + num_neighbs * 2)
+
+    return angle_local
+
+
+@register_concept(concept_level='residue_multivariate', concept_type='regression', output_dim=17)
+def residue_angles_8(structure: AtomArray) -> torch.Tensor:
+    return residue_angles_(structure, num_neighbs=8)
+
+
+@register_concept(concept_level='residue_multivariate', concept_type='regression', output_dim=11)
+def residue_angles_5(structure: AtomArray) -> torch.Tensor:
+    return residue_angles_(structure, num_neighbs=5)
+
+
 @register_concept(concept_level='residue_quadruplet_1', concept_type='regression', output_dim=1)
 def dihedral_angles(structure: AtomArray, residue_distance: int = 1) -> torch.Tensor:
     """Get the dihedral angles between residue quadruplets.
@@ -242,6 +336,50 @@ def dihedral_angles_distant(structure: AtomArray) -> torch.Tensor:
     :return: A PyTorch tensor with the dihedral angles between residue quadruplets (length N - 72).
     """
     return dihedral_angles(structure, residue_distance=24)
+
+
+def residue_neighb_distances_(
+    structure: AtomArray,
+    num_neighbs: int | None,
+) -> torch.Tensor:
+    """Get the distance between alpha carbons of each residue and its num_neighbs nearest neighbors, per residue.
+
+    :param structure: The protein structure.
+    :param num_neighbs: The number of nearest neighbors.
+    :return: A PyTorch tensor of shape (num_residues, num_neighbs) with the distances.
+    """
+
+    # Get alpha carbon residue coordinates
+    residue_coordinates = get_residue_coordinates(structure=structure)[:, 1, :]
+    num_residues = residue_coordinates.size(0)
+    assert residue_coordinates.shape == (num_residues, 3)
+
+    # Compute pairwise distances
+    distances = torch.cdist(residue_coordinates, residue_coordinates, p=2, compute_mode='donot_use_mm_for_euclid_dist')
+
+    # Get argsort indices for the residues in order of distance away
+    distances_sorted, _ = torch.sort(distances, dim=1)
+    distances_sorted = distances_sorted[:,1:num_neighbs+1]
+    distances_top = torch.empty((num_residues, num_neighbs)) * torch.nan
+    if distances_sorted.size(1) < num_neighbs: print(f"Warning: num_neighbs = {num_neighbs} but protein has {num_residues} residues.")
+    distances_top[:,:distances_sorted.size(1)] = distances_sorted
+
+    return distances_top
+
+
+@register_concept(concept_level='residue_multivariate', concept_type='regression', output_dim=16)
+def residue_neighb_distances_16(structure: AtomArray) -> torch.Tensor:
+    return residue_neighb_distances_(structure, num_neighbs=16)
+
+
+@register_concept(concept_level='residue_multivariate', concept_type='regression', output_dim=8)
+def residue_neighb_distances_8(structure: AtomArray) -> torch.Tensor:
+    return residue_neighb_distances_(structure, num_neighbs=8)
+
+
+@register_concept(concept_level='residue_multivariate', concept_type='regression', output_dim=5)
+def residue_neighb_distances_5(structure: AtomArray) -> torch.Tensor:
+    return residue_neighb_distances_(structure, num_neighbs=5)
 
 
 @register_concept(concept_level='residue_pair', concept_type='regression', output_dim=1)

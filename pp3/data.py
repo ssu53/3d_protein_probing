@@ -1,6 +1,7 @@
 """Data classes and functions."""
 import json
 from pathlib import Path
+from functools import partial
 
 import numpy as np
 import pytorch_lightning as pl
@@ -14,7 +15,8 @@ from pp3.utils.constants import BATCH_TYPE, ONE_EMBEDDING_SIZE
 
 
 def collate_fn(
-        batch: list[tuple[torch.Tensor, torch.Tensor, torch.Tensor]]
+        batch: list[tuple[torch.Tensor, torch.Tensor, torch.Tensor]],
+        concept_level: str,
 ) -> BATCH_TYPE:
     """Collate a batch of items at the residue level.
 
@@ -40,7 +42,15 @@ def collate_fn(
     # Flatten y if needed
     if not isinstance(y[0], torch.Tensor):
         y = torch.tensor(y)
+    elif concept_level == 'residue_multivariate':
+        padded_y = torch.zeros((len(y), max_seq_len, y[0].shape[1]))
+
+        for i, y_i in enumerate(y):
+            padded_y[i, :y_i.shape[0], :y_i.shape[1]] = y_i
+
+        y = padded_y
     elif y[0].ndim == 2:
+        assert concept_level == 'residue_pair'
         padded_y = torch.zeros((len(y), max_seq_len, max_seq_len))
 
         for i, y_i in enumerate(y):
@@ -340,7 +350,7 @@ class ProteinConceptDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=True,
             num_workers=self.num_workers,
-            collate_fn=collate_fn
+            collate_fn=partial(collate_fn, concept_level=self.concept_level)
         )
 
     def val_dataloader(self) -> DataLoader:
@@ -350,7 +360,7 @@ class ProteinConceptDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=False,
             num_workers=self.num_workers,
-            collate_fn=collate_fn
+            collate_fn=partial(collate_fn, concept_level=self.concept_level)
         )
 
     def test_dataloader(self) -> DataLoader:
@@ -360,7 +370,7 @@ class ProteinConceptDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=False,
             num_workers=self.num_workers,
-            collate_fn=collate_fn
+            collate_fn=partial(collate_fn, concept_level=self.concept_level)
         )
 
     predict_dataloader = test_dataloader

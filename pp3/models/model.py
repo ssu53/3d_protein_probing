@@ -141,7 +141,7 @@ class Model(pl.LightningModule):
             raise ValueError(f'Invalid model type: {encoder_type}')
 
         # Create final layer
-        if self.concept_level in {'protein', 'residue'}:
+        if self.concept_level in {'protein', 'residue', 'residue_multivariate'}:
             predictor_dim_multiplier = 1
         elif self.concept_level == 'residue_pair':
             predictor_dim_multiplier = 2
@@ -221,15 +221,20 @@ class Model(pl.LightningModule):
                 encodings[:, 3 * residue_distance:]],
                 dim=-1
             )
+        elif self.concept_level == 'residue_multivariate':
+            pass
         elif self.concept_level != 'residue':
             raise ValueError(f'Invalid concept level: {self.concept_level}')
 
         # Select encodings using keep mask
-        if keep_mask is not None and self.concept_level != 'residue_pair':
+        if keep_mask is not None and self.concept_level != 'residue_pair' and self.concept_level != 'residue_multivariate':
             encodings = encodings[keep_mask]
 
         # Predict using MLP
         output = self.predictor(encodings)
+
+        if self.concept_level == 'residue_multivariate':
+            output = output[keep_mask]
 
         return output
 
@@ -249,6 +254,7 @@ class Model(pl.LightningModule):
         # Unpack batch
         embeddings, coords, y, padding_mask = batch
         num_proteins, num_residues = padding_mask.shape
+        # print(f"{embeddings.shape=} {coords.shape=} {y.shape=} {padding_mask.shape=}")
 
         # Compute y mask
         y_mask = ~torch.isnan(y)
@@ -263,12 +269,25 @@ class Model(pl.LightningModule):
 
             keep_sum = 1
         elif self.concept_level == 'residue':
+            assert y.ndim == 2, y.shape
             # Keep mask
             keep_mask = (y_mask * padding_mask).bool()
 
             # Keep sum (for normalization per protein)
             keep_sum = keep_mask.sum(dim=1, keepdim=True).repeat(1, num_residues)
             keep_sum = keep_sum[keep_mask]
+            
+        elif self.concept_level == 'residue_multivariate':
+            assert y.ndim == 3, y.shape
+            # Keep mask
+            keep_mask = (y_mask * padding_mask.unsqueeze(-1)).bool() # (batch, num_residues, num_features)
+
+            # Keep sum (for normalization per protein)
+            keep_sum = keep_mask.sum(dim=2, keepdim=True).sum(dim=1, keepdim=True).repeat(1, num_residues, y.shape[-1])
+            # print(f"{keep_sum.shape=}")
+            keep_sum = keep_sum[keep_mask]
+            # print(f"{keep_sum.shape=}")
+        
         elif self.concept_level == 'residue_pair':
             # Padding mask
             pair_padding_mask = padding_mask[:, None, :] * padding_mask[:, :, None]
@@ -319,12 +338,14 @@ class Model(pl.LightningModule):
 
         # Make predictions
         y_hat_scaled = self(embeddings, coords, padding_mask, keep_mask).squeeze(dim=-1)
+        # print(f"{y_hat_scaled.shape=}")
 
         # Scale/unscale target and predictions
         if self.target_type == 'regression':
             y = y.float()
             y_scaled = (y - self.target_mean) / self.target_std
             y_hat = y_hat_scaled * self.target_std + self.target_mean
+            # print(f"regression, {y_scaled.shape=} {y_hat.shape=}")
         elif self.target_type == 'binary_classification':
             y_scaled = y.float()
             y_hat = torch.sigmoid(y_hat_scaled)
@@ -336,6 +357,7 @@ class Model(pl.LightningModule):
 
         # Compute loss (average per protein and then averaged across proteins)
         loss = self.loss(y_hat_scaled, y_scaled)
+        # print(f"{loss.shape=}")
         loss = (loss / keep_sum).sum() / num_proteins
 
         # Convert target and predictions to NumPy
@@ -345,6 +367,8 @@ class Model(pl.LightningModule):
         # Separate y and y_hat by protein
         if self.concept_level == 'protein':
             y_per_protein = torch.ones(num_proteins, dtype=torch.long)
+        elif self.concept_level == 'residue_multivariate':
+            y_per_protein = keep_mask.sum(dim=-1).sum(dim=-1) # sum out both the feature and residue dimensions
         else:
             y_per_protein = keep_mask.sum(dim=-1)
 
