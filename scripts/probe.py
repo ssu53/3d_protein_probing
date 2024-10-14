@@ -28,6 +28,7 @@ def probe(
     predictor_hidden_dim: int,
     batch_size: int,
     logger_type: Literal['wandb', 'tensorboard'] = 'wandb',
+    disable_wandb: bool = False,
     learning_rate: float = 1e-4,
     weight_decay: float = 0.0,
     dropout: float = 0.0,
@@ -131,7 +132,8 @@ def probe(
             project=project_name,
             save_dir=str(save_dir),
             name=run_name,
-            entity=entity
+            entity=entity,
+            mode='disabled' if disable_wandb else 'online',
         )
         logger.experiment.config.update({
             'project_name': project_name,
