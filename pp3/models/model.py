@@ -66,6 +66,8 @@ class Model(pl.LightningModule):
         """
         super(Model, self).__init__()
 
+        self.save_hyperparameters()
+
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.encoder_num_layers = encoder_num_layers
