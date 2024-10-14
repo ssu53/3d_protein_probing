@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 import torch
+import einops
 from biotite import InvalidFileError
 from biotite.structure import BadStructureError, get_residue_count
 from tqdm import tqdm
@@ -17,15 +18,18 @@ from pp3.utils.pdb import (
     get_sequence_from_structure,
     load_structure
 )
+from pp3.utils import foldseek_parsers
 
 
 def convert_pdb_to_pytorch(
         pdb_path: Path,
         max_protein_length: int,
         one_chain_only: bool = False,
+        first_chain_only: bool = False,
         chain_id: str | None = None,
         domain_start: int | None = None,
-        domain_end: int | None = None
+        domain_end: int | None = None,
+        discard_discontinuous_backbone: bool = True,
 ) -> dict[str, torch.Tensor | str] | None:
     """Parses PDB file and converts structure and sequence to PyTorch format while removing invalid structures.
 
@@ -42,9 +46,11 @@ def convert_pdb_to_pytorch(
         structure = load_structure(
             pdb_path=pdb_path,
             one_chain_only=one_chain_only,
+            first_chain_only=first_chain_only,
             chain_id=chain_id,
             domain_start=domain_start,
-            domain_end=domain_end
+            domain_end=domain_end,
+            discard_discontinuous_backbone=discard_discontinuous_backbone,
         )
     except (BadStructureError, FileNotFoundError, InvalidFileError, ValueError, TypeError) as e:
         return {'error': repr(e)}
@@ -66,6 +72,49 @@ def convert_pdb_to_pytorch(
     return {
         'structure': residue_coordinates,
         'sequence': sequence
+    }
+
+
+def convert_pdb_to_pytorch_foldseek_style(
+    pdb_path: Path,
+    max_protein_length: int,
+    one_chain_only: bool = False,
+    first_chain_only: bool = False,
+    chain_id: str | None = None,
+    domain_start: int | None = None,
+    domain_end: int | None = None,
+    discard_discontinuous_backbone: bool = True,
+) -> dict[str, torch.Tensor | str] | None:
+
+    assert one_chain_only, "one_chain_only must be true for Folseek compatibility"
+    assert first_chain_only, "first_chain_only must be true for Foldseek compatibility"
+    assert chain_id is None, "must select first chain for Foldseek compatibility"
+    if domain_start is not None: raise NotImplementedError
+    if domain_end is not None: raise NotImplementedError
+    assert ~discard_discontinuous_backbone, "no backbone checking for Foldseek compatibility"
+
+    # Get the CA, CB, N, C coordinates
+    coords, valid_mask, sequence = foldseek_parsers.get_coords_from_pdb(pdb_path, full_backbone=True)
+    coords = torch.tensor(coords)
+    valid_mask = torch.tensor(valid_mask)
+    assert coords.ndim == 2
+    assert coords.size(1) == 4 * 3
+
+    # Check if structure is too long
+    if max_protein_length is not None and coords.size(0) > max_protein_length:
+        return {'error': f'Structure is too long (> {max_protein_length} residues)'}
+
+    # Reshape to N, CA, C coordinates for downstream compatibility
+    residue_coordinates = torch.empty((coords.size(0), 3, 3))
+    residue_coordinates[:, 0, :] = coords[:, 6:9] # N
+    residue_coordinates[:, 1, :] = coords[:, 0:3] # CA
+    residue_coordinates[:, 2, :] = coords[:, 9:12] # C
+
+    # Return dictionary containing structure and sequence
+    return {
+        'structure': residue_coordinates, # N, CA, C coordinates
+        'valid_mask': valid_mask,
+        'sequence': sequence,
     }
 
 
@@ -133,7 +182,101 @@ def pdb_to_pytorch(
     pd.DataFrame({'pdb_id': pdb_ids}).to_csv(ids_save_path, index=False)
 
 
+def get_pdb_scop_path(
+    pdb_id: str,
+    pdb_dir: Path,
+):
+    return pdb_dir / pdb_id
+
+
+def pdb_scop_to_pytorch(
+    ids_path: Path,
+    pdb_dir: Path,
+    proteins_save_path: Path,
+    ids_save_path: Path,
+    max_protein_length: int | None = MAX_SEQ_LEN,
+) -> None:
+    """
+    """
+
+    # Load PDB IDs
+    print(ids_path)
+    with open(ids_path) as f:
+        pdb_ids = f.read().split('\n')
+    print(f'Loaded {len(pdb_ids):,} PDB IDs')
+
+    # Create PDB paths
+    pdb_paths = [get_pdb_scop_path(pdb_id=pdb_id, pdb_dir=pdb_dir) for pdb_id in pdb_ids]
+
+    # Convert PDB files to PyTorch format
+    pdb_id_to_protein = {}
+    error_counter = Counter()
+
+    # Convert PDB files to PyTorch format (non-multithreaded)
+    for pdb_id, pdb_path in tqdm(zip(pdb_ids, pdb_paths), total=len(pdb_ids)):
+        protein = convert_pdb_to_pytorch_foldseek_style(
+            pdb_path,
+            max_protein_length=max_protein_length, 
+            one_chain_only=True, 
+            first_chain_only=True, 
+            discard_discontinuous_backbone=False,
+        )
+        if 'error' in protein:
+            error_counter[protein['error']] += 1
+        else:
+            pdb_id_to_protein[pdb_id] = protein
+    
+    # Print errors
+    for error, count in error_counter.most_common():
+        print(f'{count:,} errors: {error}')
+
+    print(f'\nConverted {len(pdb_id_to_protein):,} PDB files successfully. Discontinuous backbones are retained!')
+
+    # Save protein structures and sequences of successfully converted structures
+    proteins_save_path.parent.mkdir(parents=True, exist_ok=True)
+    torch.save(pdb_id_to_protein, proteins_save_path)
+
+    # Save PDB IDs of successfully converted structures
+    ids_save_path.parent.mkdir(parents=True, exist_ok=True)
+    pdb_ids = sorted(pdb_id_to_protein)
+    pd.DataFrame({'pdb_id': pdb_ids}).to_csv(ids_save_path, index=False)
+
+
+def pdb_to_pytorch_(
+    ids_path: Path,
+    pdb_dir: Path,
+    proteins_save_path: Path,
+    ids_save_path: Path,
+    max_protein_length: int | None = MAX_SEQ_LEN,
+    mode: str = 'default',
+) -> None:
+
+    if mode == 'default':
+        print("Running default pdb_to_pytorch!")
+        pdb_to_pytorch(ids_path, pdb_dir, proteins_save_path, ids_save_path, max_protein_length)
+
+    elif mode == 'scop':
+        print("Running scop pdb_to_pytorch, with Foldseek compatibility!")
+        pdb_scop_to_pytorch(ids_path, pdb_dir, proteins_save_path, ids_save_path, max_protein_length)
+
+    else:
+        raise NotImplementedError
+
+
 if __name__ == '__main__':
     from tap import tapify
 
-    tapify(pdb_to_pytorch)
+    tapify(pdb_to_pytorch_)
+
+
+    """
+    e.g.
+
+    python pdb_to_pytorch.py \
+        --ids_path data/scope40_foldseek_compatible/pdbs_train.txt \
+        --pdb_dir /oak/stanford/groups/jamesz/shiye/scope40 \
+        --proteins_save_path data/scope40_foldseek_compatible/proteins_train.pt \
+        --ids_save_path data/scope40_foldseek_compatible/valid_pdb_ids_train.csv 
+        --mode scop
+
+    """

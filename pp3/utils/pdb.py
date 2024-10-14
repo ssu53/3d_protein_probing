@@ -88,9 +88,11 @@ def verify_residues(structure: AtomArray) -> None:
 def load_structure(
         pdb_path: Path,
         one_chain_only: bool = False,
+        first_chain_only: bool = False,
         chain_id: str | None = None,
         domain_start: int | None = None,
-        domain_end: int | None = None
+        domain_end: int | None = None,
+        discard_discontinuous_backbone: bool = True,
 ) -> AtomArray:
     """Load the protein structure from a PDB file.
 
@@ -109,8 +111,10 @@ def load_structure(
     :param domain_end: The end of the domain to extract.
     :return: The loaded (and cleaned) protein structure.
     """
+    if not one_chain_only and first_chain_only:
+        raise ValueError('Cannot choose first_chain_only if one_chain_only is False.')
     # Check if chain ID is given when allowing multichain proteins
-    if not one_chain_only and chain_id is None:
+    if not one_chain_only and not first_chain_only and chain_id is None:
         raise ValueError('Need chain_id if not restricting to one chain proteins')
 
     # Check if PDB file exists
@@ -128,7 +132,11 @@ def load_structure(
 
     # Restrict to one chain, either by enforcing one chain only or by selecting a chain
     if one_chain_only:
-        if get_chain_count(structure) != 1:
+        if get_chain_count(structure) == 1:
+            pass
+        elif first_chain_only:
+            structure = structure[structure.chain_id == structure.chain_id[0]]
+        else: # get_chain_count(structure) != 1
             raise ValueError('Structure contains more than one chain')
     else:
         # Restrict to chain
@@ -156,7 +164,7 @@ def load_structure(
         raise ValueError('Structure contains duplicate atoms')
 
     # Check for backbone bond continuity
-    if len(check_backbone_continuity(structure)) > 0:
+    if discard_discontinuous_backbone and len(check_backbone_continuity(structure)) > 0:
         raise ValueError('Structure contains invalid backbone bonds')
 
     return structure
