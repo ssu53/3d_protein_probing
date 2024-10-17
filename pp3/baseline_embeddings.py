@@ -43,7 +43,7 @@ def get_baseline_residue_embedding_index(sequence: str, index: int, identify_res
         residue_embedding = torch.FloatTensor([
             residue_position,
             protein_length,
-            *[0,0,0], # length 3 padding
+            # *[0,0,0], # length 3 padding
         ])
 
     return residue_embedding
