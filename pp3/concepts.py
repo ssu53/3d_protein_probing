@@ -210,7 +210,11 @@ def bond_angles_distant(structure: AtomArray) -> torch.Tensor:
     return bond_angles(structure, residue_distance=24)
 
 
-def residue_angles_(structure: AtomArray, num_neighbs: int) -> torch.Tensor:
+def residue_angles_(
+    structure: AtomArray | None = None, 
+    residue_coordinates: torch.Tensor | None = None, 
+    num_neighbs: int = None,
+) -> torch.Tensor:
     """Get angles formed by residue backbone and the num_neighbs nearest neighbors.
     :param structure: The protein structure.
     :param num_neighbs: Number of nearest neighbors.
@@ -222,8 +226,10 @@ def residue_angles_(structure: AtomArray, num_neighbs: int) -> torch.Tensor:
     """
 
     # Get alpha carbon residue coordinates
-
-    residue_coordinates = get_residue_coordinates(structure=structure)[:, 1, :]
+    if residue_coordinates is None:
+        residue_coordinates = get_residue_coordinates(structure=structure)[:, 1, :]
+    else:
+        residue_coordinates = residue_coordinates[:, 1, :]
     num_residues = residue_coordinates.size(0)
     assert residue_coordinates.shape == (num_residues, 3)
 
@@ -236,6 +242,11 @@ def residue_angles_(structure: AtomArray, num_neighbs: int) -> torch.Tensor:
     # Get argsort indices for the residues in order of distance away
 
     indices = torch.argsort(distances, dim=1)
+
+    if indices.shape[1] == 0:
+        print(f"{residue_coordinates.shape=}")
+        print(f"{distances.shape=}")
+        print(f"{indices.shape=}")
 
     # closest residue is self
     assert all(indices[:,0] == torch.arange(len(indices))) # itself is the closest
@@ -256,7 +267,7 @@ def residue_angles_(structure: AtomArray, num_neighbs: int) -> torch.Tensor:
     residue_coordinates_top = residue_coordinates[indices_top_flat]
     residue_coordinates_top = einops.rearrange(residue_coordinates_top, "(r s) d -> r s d", r=num_residues)
     if indices_top.shape[1] < num_neighbs:
-        print(f"Small neighbourhood.")
+        print(f"Warning: num_neighbs = {num_neighbs} but protein has {num_residues} residues.")
         assert residue_coordinates_top.shape == (num_residues, num_residues-1, 3)
         residue_coordinates_top = torch.cat((residue_coordinates_top, torch.empty(num_residues, num_neighbs-num_residues+1, 3) * torch.nan), dim=1)
     vec_local = residue_coordinates_top - einops.rearrange(residue_coordinates, "r d -> r 1 d")
@@ -283,24 +294,29 @@ def residue_angles_(structure: AtomArray, num_neighbs: int) -> torch.Tensor:
     angle_right = torch.einsum("r d, r s d -> r s", vec_right, vec_local[1:-1])
 
     angle_local = torch.cat((angle_backbone, angle_left, angle_right), dim=1)
-    angle_local = torch.cat([                   # pad to native index (incl. residues at end)
-        torch.empty(1,angle_local.shape[-1]) * torch.nan, 
-        angle_local, 
-        torch.empty(1,angle_local.shape[-1]) * torch.nan], dim=0)
+    # angle_local = torch.cat([                   # pad to native index (incl. residues at end)
+    #     torch.empty(1,angle_local.shape[-1]) * torch.nan, 
+    #     angle_local, 
+    #     torch.empty(1,angle_local.shape[-1]) * torch.nan], dim=0)
 
-    assert angle_local.shape == (num_residues, 1 + num_neighbs * 2)
+    assert angle_local.shape == (num_residues-2, 1 + num_neighbs * 2)
 
     return angle_local
 
 
-@register_concept(concept_level='residue_multivariate', concept_type='regression', output_dim=17)
-def residue_angles_8(structure: AtomArray) -> torch.Tensor:
-    return residue_angles_(structure, num_neighbs=8)
+@register_concept(concept_level='residue_triplet_multivariate_1', concept_type='regression', output_dim=17)
+def residue_angles_8(structure: AtomArray, residue_coordinates: torch.Tensor) -> torch.Tensor:
+    return residue_angles_(structure, residue_coordinates, num_neighbs=8)
 
 
-@register_concept(concept_level='residue_multivariate', concept_type='regression', output_dim=11)
-def residue_angles_5(structure: AtomArray) -> torch.Tensor:
-    return residue_angles_(structure, num_neighbs=5)
+@register_concept(concept_level='residue_triplet_multivariate_1', concept_type='regression', output_dim=11)
+def residue_angles_5(structure: AtomArray, residue_coordinates: torch.Tensor) -> torch.Tensor:
+    return residue_angles_(structure, residue_coordinates, num_neighbs=5)
+
+
+@register_concept(concept_level='residue_triplet_multivariate_1', concept_type='regression', output_dim=1)
+def residue_angles_0(structure: AtomArray, residue_coordinates: torch.Tensor) -> torch.Tensor:
+    return residue_angles_(structure, residue_coordinates, num_neighbs=0)
 
 
 @register_concept(concept_level='residue_quadruplet_1', concept_type='regression', output_dim=1)
@@ -339,8 +355,9 @@ def dihedral_angles_distant(structure: AtomArray) -> torch.Tensor:
 
 
 def residue_neighb_distances_(
-    structure: AtomArray,
-    num_neighbs: int | None,
+    structure: AtomArray | None,
+    residue_coordinates: torch.Tensor | None = None,
+    num_neighbs: int | None = None,
 ) -> torch.Tensor:
     """Get the distance between alpha carbons of each residue and its num_neighbs nearest neighbors, per residue.
 
@@ -350,7 +367,10 @@ def residue_neighb_distances_(
     """
 
     # Get alpha carbon residue coordinates
-    residue_coordinates = get_residue_coordinates(structure=structure)[:, 1, :]
+    if residue_coordinates is None:
+        residue_coordinates = get_residue_coordinates(structure=structure)[:, 1, :]
+    else:
+        residue_coordinates = residue_coordinates[:, 1, :]
     num_residues = residue_coordinates.size(0)
     assert residue_coordinates.shape == (num_residues, 3)
 
@@ -368,18 +388,18 @@ def residue_neighb_distances_(
 
 
 @register_concept(concept_level='residue_multivariate', concept_type='regression', output_dim=16)
-def residue_neighb_distances_16(structure: AtomArray) -> torch.Tensor:
-    return residue_neighb_distances_(structure, num_neighbs=16)
+def residue_neighb_distances_16(structure: AtomArray, residue_coordinates: torch.Tensor) -> torch.Tensor:
+    return residue_neighb_distances_(structure, residue_coordinates, num_neighbs=16)
 
 
 @register_concept(concept_level='residue_multivariate', concept_type='regression', output_dim=8)
-def residue_neighb_distances_8(structure: AtomArray) -> torch.Tensor:
-    return residue_neighb_distances_(structure, num_neighbs=8)
+def residue_neighb_distances_8(structure: AtomArray, residue_coordinates: torch.Tensor) -> torch.Tensor:
+    return residue_neighb_distances_(structure, residue_coordinates, num_neighbs=8)
 
 
 @register_concept(concept_level='residue_multivariate', concept_type='regression', output_dim=5)
-def residue_neighb_distances_5(structure: AtomArray) -> torch.Tensor:
-    return residue_neighb_distances_(structure, num_neighbs=5)
+def residue_neighb_distances_5(structure: AtomArray, residue_coordinates: torch.Tensor) -> torch.Tensor:
+    return residue_neighb_distances_(structure, residue_coordinates, num_neighbs=5)
 
 
 @register_concept(concept_level='residue_pair', concept_type='regression', output_dim=1)

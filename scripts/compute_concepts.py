@@ -2,7 +2,7 @@
 from functools import partial
 from multiprocessing import Pool
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict
 
 import pandas as pd
 import torch
@@ -15,7 +15,7 @@ from pp3.utils.pdb import load_structure, get_pdb_path_experimental
 def compute_concepts_for_structure(
         pdb_path: Path,
         concepts: list[str] | None = None
-) -> dict[str, Any]:
+    ) -> dict[str, Any]:
     """Computes 3D geometric concepts from a protein structure.
 
     :param pdb_path: The path to the PDB structure.
@@ -30,23 +30,53 @@ def compute_concepts_for_structure(
         concept_name_to_value = compute_all_concepts(structure=structure)
     else:
         concept_name_to_value = {
-            concept_name: get_concept_function(concept_name)(structure)
+            concept_name: get_concept_function(concept_name)(structure=structure)
             for concept_name in concepts
         }
 
     return concept_name_to_value
 
 
+def compute_concepts_for_residue_coordinates(
+        pdb_id: str,
+        proteins: Dict[str, torch.Tensor],
+        concepts: list[str] | None = None
+    ) -> dict[str, Any]:
+    """Computes 3D geometric concepts from a protein structure.
+    Only compatible with certain concepts!
+
+    :param pdb_id: The PDB ID.
+    :param proteins: The dictionary of proteins, indexed by pdb_id key.
+    :param concepts: List of concepts to compute. If None, all concepts will be computed.
+    :return: A dictionary mapping concept names to values.
+    """
+    # Load (valid) residue coordinates
+    residue_coordinates = proteins[pdb_id]['structure']
+    residue_coordinates = residue_coordinates[proteins[pdb_id]['valid_mask']]
+
+    # Set up concept dictionary
+    concept_name_to_value = {
+        concept_name: get_concept_function(concept_name)(structure=None, residue_coordinates=residue_coordinates)
+        for concept_name in concepts
+    }
+
+    return concept_name_to_value
+
+
 def compute_concepts(
         ids_path: Path,
-        pdb_dir: Path,
         save_dir: Path,
-        concepts: list[str] | None = None
+        pdb_dir: Path | None = None,
+        proteins_path: Path | None = None,
+        concepts: list[str] | None = None,
 ) -> None:
     """Compute 3D geometric concepts from protein structures.
+    
+    Specify either pdb_dir or proteins_path.
 
     :param ids_path: Path to a CSV file containing PDB IDs.
     :param pdb_dir: Path to a directory containing PDB structures.
+    :param proteins_path: Path to torch.load-able file containing proteins (from pdb_to_pytorch processing).
     :param save_dir: Path to a directory where PyTorch files with computed concepts will be saved.
     :param concepts: List of concepts to compute. If None, all concepts will be computed.
     """
@@ -55,35 +85,52 @@ def compute_concepts(
 
     print(f'Loaded {len(pdb_ids):,} PDB IDs')
 
-    # Create PDB paths
-    pdb_paths = [
-        get_pdb_path_experimental(
-            pdb_id=pdb_id,
-            pdb_dir=pdb_dir
-        )
-        for pdb_id in pdb_ids
-    ]
-
     # Set up save directory
     save_dir.mkdir(parents=True, exist_ok=True)
 
-    # Set up concept function
-    compute_concepts_for_structure_fn = partial(
-        compute_concepts_for_structure,
-        concepts=concepts
-    )
+    if proteins_path is not None:
+        assert pdb_dir is None
 
-    # Check which PDB IDs have structures
+        proteins = torch.load(proteins_path)
+        pdb_ids = proteins.keys()
 
-    # Multi-threaded
-    with Pool() as pool:
-        concept_dicts = list(
-            tqdm(pool.imap(compute_concepts_for_structure_fn, pdb_paths), total=len(pdb_paths))
+        # Set up concept function
+        compute_concepts_for_residue_coordinates_fn = partial(
+            compute_concepts_for_residue_coordinates,
+            proteins=proteins,
+            concepts=concepts
         )
-    # Non-multithreaded alternative, if above errors
-    # concept_dicts = []
-    # for pdb_path in tqdm(pdb_paths):
-    #     concept_dicts.append(compute_concepts_for_structure_fn(pdb_path))
+    
+        # Single-threaded
+        concept_dicts = []
+        for pdb_id in tqdm(pdb_ids):
+            concept_dicts.append(compute_concepts_for_residue_coordinates_fn(pdb_id=pdb_id))
+        
+    else:
+        assert proteins_path is None
+
+        # Create PDB paths
+        pdb_paths = [
+            get_pdb_path_experimental(
+                pdb_id=pdb_id,
+                pdb_dir=pdb_dir
+            )
+            for pdb_id in pdb_ids
+        ]
+
+        # Set up concept function
+        compute_concepts_for_structure_fn = partial(
+            compute_concepts_for_structure,
+            concepts=concepts
+        )
+
+        # Check which PDB IDs have structures
+
+        # Multi-threaded
+        with Pool() as pool:
+            concept_dicts = list(
+                tqdm(pool.imap(compute_concepts_for_structure_fn, pdb_paths), total=len(pdb_paths))
+            )
 
     # Map PDB IDs to concepts
     pdb_id_to_concepts = dict(zip(pdb_ids, concept_dicts))
