@@ -116,6 +116,10 @@ def get_coords_from_pdb(path, full_backbone=False):
     # Get sequence
     sequence = []
     for residue in chain: 
+        het_flag,_ ,_ = residue.id
+        if het_flag != ' ':
+            sequence.append('-')
+            continue
         sequence.append(AA_3_TO_1[residue.resname])
     sequence = ''.join(sequence)
 
