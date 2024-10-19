@@ -213,15 +213,10 @@ if __name__ == '__main__':
     """
     e.g.
 
-    python scripts/get_embeddings.py \
-        --proteins_path data/scope40_foldseek_compatible/proteins_train_10.pt \
+    python scripts/get_encodings.py \
+        --proteins_path data/scope40_foldseek_compatible/proteins.pt \
         --concept residue_neighb_distances_8 \
-        --checkpoint_path results/pdb_single_chain_protein_30_identity/basic_embed/residue_neighb_distances_8_baseline-basic_egnn_3L_mlp_2L_split_0/epoch=99-step=48700-v1.ckpt \
-        --encodings_save_path data/scope40_foldseek_compatible/encodings/residue_neighb_distances_8_train_10.pt
-    
-    python scripts/get_embeddings.py \
-        --proteins_path data/scope40_foldseek_compatible/proteins_train_10.pt \
-        --concept bond_angles \
-        --checkpoint_path results/pdb_single_chain_protein_30_identity/basic_embed/bond_angles_baseline-basic_egnn_3L_mlp_2L_split_0/epoch=99-step=48700.ckpt \
-        --encodings_save_path data/scope40_foldseek_compatible/encodings/bond_angles_train_10.pt
+        --checkpoint_path results/scope40_foldseek_compatible/basic_embed_dim2/residue_neighb_distances_8_baseline-basic_egnn_3L_mlp_2L_split_0/epoch\=99-step\=88300.ckpt \
+        --encodings_save_path data/scope40_foldseek_compatible/encodings/residue_neighb_distances_8.pt
+
     """

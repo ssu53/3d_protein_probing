@@ -292,34 +292,34 @@ def pdb_to_pytorch(
     elif parse_mode == 'foldseek':
         print("Running scop pdb_to_pytorch, with Foldseek compatibility!")
 
-        # convert_pdb_to_pytorch_fn = partial(
-        #     convert_pdb_to_pytorch_foldseek_style,
-        #     max_protein_length=max_protein_length, 
-        #     one_chain_only=True, 
-        #     first_chain_only=True, 
-        #     discard_discontinuous_backbone=False,
-        # )
+        convert_pdb_to_pytorch_fn = partial(
+            convert_pdb_to_pytorch_foldseek_style,
+            max_protein_length=max_protein_length, 
+            one_chain_only=True, 
+            first_chain_only=True, 
+            discard_discontinuous_backbone=False,
+        )
 
-        # with Pool() as pool:
-        #     for pdb_id, protein in tqdm(zip(pdb_ids, pool.imap(convert_pdb_to_pytorch_fn, pdb_paths)), total=len(pdb_ids)):
-        #         if 'error' in protein:
-        #             error_counter[protein['error']] += 1
-        #         else:
-        #             pdb_id_to_protein[pdb_id] = protein
+        with Pool() as pool:
+            for pdb_id, protein in tqdm(zip(pdb_ids, pool.imap(convert_pdb_to_pytorch_fn, pdb_paths)), total=len(pdb_ids)):
+                if 'error' in protein:
+                    error_counter[protein['error']] += 1
+                else:
+                    pdb_id_to_protein[pdb_id] = protein
 
         # Non-multithreaded version, since above is mysteriously hanging
-        for pdb_id, pdb_path in tqdm(zip(pdb_ids, pdb_paths), total=len(pdb_ids)):
-            protein = convert_pdb_to_pytorch_foldseek_style(
-                pdb_path,
-                max_protein_length=max_protein_length, 
-                one_chain_only=True, 
-                first_chain_only=True, 
-                discard_discontinuous_backbone=False,
-            )
-            if 'error' in protein:
-                error_counter[protein['error']] += 1
-            else:
-                pdb_id_to_protein[pdb_id] = protein
+        # for pdb_id, pdb_path in tqdm(zip(pdb_ids, pdb_paths), total=len(pdb_ids)):
+        #     protein = convert_pdb_to_pytorch_foldseek_style(
+        #         pdb_path,
+        #         max_protein_length=max_protein_length, 
+        #         one_chain_only=True, 
+        #         first_chain_only=True, 
+        #         discard_discontinuous_backbone=False,
+        #     )
+        #     if 'error' in protein:
+        #         error_counter[protein['error']] += 1
+        #     else:
+        #         pdb_id_to_protein[pdb_id] = protein
     
     else:
         raise NotImplementedError

@@ -33,7 +33,7 @@ def approx_c_beta_position(c_alpha, n, c_carboxyl):
     return c_alpha + DISTANCE_ALPHA_BETA * v4  # c_beta
 
 
-def get_atom_coordinates(chain, verbose=False, full_backbone=False):
+def get_atom_coordinates(chain, verbose=False, full_backbone=False, raise_error=True):
     """Get CA/CB coordinates from list of biopython residues.
 
     C betas from GLY are approximated.
@@ -50,17 +50,21 @@ def get_atom_coordinates(chain, verbose=False, full_backbone=False):
     n_cols = 6 if not full_backbone else 12
     # CA, CB(, N, C)
     coords = np.full((n_res, n_cols), np.nan, dtype=np.float32)
+    is_hetatm_mask = np.full((n_res,), False, dtype=bool)
 
     for i, res in enumerate(chain):
 
         is_HETATM = len(res.id[0].strip())
         if is_HETATM:
+            is_hetatm_mask[i] = True
             continue  # skip HETATMs
 
         ca_atoms = [atom for atom in res if atom.name == 'CA']
         if len(ca_atoms) != 1:
             if verbose:
                 print(f'No CA found [{i}] {chain.full_id}')
+            if raise_error: 
+                raise ValueError
         else:
             coords[i, 0:3] = ca_atoms[0].coord
 
@@ -68,8 +72,11 @@ def get_atom_coordinates(chain, verbose=False, full_backbone=False):
         if res.resname != 'GLY' and cb_atoms:
             if len(cb_atoms) == 1:
                 coords[i, 3:6] = cb_atoms[0].coord
-            elif verbose:
-                print(f'No CB found [{i}] {chain.full_id}')
+            else:
+                if verbose:
+                    print(f'No CB found [{i}] {chain.full_id}')
+                if raise_error:
+                    raise ValueError
 
         else:  # approx CB position
             n_atoms = [atom for atom in res if atom.name == 'N']
@@ -77,6 +84,8 @@ def get_atom_coordinates(chain, verbose=False, full_backbone=False):
             if len(ca_atoms) != 1 or len(n_atoms) != 1 or len(co_atoms) != 1:
                 if verbose:
                     print(f'Failed to approx CB ({ca_atoms}, {n_atoms}, {co_atoms})')
+                if raise_error:
+                    raise ValueError
             else:
                 cb_coord = approx_c_beta_position(
                         ca_atoms[0].coord,
@@ -88,12 +97,18 @@ def get_atom_coordinates(chain, verbose=False, full_backbone=False):
             n_atoms = [atom for atom in res if atom.name == 'N']
             co_atoms = [atom for atom in res if atom.name == 'C']
             if len(n_atoms) != 1 or len(co_atoms) != 1:
+                if raise_error:
+                    raise ValueError
                 pass
             else:
                 coords[i, 6:9] = n_atoms[0].coord
                 coords[i, 9:12] = co_atoms[0].coord
 
+    # Collapse chain to be continuous around the HETATM entries
+    coords = coords[~is_hetatm_mask, :]
     valid_mask = ~np.any(np.isnan(coords), axis=1)  # mask all rows containing NANs
+    if raise_error:
+        assert np.all(valid_mask), "structure is not everywhere valid"
 
     return coords, valid_mask
 
@@ -113,12 +128,18 @@ def get_coords_from_pdb(path, full_backbone=False):
     coords, valid_mask = get_atom_coordinates(list(chain.get_residues()),
             full_backbone=full_backbone)
 
+    # # Remove HETATM entries
+    # for residue in chain:
+    #     residue_id = residue.id
+    #     het_flag, _, _ = residue_id
+    #     if het_flag != ' ':
+    #         chain.detach_child(residue_id)
+
     # Get sequence
     sequence = []
     for residue in chain: 
         het_flag,_ ,_ = residue.id
         if het_flag != ' ':
-            sequence.append('-')
             continue
         sequence.append(AA_3_TO_1[residue.resname])
     sequence = ''.join(sequence)
