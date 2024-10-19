@@ -223,19 +223,17 @@ class Model(pl.LightningModule):
                 encodings[:, 3 * residue_distance:]],
                 dim=-1
             )
-        elif self.concept_level == 'residue_multivariate':
-            pass
-        elif self.concept_level != 'residue':
+        elif self.concept_level not in {'residue', 'residue_multivariate'}:
             raise ValueError(f'Invalid concept level: {self.concept_level}')
 
         # Select encodings using keep mask
-        if keep_mask is not None and self.concept_level != 'residue_pair' and self.concept_level != 'residue_multivariate':
+        if keep_mask is not None and self.concept_level not in {'residue_pair', 'residue_multivariate', 'residue_triplet_multivariate_1'}:
             encodings = encodings[keep_mask]
 
         # Predict using MLP
         output = self.predictor(encodings)
 
-        if self.concept_level == 'residue_multivariate':
+        if self.concept_level in {'residue_multivariate', 'residue_triplet_multivariate_1'}:
             output = output[keep_mask]
 
         return output
@@ -256,7 +254,7 @@ class Model(pl.LightningModule):
         # Unpack batch
         embeddings, coords, y, padding_mask = batch
         num_proteins, num_residues = padding_mask.shape
-        # print(f"{embeddings.shape=} {coords.shape=} {y.shape=} {padding_mask.shape=}")
+        assert embeddings.shape == (num_proteins, num_residues, 2), f"{embeddings.shape=} {coords.shape=} {y.shape=} {padding_mask.shape=}"
 
         # Compute y mask
         y_mask = ~torch.isnan(y)
@@ -308,6 +306,21 @@ class Model(pl.LightningModule):
 
             # Keep sum (for normalization per protein)
             keep_sum = keep_mask.sum(dim=1, keepdim=True).repeat(1, num_residues ** 2)
+            keep_sum = keep_sum[keep_mask]
+        elif self.concept_level.startswith('residue_triplet_multivariate'):
+            # Keep mask
+            residue_distance = int(self.concept_level.split('_')[-1])
+            assert y_mask.ndim == 3
+            assert padding_mask.ndim == 2
+            triplet_padding_mask = padding_mask[:, :-2 * residue_distance] * \
+                                   padding_mask[:, residue_distance:-residue_distance] * \
+                                   padding_mask[:, 2 * residue_distance:]
+            triplet_padding_mask = triplet_padding_mask.unsqueeze(-1)
+            keep_mask = (y_mask * triplet_padding_mask).bool()
+            assert keep_mask.shape == y.shape
+
+            # Keep sum (for normalization per protein)
+            keep_sum = keep_mask.sum(dim=2, keepdim=True).sum(dim=1, keepdim=True).repeat(1, keep_mask.shape[1], y.shape[-1])
             keep_sum = keep_sum[keep_mask]
         elif self.concept_level.startswith('residue_triplet'):
             # Keep mask
@@ -370,6 +383,8 @@ class Model(pl.LightningModule):
         if self.concept_level == 'protein':
             y_per_protein = torch.ones(num_proteins, dtype=torch.long)
         elif self.concept_level == 'residue_multivariate':
+            y_per_protein = keep_mask.sum(dim=-1).sum(dim=-1) # sum out both the feature and residue dimensions
+        elif self.concept_level == 'residue_triplet_multivariate_1':
             y_per_protein = keep_mask.sum(dim=-1).sum(dim=-1) # sum out both the feature and residue dimensions
         else:
             y_per_protein = keep_mask.sum(dim=-1)

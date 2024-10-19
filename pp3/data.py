@@ -27,7 +27,7 @@ def collate_fn(
     :return: A collated batch with:
                 - Embeddings (batch_size, max_num_residues, embedding_dim)
                 - Coordinates (batch_size, max_num_residues, 3, 3)
-                - Y value (batch_size, max_num_residues)
+                - Y value (batch_size, max_num_residues_)     # max_num_residues_ != max_num_residues for triplet, quadruplet
                 - Padding mask (batch_size, max_num_residues)
     """
     embeddings, coords, y = zip(*batch)
@@ -43,12 +43,16 @@ def collate_fn(
     if not isinstance(y[0], torch.Tensor):
         y = torch.tensor(y)
     elif concept_level == 'residue_multivariate':
+        # Verify can also utils.rnn.pad_sequence here
+        assert y[0].ndim == 2
         padded_y = torch.zeros((len(y), max_seq_len, y[0].shape[1]))
 
         for i, y_i in enumerate(y):
             padded_y[i, :y_i.shape[0], :y_i.shape[1]] = y_i
 
         y = padded_y
+    elif concept_level.startswith('residue_triplet_multivariate'):
+        y = torch.nn.utils.rnn.pad_sequence(y, batch_first=True)
     elif y[0].ndim == 2:
         assert concept_level == 'residue_pair'
         padded_y = torch.zeros((len(y), max_seq_len, max_seq_len))
