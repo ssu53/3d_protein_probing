@@ -7,7 +7,7 @@
 #SBATCH --gpus=1
 #SBATCH --constraint=GPU_SKU:RTX_2080Ti|GPU_SKU:TITAN_V|GPU_SKU:TITAN_Xp
 #SBATCH --cpus-per-task=4
-#SBATCH --mem=8G
+#SBATCH --mem=4G
 #SBATCH --array=0-0%1
 #SBATCH --partition=jamesz
 #SBATCH --output=/home/groups/jamesz/shiye/3d_protein_probing/slurm_output/probe/%x.%j.%a.out
@@ -35,7 +35,7 @@ experiments=()
 
 
 # Geometry
-for CONCEPT in residue_neighb_distances_5
+for CONCEPT in residue_angles_0, residue_neighb_distances_8, residue_angles_8, residue_neighb_distances_5, residue_angles_5
 do
 
     # Structure
@@ -45,10 +45,10 @@ do
         do
             no_interaction="python scripts/probe.py \
                 --project_name $PROJECT_NAME \
-                --proteins_path data/pdb_single_chain_protein_30_identity/proteins.pt \
-                --embeddings_path data/pdb_single_chain_protein_30_identity/embeddings/esm2_t33_650M_UR50D.pt \
-                --save_dir results/pdb_single_chain_protein_30_identity/basic_embed \
-                --concepts_dir data/pdb_single_chain_protein_30_identity/concepts \
+                --proteins_path data/scope40_foldseek_compatible/proteins_train.pt \
+                --embeddings_path null \
+                --save_dir results/scope40_foldseek_compatible/basic_embed_dim2 \
+                --concepts_dir data/scope40_foldseek_compatible/concepts_train \
                 --concept $CONCEPT \
                 --embedding_method $EMBEDDING_METHOD \
                 --encoder_type $ENCODER_TYPE \
