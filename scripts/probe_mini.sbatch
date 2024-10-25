@@ -35,7 +35,7 @@ experiments=()
 
 
 # Geometry
-for CONCEPT in residue_angles_0, residue_neighb_distances_8, residue_angles_8, residue_neighb_distances_5, residue_angles_5
+for CONCEPT in bond_angles_basic, residue_neighb_distances_8, residue_logseqdist_1, residue_logseqdist_5, residue_logseqdist_8
 do
 
     # Structure
@@ -45,10 +45,10 @@ do
         do
             no_interaction="python scripts/probe.py \
                 --project_name $PROJECT_NAME \
-                --proteins_path data/scope40_foldseek_compatible/proteins_train.pt \
+                --proteins_path data/scope40_foldseek_compatible/proteins_vc_train.pt \
                 --embeddings_path null \
-                --save_dir results/scope40_foldseek_compatible/basic_embed_dim2 \
-                --concepts_dir data/scope40_foldseek_compatible/concepts_train \
+                --save_dir results/scope40_foldseek_compatible/basic_embed_dim2_vc \
+                --concepts_dir data/scope40_foldseek_compatible/concepts_vc_train \
                 --concept $CONCEPT \
                 --embedding_method $EMBEDDING_METHOD \
                 --encoder_type $ENCODER_TYPE \

@@ -319,6 +319,141 @@ def residue_angles_0(structure: AtomArray, residue_coordinates: torch.Tensor) ->
     return residue_angles_(structure, residue_coordinates, num_neighbs=0)
 
 
+@register_concept(concept_level='residue', concept_type='regression', output_dim=1)
+def bond_angles_basic(structure: AtomArray, residue_coordinates: torch.Tensor) -> torch.Tensor:
+    """
+    Cosine of the bond angle, as single-variate, non-triplet
+    """
+    residue_bond_angle = residue_angles_(structure, residue_coordinates, num_neighbs=0)
+    num_residues = len(residue_bond_angle) + 2
+    assert residue_bond_angle.shape == (num_residues-2, 1)
+    residue_bond_angle_ = torch.full((num_residues,), torch.nan)
+    residue_bond_angle_[1:-1] = residue_bond_angle.squeeze(dim=1)
+    return residue_bond_angle_
+
+
+@register_concept(concept_level='residue', concept_type='regression', output_dim=1)
+def foldseek_distance() -> None:
+    """
+    This is pre-computed from Foldseek. Just reigster the concept here.
+    """
+    pass
+
+
+@register_concept(concept_level='residue', concept_type='regression', output_dim=1)
+def foldseek_near_seqdist() -> None:
+    """
+    This is pre-computed from Foldseek. Just reigster the concept here.
+    """
+    pass
+
+
+@register_concept(concept_level='residue', concept_type='regression', output_dim=1)
+def foldseek_log_seqdist() -> None:
+    """
+    This is pre-computed from Foldseek. Just reigster the concept here.
+    """
+    pass
+
+
+def residue_seqdist_(
+    structure: AtomArray | None = None, 
+    residue_coordinates: torch.Tensor | None = None, 
+    num_neighbs: int = None,
+) -> torch.Tensor:
+    """
+    """
+
+    # Get alpha carbon residue coordinates
+    if residue_coordinates is None:
+        residue_coordinates = get_residue_coordinates(structure=structure)[:, 1, :]
+    else:
+        residue_coordinates = residue_coordinates[:, 1, :]
+    num_residues = residue_coordinates.size(0)
+    assert residue_coordinates.shape == (num_residues, 3)
+
+
+    # Compute pairwise distances
+    distances = torch.cdist(residue_coordinates, residue_coordinates, p=2, compute_mode='donot_use_mm_for_euclid_dist')
+
+    # no pairing with first or last residue
+    distances[:, 0] = float('inf')
+    # distances[0, :] = float('inf')
+    distances[:, -1] = float('inf')
+    # distances[-1, :] = float('inf')
+
+    # Get argsort indices for the residues in order of distance away
+
+    indices = torch.argsort(distances, dim=1)
+    assert indices.shape == (num_residues, num_residues), indices.shape
+
+    # closest residue is self
+    # assert all(indices[:,0] == torch.arange(len(indices))) # itself is the closest
+
+    # exclude self
+    indices_top = indices[:,1:num_neighbs+1]
+
+    seq_dist = indices_top - torch.range(start=0, end=num_residues-1, step=1, dtype=torch.int).unsqueeze(1)
+
+    if indices_top.shape[1] < num_neighbs:
+        print(f"Warning: num_neighbs = {num_neighbs} but protein has {num_residues} residues.")
+        assert seq_dist.shape == (num_residues, num_residues-1)
+        seq_dist = torch.cat((seq_dist, torch.empty(num_residues, num_neighbs-num_residues+1) * torch.nan), dim=1)
+
+    return seq_dist
+
+
+@register_concept(concept_level='residue_multivariate', concept_type='regression', output_dim=8)
+def residue_seqdist_8(structure: AtomArray, residue_coordinates: torch.Tensor) -> torch.Tensor:
+    return residue_seqdist_(structure, residue_coordinates, num_neighbs=8).to(torch.float32)
+
+
+@register_concept(concept_level='residue_multivariate', concept_type='regression', output_dim=5)
+def residue_seqdist_5(structure: AtomArray, residue_coordinates: torch.Tensor) -> torch.Tensor:
+    return residue_seqdist_(structure, residue_coordinates, num_neighbs=5).to(torch.float32)
+
+
+@register_concept(concept_level='residue_multivariate', concept_type='regression', output_dim=1)
+def residue_seqdist_1(structure: AtomArray, residue_coordinates: torch.Tensor) -> torch.Tensor:
+    return residue_seqdist_(structure, residue_coordinates, num_neighbs=1).to(torch.float32)
+
+
+def residue_logseqdist_(
+    structure: AtomArray | None = None, 
+    residue_coordinates: torch.Tensor | None = None, 
+    num_neighbs: int = None,
+) -> torch.Tensor:
+
+    seq_dist = residue_seqdist_(structure, residue_coordinates, num_neighbs)
+    seq_dist = torch.sign(seq_dist) * torch.log(torch.abs(seq_dist) + 1)
+    
+    # valid_mask = torch.full((len(residue_coordinates),), True)
+    # valid_mask[0] = False
+    # valid_mask[-1] = False
+    # from pp3.utils.foldseek_parsers import find_nearest_residues
+    # partner_idx = find_nearest_residues(residue_coordinates.numpy(), valid_mask.numpy())
+    # seq_dist = (partner_idx - np.arange(len(partner_idx)))
+    # seq_dist = torch.tensor(seq_dist, dtype=torch.float32)
+    # seq_dist = torch.sign(seq_dist) * torch.log(torch.abs(seq_dist) + 1)
+
+    return seq_dist
+
+
+@register_concept(concept_level='residue_multivariate', concept_type='regression', output_dim=8)
+def residue_logseqdist_8(structure: AtomArray, residue_coordinates: torch.Tensor) -> torch.Tensor:
+    return residue_logseqdist_(structure, residue_coordinates, num_neighbs=8)
+
+
+@register_concept(concept_level='residue_multivariate', concept_type='regression', output_dim=5)
+def residue_logseqdist_5(structure: AtomArray, residue_coordinates: torch.Tensor) -> torch.Tensor:
+    return residue_logseqdist_(structure, residue_coordinates, num_neighbs=5)
+
+
+@register_concept(concept_level='residue_multivariate', concept_type='regression', output_dim=1)
+def residue_logseqdist_1(structure: AtomArray, residue_coordinates: torch.Tensor) -> torch.Tensor:
+    return residue_logseqdist_(structure, residue_coordinates, num_neighbs=1)
+
+
 @register_concept(concept_level='residue_quadruplet_1', concept_type='regression', output_dim=1)
 def dihedral_angles(structure: AtomArray, residue_distance: int = 1) -> torch.Tensor:
     """Get the dihedral angles between residue quadruplets.

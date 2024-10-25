@@ -113,6 +113,72 @@ def get_atom_coordinates(chain, verbose=False, full_backbone=False, raise_error=
     return coords, valid_mask
 
 
+def distance_matrix(a, b):
+    return np.sqrt(np.sum((a[:, np.newaxis, :] - b[np.newaxis, :, :])**2, axis=-1))
+    # ab = a.dot(b.T)
+    # a2 = np.square(a).sum(axis=1)
+    # b2 = np.square(b).sum(axis=1)
+    # d = np.sqrt(-2 * ab  + a2[:, np.newaxis] + b2)
+    # return d
+
+
+def find_nearest_residues(coords, valid_mask, k=1, return_dist=False,
+                          min_seq_dist=1, fall_back_dist=10):
+    """
+    MODIFIED: Reading from a (num_res, 3, 3) shape coords
+    Find indices of k-th nearest neighbors,
+    by comparing distances between C_betas.
+    """
+    assert not np.isnan(coords[valid_mask, 1, :]).any()
+    dist = distance_matrix(coords[:, 1, :], coords[:, 1, :])  # distance between C betas
+
+    # remove zeros on diagonal
+    dist[np.identity(dist.shape[0], dtype=np.bool)] = np.inf
+
+    # dont match invalid residues
+    dist[~valid_mask, :] = np.inf
+    dist[:, ~valid_mask] = np.inf
+
+    # no pairing with first or last residue
+    dist[:, 0] = np.inf
+    dist[0, :] = np.inf
+    dist[:, -1] = np.inf
+    dist[-1, :] = np.inf
+
+    if min_seq_dist != 1 and min_seq_dist is not None:
+        # Restrict possible residue pairs to those which
+        # have atleast (min_seq_dist - 1) residues between them.
+        # Unless the resulting pair is more than fall_back_dist
+        # (measured between CBs) away.
+        n = dist.shape[0]
+
+        # indices without restriction
+        j_no_min_seq = dist.argmin(axis=0)
+
+        # mask all residues closer than min_seq_dist
+        for k in range(- min_seq_dist + 1, min_seq_dist):
+            i, j = np.where(np.eye(n, k=k))
+            dist[i, j] = np.inf
+
+        j = dist.argmin(axis=0)
+        fall_back_mask = dist.min(axis=0) >= fall_back_dist
+
+        # If no pairs within fall_back_dist found, lift restriction.
+        j[fall_back_mask] = j_no_min_seq[fall_back_mask]
+
+    else:
+        while k > 1:  # find the k-th nearest neighbor
+            j = dist.argmin(axis=0)
+            dist[j, np.arange(dist.shape[0])] = np.inf
+            k = k - 1
+
+        j = dist.argmin(axis=0)
+
+    if return_dist:
+        return j, dist[j, np.arange(dist.shape[0])]
+    else:
+        return j
+
 
 def get_coords_from_pdb(path, full_backbone=False):
     """
@@ -146,3 +212,42 @@ def get_coords_from_pdb(path, full_backbone=False):
 
     return coords, valid_mask, sequence
 
+
+def move_CB(coords, c_alpha_beta_distance_scale=1, virt_cb=None):
+
+    # replace CB coordinates with position along CA-CB vector
+    if c_alpha_beta_distance_scale != 1 and virt_cb is None:
+        ca = coords[:, 0:3]
+        cb = coords[:, 3:6]
+        coords[:, 3:6] = (cb - ca) * c_alpha_beta_distance_scale + ca
+
+    # instead of CB use point defined by two angles and a distance
+    if virt_cb is not None:
+        alpha, beta, d = virt_cb
+
+        alpha = np.radians(alpha)
+        beta = np.radians(beta)
+
+        ca = coords[:, 0:3]
+        cb = coords[:, 3:6]
+        n_atm = coords[:, 6:9]
+        co_atm = coords[:, 9:12]
+
+        v = cb - ca
+
+        # normal angle (between CA-N and CA-VIRT)
+        a = cb - ca
+        b = n_atm - ca
+        k = np.cross(a, b) / np.linalg.norm(np.cross(a, b), axis=1, keepdims=1)
+
+        # Rodrigues rotation formula
+        v = v * np.cos(alpha) + np.cross(k, v) * np.sin(alpha) + \
+            k * (k * v).sum(axis=1, keepdims=1) * (1 - np.cos(alpha))
+
+        # dihedral angle (axis: CA-N, CO, VIRT)
+        k = (n_atm - ca) / np.linalg.norm(n_atm - ca, axis=1, keepdims=1)
+        v = v * np.cos(beta) + np.cross(k, v) * np.sin(beta) + \
+            k * (k * v).sum(axis=1, keepdims=1) * (1 - np.cos(beta))
+
+        coords[:, 3:6] = ca + v * d
+    return coords

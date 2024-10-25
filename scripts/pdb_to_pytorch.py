@@ -86,6 +86,7 @@ def convert_pdb_to_pytorch_foldseek_style(
     domain_start: int | None = None,
     domain_end: int | None = None,
     discard_discontinuous_backbone: bool = True,
+    virt_cb: tuple | None = None,
 ) -> dict[str, torch.Tensor | str] | None:
 
     assert one_chain_only, "one_chain_only must be true for Folseek compatibility"
@@ -98,6 +99,7 @@ def convert_pdb_to_pytorch_foldseek_style(
     # Get the CA, CB, N, C coordinates
     try:
         coords, valid_mask, sequence = foldseek_parsers.get_coords_from_pdb(pdb_path, full_backbone=True)
+        foldseek_parsers.move_CB(coords, virt_cb=virt_cb) # coords of CB moved in-place
     except (FileNotFoundError, ValueError, TypeError, KeyError) as e:
         # KeyError: presumably for indexing invalid 3-letter residue for sequence
         return {'error': repr(e)}
@@ -117,6 +119,10 @@ def convert_pdb_to_pytorch_foldseek_style(
     residue_coordinates[:, 0, :] = coords[:, 6:9] # N
     residue_coordinates[:, 1, :] = coords[:, 0:3] # CA
     residue_coordinates[:, 2, :] = coords[:, 9:12] # C
+
+    if virt_cb is not None:
+        # Use virtual centre position instead of CA
+        residue_coordinates[:, 1, :] = coords[:, 3:6]
 
     # Return dictionary containing structure and sequence
     return {
@@ -205,6 +211,7 @@ def pdb_to_pytorch(
     max_protein_length: int | None = MAX_SEQ_LEN,
     load_mode: Literal['default', 'scop'] = 'default',
     parse_mode: Literal['default', 'foldseek'] = 'default',
+    virt_cb: tuple | None = None,
 ) -> None:
     """Parses PDB files and saves coordinates and sequence in PyTorch format while removing invalid structures.
 
@@ -218,6 +225,11 @@ def pdb_to_pytorch(
         'default' does strict structure checking
         'foldseek' is more permissive and the same pipeline as Foldseek
     """
+
+    if virt_cb is not None:
+        assert len(virt_cb) == 3, "Invalid virtual centre spec."
+        virt_cb = (int(virt_cb[0]), int(virt_cb[1]), int(virt_cb[2]))
+        print(f"Virtual centre at: {virt_cb}")
 
     # Load PDB IDs
     print(f"{ids_path=}")
@@ -261,6 +273,8 @@ def pdb_to_pytorch(
     if parse_mode == 'default':
         print("Running default pdb_to_pytorch!")
 
+        assert virt_cb is None, "virtual centre not supported for default parse mode."
+
         # Set up conversion function
         convert_pdb_to_pytorch_fn = partial(
             convert_pdb_to_pytorch,
@@ -298,6 +312,7 @@ def pdb_to_pytorch(
             one_chain_only=True, 
             first_chain_only=True, 
             discard_discontinuous_backbone=False,
+            virt_cb=virt_cb,
         )
 
         with Pool() as pool:
@@ -309,13 +324,7 @@ def pdb_to_pytorch(
 
         # Non-multithreaded version, since above is mysteriously hanging
         # for pdb_id, pdb_path in tqdm(zip(pdb_ids, pdb_paths), total=len(pdb_ids)):
-        #     protein = convert_pdb_to_pytorch_foldseek_style(
-        #         pdb_path,
-        #         max_protein_length=max_protein_length, 
-        #         one_chain_only=True, 
-        #         first_chain_only=True, 
-        #         discard_discontinuous_backbone=False,
-        #     )
+        #     protein = convert_pdb_to_pytorch_fn(pdb_path)
         #     if 'error' in protein:
         #         error_counter[protein['error']] += 1
         #     else:
@@ -355,12 +364,13 @@ if __name__ == '__main__':
     """
     e.g.
 
-    python pdb_to_pytorch.py \
-        --ids_path data/scope40_foldseek_compatible/pdbs_train.txt \
-        --pdb_dir /oak/stanford/groups/jamesz/shiye/scope40 \
-        --proteins_save_path data/scope40_foldseek_compatible/proteins_train.pt \
-        --ids_save_path data/scope40_foldseek_compatible/valid_pdb_ids_train.csv 
-        --load_mode scop
-        --parse_mode foldseek
+    python scripts/pdb_to_pytorch.py \
+        --ids_path data/scope40_foldseek_compatible/pdb_ids_train.txt \
+        --pdb_dir /scratch/groups/jamesz/shiye/scope40 \
+        --proteins_save_path data/scope40_foldseek_compatible/proteins_train_cb.pt \
+        --ids_save_path data/scope40_foldseek_compatible/valid_pdb_ids_train_cb.csv \
+        --load_mode scop \
+        --parse_mode foldseek \
+        --virt_cb 270 0 2
 
     """
