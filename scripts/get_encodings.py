@@ -17,10 +17,13 @@ from pp3.models.model import Model
 def get_data(
     proteins_path: Path,
     concept: str,
-    concepts_dir: Path, # not used
+    concepts_dir: Path,
     batch_size: int,
     num_workers: int = 4,
 ):
+"""
+Concept values are not needed (concepts_dir = None) to get the encodings, but can be loaded to validate performance.
+"""
 
     # Load PDB ID to protein dictionary with sequence and structure
     pdb_id_to_proteins: dict[str, dict[str, torch.Tensor | str]] = torch.load(proteins_path)
@@ -38,22 +41,25 @@ def get_data(
     pdb_id_to_coordinates = {k: v["structure"] for k, v in pdb_id_to_proteins.items()}
 
     # Load PDB ID to concept value dictionary
-    # We won't need this to get the encodings, but should compute and check the performance on these in future.
-    # pdb_id_to_concept_value: dict[str, torch.Tensor | float] = torch.load(concepts_dir / f'{self.concept}.pt')
-    # for now, use dummy concept tensors
-    print(f"{get_concept_level(concept)=}")
-    if get_concept_level(concept) == 'residue_multivariate':
-        pdb_id_to_concept_value: dict[str, torch.Tensor | float] = {
-            pdb_id: torch.zeros((len(pdb_id_to_embeddings[pdb_id]), 1)) for pdb_id in pdb_ids
-        }
-    elif get_concept_level(concept) == 'residue_pair':
-        pdb_id_to_concept_value: dict[str, torch.Tensor | float] = {
-            pdb_id: torch.zeros((len(pdb_id_to_embeddings[pdb_id]), len(pdb_id_to_embeddings[pdb_id]))) for pdb_id in pdb_ids
-        }
-    else:
-        pdb_id_to_concept_value: dict[str, torch.Tensor | float] = {
-            pdb_id: torch.zeros((len(pdb_id_to_embeddings[pdb_id]),)) for pdb_id in pdb_ids
-        }
+    if concepts_dir is not None:
+        pdb_id_to_concept_value: dict[str, torch.Tensor | float] = torch.load(concepts_dir / f'{concept}.pt')
+    
+    if concepts_dir is None:
+        # Use dummy tensors for pdb_id_to_concept_value
+        print(f"{get_concept_level(concept)=}")
+        if get_concept_level(concept) == 'residue_multivariate':
+            pdb_id_to_concept_value: dict[str, torch.Tensor | float] = {
+                pdb_id: torch.full((len(pdb_id_to_embeddings[pdb_id]), 1), torch.nan) for pdb_id in pdb_ids
+            }
+        elif get_concept_level(concept) == 'residue_pair':
+            pdb_id_to_concept_value: dict[str, torch.Tensor | float] = {
+                pdb_id: torch.full((len(pdb_id_to_embeddings[pdb_id]), len(pdb_id_to_embeddings[pdb_id])), torch.nan) 
+                for pdb_id in pdb_ids
+            }
+        else:
+            pdb_id_to_concept_value: dict[str, torch.Tensor | float] = {
+                pdb_id: torch.full((len(pdb_id_to_embeddings[pdb_id]),), torch.nan) for pdb_id in pdb_ids
+            }
 
     # Ensure that the PDB IDs are the same across dictionaries
     assert set(pdb_id_to_proteins) == set(pdb_id_to_embeddings) == set(pdb_id_to_concept_value)
