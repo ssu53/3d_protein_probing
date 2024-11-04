@@ -1,0 +1,73 @@
+#!/bin/bash
+#
+#SBATCH --job-name=embed_for_retrieval
+#
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --gpus=1
+#SBATCH --constraint=GPU_SKU:RTX_2080Ti|GPU_SKU:TITAN_V|GPU_SKU:TITAN_Xp
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=4G
+#SBATCH --array=0-10%1
+#SBATCH --partition=jamesz
+#SBATCH --output=/home/groups/jamesz/shiye/3d_protein_probing/slurm_output/embed/%x.%j.%a.out
+#SBATCH --error=/home/groups/jamesz/shiye/3d_protein_probing/slurm_error/embed/%x.%j.%a.err
+#SBATCH --time=5:00:00
+#SBATCH --mail-type=END,FAIL
+#SBATCH --mail-user=shiye@stanford.edu
+
+echo "SLURM_JOBID="$SLURM_JOBID
+echo "SLURM_JOB_NAME="$SLURM_JOB_NAME
+echo "SLURM_JOB_NODELIST"=$SLURM_JOB_NODELIST
+echo "SLURM_NNODES"=$SLURM_NNODES
+echo "SLURMTMPDIR="$SLURMTMPDIR
+echo "working directory="$SLURM_SUBMIT_DIR
+
+source /home/users/shiye/.bashrc
+
+conda activate 3d_protein_probing
+
+cd /home/groups/jamesz/shiye/3d_protein_probing
+
+PROJECT_NAME=embed_for_retrieval
+
+experiments=()
+
+
+for LR in 1e-4, 1e-3, 1e-2
+do
+
+    for BATCH_SIZE in 32
+    do
+
+        for TEMPERATURE in 1, 1e-1, 1e-2
+        do
+
+            no_interaction="python scripts/embed_for_retrieval.py \
+                --project_name $PROJECT_NAME \
+                --save_dir results/embed_for_retrieval \
+                --embeddings_path /home/groups/jamesz/shiye/3d_protein_probing/data/embed_for_retrieval/encodings/encodings_aa_onehot_v6.pt \
+                --num_layers 3 \
+                --num_heads 2 \
+                --learning_rate $LR \
+                --temperature $TEMPERATURE \
+                --batch_size $BATCH_SIZE \
+                --max_epochs 10 \
+                # --similarity_func euclidean \
+                # --run_name_suffix euclidean \
+                --run_id_number $SLURM_ARRAY_TASK_ID \
+                --entity ssu53"
+            interaction="${no_interaction} --interaction_model transformer"
+            experiments+=("$no_interaction" "$interaction")
+        done
+    done
+done
+
+command=${experiments[SLURM_ARRAY_TASK_ID]}
+echo "Task ID = $SLURM_ARRAY_TASK_ID"
+echo "Number of experiments = ${#experiments[@]}"
+echo "$command"
+eval "$command"
+
+echo "Done"
+exit 0
