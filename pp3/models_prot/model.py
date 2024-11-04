@@ -105,6 +105,8 @@ class ModelProt(pl.LightningModule):
             similarity = nn.functional.cosine_similarity(feats[0], feats[1:], dim=-1)
         if self.similarity_func == 'euclidean':
             similarity = torch.sqrt(torch.sum(torch.square(feats[0] - feats[1:]), dim=-1))
+            similarity = -similarity
+            # similarity = 1. / similarity
         # print(similarity)
                 
         # InfoNCE loss
@@ -123,7 +125,7 @@ class ModelProt(pl.LightningModule):
 
 
     def training_step(self, batch, batch_idx):
-        # for name, param in self.encoder.named_parameters(x):
+        # for name, param in self.encoder.named_parameters():
             # print(torch.isfinite(param).all().item(), torch.isfinite(param.grad).all().item() if param.grad is not None else "none", name)
         loss = self.info_nce_loss(batch, mode='train')
         self.log('train_loss', loss)
