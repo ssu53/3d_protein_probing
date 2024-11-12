@@ -37,6 +37,7 @@ class ModelProt(pl.LightningModule):
         temperature: float = 1e-1,
         weight_decay: float = 0.0,
         similarity_func: Literal['cosine','euclidean'] = 'cosine',
+        loss_func: Literal['l1','infonce'] = 'l1',
     ):
         """
         :param num_channels: number of dimensions of the residue-level embedding
@@ -70,6 +71,15 @@ class ModelProt(pl.LightningModule):
         self.temperature = temperature
         self.weight_decay = weight_decay
         self.similarity_func = similarity_func
+        self.loss_func = loss_func
+
+        if loss_func == 'infonce': 
+            self.loss_function = self.info_nce_loss
+        elif loss_func == 'l1':
+            assert similarity_func == 'cosine'
+            self.loss_function = self.l1_loss
+        else:
+            raise NotImplementedError
 
 
     def configure_optimizers(self) -> dict[str, torch.optim.Optimizer | ReduceLROnPlateau | str]:
@@ -88,7 +98,7 @@ class ModelProt(pl.LightningModule):
 
     def info_nce_loss(self, batch, mode, log_rank_metrics=True):
         """
-        Recall that embeddings are packed such that the first two form a positive pair
+        Batch should be packed such that the first two form a positive pair
         and the remaining are negative examples
         """
 
@@ -124,15 +134,35 @@ class ModelProt(pl.LightningModule):
         return nll
 
 
+    def l1_loss(self, batch, mode):
+        """
+        Batch should be packed such that the first half and second half of the batch
+        are pairs with targets
+        """
+
+        pdb_ids, embeddings, padding_mask, targets = batch
+        num_pairs = len(targets)
+
+        # Encode each protein
+        feats = self.encoder(x=embeddings, pad_mask=padding_mask,)
+        assert len(feats) % 2 == 0
+        assert len(feats) // 2 == num_pairs
+        
+        similarity = nn.functional.cosine_similarity(feats[:num_pairs], feats[num_pairs:], dim=-1)
+        loss = nn.functional.l1_loss(similarity, targets)
+
+        return loss
+
+
     def training_step(self, batch, batch_idx):
         # for name, param in self.encoder.named_parameters():
             # print(torch.isfinite(param).all().item(), torch.isfinite(param.grad).all().item() if param.grad is not None else "none", name)
-        loss = self.info_nce_loss(batch, mode='train')
+        loss = self.loss_function(batch, mode='train')
         self.log('train_loss', loss)
         return loss
     
     def validation_step(self, batch, batch_idx):
-        loss = self.info_nce_loss(batch, mode='val')
+        loss = self.loss_function(batch, mode='val')
         self.log('val_loss', loss)
         return loss
 

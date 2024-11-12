@@ -94,12 +94,44 @@ def collate_fn_paired_pos(
 
 
 
+def collate_fn_supervised_pairs(
+    batch: list[tuple[str, str, torch.Tensor, torch.Tensor]],
+):
+    """
+    """
+
+    pdb_ids_1, pdb_ids_2, embeddings_1, embeddings_2, targets = zip(*batch)
+
+    pdb_ids = [
+        *pdb_ids_1,
+        *pdb_ids_2,
+    ]
+    
+    embeddings = [
+        *embeddings_1,
+        *embeddings_2,
+    ]
+
+    targets = torch.tensor(targets, dtype=torch.float32)
+
+    lengths = [embedding.shape[0] for embedding in embeddings]
+    max_seq_len = max(lengths)
+    valid_positions = torch.tensor([[1] * length + [0] * (max_seq_len - length) for length in lengths])
+    padding_mask = ~valid_positions.bool() # True where padding token
+    embeddings = torch.nn.utils.rnn.pad_sequence(embeddings, batch_first=True)
+
+    return pdb_ids, embeddings, padding_mask, targets
+
+
+
+
 class ProteinPairDataset(Dataset):
 
     def __init__(
             self,
             pdb_ids_1: list[str],
             pdb_ids_2: list[str],
+            targets: list[float],
             pdb_id_to_embeddings: dict[str, torch.Tensor],
     ) -> None:
 
@@ -107,6 +139,7 @@ class ProteinPairDataset(Dataset):
 
         self.pdb_ids_1 = pdb_ids_1
         self.pdb_ids_2 = pdb_ids_2
+        self.targets = targets
         self.pdb_id_to_embeddings = pdb_id_to_embeddings
 
         self.rng = np.random.default_rng(seed=0)
@@ -132,12 +165,16 @@ class ProteinPairDataset(Dataset):
 
         pdb_id_1 = self.pdb_ids_1[index]
         pdb_id_2 = self.pdb_ids_2[index]
+        if self.targets is not None:
+            target = self.targets[index]
 
         embedding_1 = self.pdb_id_to_embeddings[pdb_id_1]
         embedding_2 = self.pdb_id_to_embeddings[pdb_id_2]
 
-        return pdb_id_1, pdb_id_2, embedding_1, embedding_2
-    
+        if self.targets is None:
+            return pdb_id_1, pdb_id_2, embedding_1, embedding_2
+        else:
+            return pdb_id_1, pdb_id_2, embedding_1, embedding_2, target
 
 
 class ProteinPairDataModule(pl.LightningDataModule):
@@ -149,6 +186,7 @@ class ProteinPairDataModule(pl.LightningDataModule):
         pdb_ids_val_path: Path,
         pairfile_train_path: Path,
         pairfile_val_path: Path,
+        is_supervised: bool,
         batch_size: int,
         num_workers: int = 4,
     ) -> None:
@@ -162,6 +200,7 @@ class ProteinPairDataModule(pl.LightningDataModule):
         self.pdb_ids_val_path = pdb_ids_val_path
         self.pairfile_train_path = pairfile_train_path
         self.pairfile_val_path = pairfile_val_path
+        self.is_supervised = is_supervised
         self.batch_size = batch_size
         self.num_workers = num_workers
 
@@ -187,6 +226,7 @@ class ProteinPairDataModule(pl.LightningDataModule):
         self.train_dataset = ProteinPairDataset(
             pdb_ids_1=pairfile_train[0].tolist(),
             pdb_ids_2=pairfile_train[1].tolist(),
+            targets=pairfile_train[2].tolist() if self.is_supervised else None,
             pdb_id_to_embeddings=self.pdb_id_to_embeddings,
         )
         print(f'Train dataset size: {len(self.train_dataset):,}')
@@ -196,6 +236,7 @@ class ProteinPairDataModule(pl.LightningDataModule):
         self.val_dataset = ProteinPairDataset(
             pdb_ids_1=pairfile_val[0].tolist(),
             pdb_ids_2=pairfile_val[1].tolist(),
+            targets=pairfile_val[2].tolist() if self.is_supervised else None,
             pdb_id_to_embeddings=self.pdb_id_to_embeddings,
         )
         print(f'Val dataset size: {len(self.val_dataset):,}')
@@ -205,33 +246,51 @@ class ProteinPairDataModule(pl.LightningDataModule):
 
     def train_dataloader(self) -> DataLoader:
         """Get the train data loader."""
-        return DataLoader(
-            dataset=self.train_dataset,
-            batch_size=1,  # one positive pair per batch
-            shuffle=True,
-            num_workers=self.num_workers,
-            collate_fn=partial(
-                collate_fn_single_pos, 
-                num_negatives=self.batch_size-2, 
-                pdb_ids=self.pdb_ids_train, 
-                pdb_id_to_embeddings=self.pdb_id_to_embeddings,
-            ),
-        )
+        if self.is_supervised:
+            return DataLoader(
+                dataset=self.train_dataset,
+                batch_size=self.batch_size,
+                shuffle=True,
+                num_workers=self.num_workers,
+                collate_fn=collate_fn_supervised_pairs,
+            )
+        else:
+            return DataLoader(
+                dataset=self.train_dataset,
+                batch_size=1,  # one positive pair per batch
+                shuffle=True,
+                num_workers=self.num_workers,
+                collate_fn=partial(
+                    collate_fn_single_pos, 
+                    num_negatives=self.batch_size-2, 
+                    pdb_ids=self.pdb_ids_train, 
+                    pdb_id_to_embeddings=self.pdb_id_to_embeddings,
+                ),
+            )
 
     def val_dataloader(self) -> DataLoader:
         """Get the validation data loader."""
-        return DataLoader(
-            dataset=self.val_dataset,
-            batch_size=1,  # one positive pair per batch
-            shuffle=False,
-            num_workers=self.num_workers,
-            collate_fn=partial(
-                collate_fn_single_pos, 
-                num_negatives=self.batch_size-2, 
-                pdb_ids=self.pdb_ids_val, 
-                pdb_id_to_embeddings=self.pdb_id_to_embeddings,
-            ),
-        )
+        if self.is_supervised:
+            return DataLoader(
+                dataset=self.val_dataset,
+                batch_size=self.batch_size,
+                shuffle=False,
+                num_workers=self.num_workers,
+                collate_fn=collate_fn_supervised_pairs,
+            )
+        else:
+            return DataLoader(
+                dataset=self.val_dataset,
+                batch_size=1,  # one positive pair per batch
+                shuffle=False,
+                num_workers=self.num_workers,
+                collate_fn=partial(
+                    collate_fn_single_pos, 
+                    num_negatives=self.batch_size-2, 
+                    pdb_ids=self.pdb_ids_val, 
+                    pdb_id_to_embeddings=self.pdb_id_to_embeddings,
+                ),
+            )
 
 
     @property
@@ -374,3 +433,36 @@ def test():
 
 
     # %%
+
+
+def test():
+
+    import pp3.models_prot.default_paths as default_paths
+
+    embeddings_path = '/home/groups/jamesz/shiye/3d_protein_probing/data/embed_for_retrieval/encodings/encodings_aa_onehot_v6.pt'
+    valid_pdb_ids_train_path = default_paths.get_valid_pdb_ids_train_path()
+    valid_pdb_ids_val_path = default_paths.get_valid_pdb_ids_val_path()
+    pairfile_train_path = default_paths.get_tmaln_data_train_path() 
+    pairfile_val_path = default_paths.get_tmaln_data_val_path()
+
+    data_module = ProteinPairDataModule(
+        embeddings_path=embeddings_path,
+        pdb_ids_train_path=valid_pdb_ids_train_path,
+        pdb_ids_val_path=valid_pdb_ids_val_path,
+        pairfile_train_path=pairfile_train_path,
+        pairfile_val_path=pairfile_val_path,
+        is_supervised=True,
+        batch_size=16,
+        num_workers=0,
+    )
+    data_module.setup()
+    
+    for batch in data_module.train_dataloader():
+        pdb_ids, embeddings, padding_mask, targets = batch
+        break
+    
+    print(len(pdb_ids))
+    print(embeddings.shape)
+    print(padding_mask.shape)
+    print(targets.shape)
+# %%

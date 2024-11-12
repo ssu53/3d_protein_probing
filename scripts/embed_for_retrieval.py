@@ -3,9 +3,7 @@ from pathlib import Path
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import EarlyStopping, LearningRateMonitor, ModelCheckpoint
 
-from pp3.models_prot.default_paths import (
-    get_valid_pdb_ids_train_path, get_valid_pdb_ids_val_path, get_pairfile_train_path, get_pairfile_val_path
-)
+import pp3.models_prot.default_paths as default_paths
 from pp3.models_prot.data import ProteinPairDataModule
 from pp3.models_prot.model import ModelProt
 
@@ -23,6 +21,7 @@ def embed_for_retrieval(
     pairfile_val_path: Path | None = None,
     temperature: float = 1e-1,
     similarity_func: str = 'cosine',
+    loss_func: str = 'infonce',
     learning_rate: float = 1e-4,
     dropout: float = 0.0,
     weight_decay: float = 0.0,
@@ -43,7 +42,11 @@ def embed_for_retrieval(
 
     # Create save directory
     embeddings_name = str(embeddings_path).split('/')[-1].replace('.pt','')
-    run_name = f'{embeddings_name}_{num_layers}L_{learning_rate}lr_{batch_size}bs_{temperature}temp'
+    if loss_func != 'infonce':
+        print("Ignoring temperature!")
+        run_name = f'{embeddings_name}_{loss_func}_{num_layers}L_{learning_rate}lr_{batch_size}bs'
+    else:
+        run_name = f'{embeddings_name}_{loss_func}_{num_layers}L_{learning_rate}lr_{batch_size}bs_{temperature}temp'
     if run_name_suffix:
         run_name += f'_{run_name_suffix}'
 
@@ -53,13 +56,19 @@ def embed_for_retrieval(
 
     # Get default paths
     if valid_pdb_ids_train_path is None:
-        valid_pdb_ids_train_path = get_valid_pdb_ids_train_path()
+        valid_pdb_ids_train_path = default_paths.get_valid_pdb_ids_train_path()
     if valid_pdb_ids_val_path is None:
-        valid_pdb_ids_val_path = get_valid_pdb_ids_val_path()
+        valid_pdb_ids_val_path = default_paths.get_valid_pdb_ids_val_path()
     if pairfile_train_path is None:
-        pairfile_train_path = get_pairfile_train_path()
+        if loss_func == 'infonce': 
+            pairfile_train_path = default_paths.get_pairfile_train_path() # contrastive
+        else:
+            pairfile_train_path = default_paths.get_tmaln_data_train_path() # supervised
     if pairfile_val_path is None:
-        pairfile_val_path = get_pairfile_val_path()
+        if loss_func == 'infonce': 
+            pairfile_val_path = default_paths.get_pairfile_val_path() # contrastive
+        else: 
+            pairfile_val_path = default_paths.get_tmaln_data_val_path() # supervised
 
 
     # Random seed
@@ -72,6 +81,7 @@ def embed_for_retrieval(
         pdb_ids_val_path=valid_pdb_ids_val_path,
         pairfile_train_path=pairfile_train_path,
         pairfile_val_path=pairfile_val_path,
+        is_supervised=loss_func!='infonce',
         batch_size=batch_size,
         num_workers=num_workers,
     )
@@ -88,6 +98,7 @@ def embed_for_retrieval(
         temperature=temperature,
         weight_decay=weight_decay,
         similarity_func=similarity_func,
+        loss_func=loss_func,
     )
 
     print(model)
@@ -112,6 +123,8 @@ def embed_for_retrieval(
         'save_dir': str(save_dir),
         'num_layers': num_layers,
         'num_heads': num_heads,
+        'similarity_func': similarity_func,
+        'loss_func': loss_func,
         'batch_size': batch_size,
         'learning_rate': learning_rate,
         'temperature': temperature,

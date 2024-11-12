@@ -8,11 +8,11 @@
 #SBATCH --constraint=GPU_SKU:RTX_2080Ti|GPU_SKU:TITAN_V|GPU_SKU:TITAN_Xp
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=4G
-#SBATCH --array=0-10%1
+#SBATCH --array=0-0%1
 #SBATCH --partition=jamesz
 #SBATCH --output=/home/groups/jamesz/shiye/3d_protein_probing/slurm_output/embed/%x.%j.%a.out
 #SBATCH --error=/home/groups/jamesz/shiye/3d_protein_probing/slurm_error/embed/%x.%j.%a.err
-#SBATCH --time=5:00:00
+#SBATCH --time=3:00:00
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=shiye@stanford.edu
 
@@ -34,13 +34,13 @@ PROJECT_NAME=embed_for_retrieval
 experiments=()
 
 
-for LR in 1e-4, 1e-3, 1e-2
+for LR in 1e-4 # 1e-4 1e-3 1e-2
 do
 
     for BATCH_SIZE in 32
     do
 
-        for TEMPERATURE in 1, 1e-1, 1e-2
+        for TEMPERATURE in 1e-1 # 1e-0 1e-1 1e-2
         do
 
             no_interaction="python scripts/embed_for_retrieval.py \
@@ -52,7 +52,8 @@ do
                 --learning_rate $LR \
                 --temperature $TEMPERATURE \
                 --batch_size $BATCH_SIZE \
-                --max_epochs 10 \
+                --max_epochs 50 \
+                --loss_func l1 \
                 # --similarity_func euclidean \
                 # --run_name_suffix euclidean \
                 --run_id_number $SLURM_ARRAY_TASK_ID \
