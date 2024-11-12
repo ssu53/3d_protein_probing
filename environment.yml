@@ -26,6 +26,7 @@ dependencies:
   - pip:
     - e3nn
     - fair-esm
+    - py3Dmol
     - tensorboardX
 #    - torchdrug  # requires python 3.9
     - typed-argument-parser>=1.8.0
