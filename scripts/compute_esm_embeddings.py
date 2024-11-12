@@ -3,6 +3,7 @@ from time import time
 from pathlib import Path
 
 import torch
+import esm
 from esm import Alphabet, BatchConverter, ESM2
 from tqdm import trange
 
@@ -18,7 +19,11 @@ def load_esm_model(
     :return: A tuple of a pretrained ESM2 model and a BatchConverter for preparing protein sequences as input.
     """
     torch.hub.set_dir(hub_dir)
-    model, alphabet = torch.hub.load('facebookresearch/esm:main', esm_model)
+    if esm_model == 'esm2_t33_650M_UR50D':
+        model, alphabet = esm.pretrained.esm2_t33_650M_UR50D()
+    else: 
+        raise NotImplementedError
+        model, alphabet = torch.hub.load('facebookresearch/esm:main', esm_model) # issue with load
     batch_converter = alphabet.get_batch_converter()
     model.eval()
 
@@ -98,3 +103,13 @@ if __name__ == '__main__':
     from tap import tapify
 
     tapify(compute_esm_embeddings)
+
+    """
+    python scripts/compute_esm_embeddings.py \
+        --proteins_path data/scope40_foldseek_compatible/proteins_val.pt \
+        --hub_dir /home/groups/jamesz/shiye/.cache/torch/hub \
+        --esm_model esm2_t33_650M_UR50D \ 
+        --last_layer 33 \
+        --save_path /home/groups/jamesz/shiye/foldseek-analysis/training/data_dev/encodings_esm_val.pt \
+        --batch_size 64 \
+    """

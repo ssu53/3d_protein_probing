@@ -117,10 +117,16 @@ def main():
     root_dir = Path(__file__).parent / '..'
 
     encoding_name = 'encodings_aa_onehot_v6'
-    checkpoint_path = root_dir / f'results/embed_for_retrieval/{encoding_name}_3L_0.0001lr_32bs_0.1temp/epoch=8-step=185481.ckpt'
+    # checkpoint_path = root_dir / f'results/embed_for_retrieval/{encoding_name}_3L_0.0001lr_32bs_0.1temp/epoch=8-step=185481.ckpt'
+    # checkpoint_path = root_dir / f'results/embed_for_retrieval/{encoding_name}_3L_0.0001lr_32bs_0.01temp/epoch=8-step=185481.ckpt'
+    # checkpoint_path = root_dir / f'results/embed_for_retrieval/{encoding_name}_l1_3L_0.0001lr_32bs/epoch=25-step=32994.ckpt'
+    checkpoint_path = root_dir / f'results/embed_for_retrieval/{encoding_name}_l1_3L_0.0001lr_32bs/epoch=49-step=32250.ckpt'
     load_path = root_dir / f'data/embed_for_retrieval/encodings/{encoding_name}.pt'
-    save_path = root_dir / f'data/embed_for_retrieval/encodings_whole_prot/{encoding_name}.pt'
+    save_path = root_dir / f'data/embed_for_retrieval/encodings_whole_prot/{encoding_name}_v5.pt'
 
+    print(f"{checkpoint_path=}")
+    print(f"{load_path=}")
+    print(f"{save_path=}")
 
     # Load residue-level encodings
     pdb_id_to_encodings = torch.load(load_path)
