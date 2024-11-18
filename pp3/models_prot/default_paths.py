@@ -2,6 +2,9 @@ from pathlib import Path
 
 path_local = Path(__file__).parent
 
+def get_proteins_path():
+    return path_local / '../../data/scope40_foldseek_compatible/proteins.pt'
+
 def get_valid_pdb_ids_train_path():
     return path_local / '../../data/embed_for_retrieval/valid_pdb_ids_train.csv'
 

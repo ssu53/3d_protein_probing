@@ -42,20 +42,25 @@ do
 
         for TEMPERATURE in 1e-1 # 1e-0 1e-1 1e-2
         do
-
+            
             no_interaction="python scripts/embed_for_retrieval.py \
                 --project_name $PROJECT_NAME \
-                --save_dir results/embed_for_retrieval \
-                --embeddings_path /home/groups/jamesz/shiye/3d_protein_probing/data/embed_for_retrieval/encodings/encodings_aa_onehot_v6.pt \
-                --num_layers 3 \
+                --save_dir results/embed_for_retrieval_egnn \
+                --embeddings_path /home/groups/jamesz/shiye/3d_protein_probing/data/embed_for_retrieval/encodings/encodings_foldseek_sinusoid.pt \
+                --proteins_path data/scope40_foldseek_compatible/proteins.pt \
+                --preencoder_num_layers 3 \
+                --preencoder_hidden_dim 16 \
+                --preencoder_max_neighbors 24 \
+                --preencoder_noise_std 2.0 \
+                --embedding_dim 32 \
+                --num_layers 2 \
                 --num_heads 2 \
                 --learning_rate $LR \
                 --temperature $TEMPERATURE \
                 --batch_size $BATCH_SIZE \
                 --max_epochs 50 \
                 --loss_func l1 \
-                # --similarity_func euclidean \
-                # --run_name_suffix euclidean \
+                --run_name_suffix egnn_2.0noise \
                 --run_id_number $SLURM_ARRAY_TASK_ID \
                 --entity ssu53"
             interaction="${no_interaction} --interaction_model transformer"

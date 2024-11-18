@@ -12,9 +12,15 @@ from pp3.models_prot.model import ModelProt
 def embed_for_retrieval(
     project_name: str,
     save_dir: Path,
+    preencoder_num_layers: int,
+    preencoder_hidden_dim: int,
+    preencoder_max_neighbors: int,
+    preencoder_noise_std: float,
     num_layers: int,
     num_heads: int,
+    embedding_dim: int,
     embeddings_path: Path,
+    proteins_path: Path,
     valid_pdb_ids_train_path: Path | None = None,
     valid_pdb_ids_val_path: Path | None = None,
     pairfile_train_path: Path | None = None,
@@ -55,6 +61,8 @@ def embed_for_retrieval(
 
 
     # Get default paths
+    if proteins_path is None:
+        proteins_path = default_paths.proteins_path()
     if valid_pdb_ids_train_path is None:
         valid_pdb_ids_train_path = default_paths.get_valid_pdb_ids_train_path()
     if valid_pdb_ids_val_path is None:
@@ -77,6 +85,7 @@ def embed_for_retrieval(
     # Build data module
     data_module = ProteinPairDataModule(
         embeddings_path=embeddings_path,
+        proteins_path=proteins_path,
         pdb_ids_train_path=valid_pdb_ids_train_path,
         pdb_ids_val_path=valid_pdb_ids_val_path,
         pairfile_train_path=pairfile_train_path,
@@ -90,9 +99,14 @@ def embed_for_retrieval(
 
     # Build model
     model = ModelProt(
+        preencoder_num_layers=preencoder_num_layers,
+        preencoder_hidden_dim=preencoder_hidden_dim,
+        preencoder_max_neighbors=preencoder_max_neighbors,
+        preencoder_noise_std=preencoder_noise_std,
         num_layers=num_layers,
         num_heads=num_heads,
-        num_channels=data_module.embedding_dim,
+        input_dim=data_module.embedding_dim,
+        embedding_dim=embedding_dim,
         dropout=dropout,
         learning_rate=learning_rate,
         temperature=temperature,
@@ -116,11 +130,17 @@ def embed_for_retrieval(
     logger.experiment.config.update({
         'project_name': project_name,
         'embeddings_path': str(embeddings_path),
+        'proteins_path': str(proteins_path),
         'valid_pdb_ids_train_path': str(valid_pdb_ids_train_path),
         'valid_pdb_ids_val_path': str(valid_pdb_ids_val_path),
         'pairfile_train_path': str(pairfile_train_path),
         'pairfile_val_path': str(pairfile_val_path),
         'save_dir': str(save_dir),
+        'embedding_dim': embedding_dim,
+        'preencoder_num_layers': preencoder_num_layers,
+        'preencoder_hidden_dim': preencoder_hidden_dim,
+        'preencoder_max_neighbors': preencoder_max_neighbors,
+        'preencoder_noise_std': preencoder_noise_std,
         'num_layers': num_layers,
         'num_heads': num_heads,
         'similarity_func': similarity_func,
@@ -128,6 +148,8 @@ def embed_for_retrieval(
         'batch_size': batch_size,
         'learning_rate': learning_rate,
         'temperature': temperature,
+        'loss_func': loss_func,
+        'similarity_func': similarity_func,
         'weight_decay': weight_decay,
         'dropout': dropout,
         'max_epochs': max_epochs,

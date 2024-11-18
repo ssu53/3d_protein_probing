@@ -14,10 +14,11 @@ import pytorch_lightning as pl
 
 
 def collate_fn_single_pos(
-    batch: list[tuple[str, str, torch.Tensor, torch.Tensor]],
+    batch: list[tuple[str, str, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]],
     num_negatives: int = 16,
     pdb_ids: list[str] = None,
     pdb_id_to_embeddings: dict[str, torch.Tensor] = None,
+    pdb_id_to_coordinates: dict[str, torch.Tensor] = None,
 ):
     """
     :param batch: A batch of items, where each item contains
@@ -31,13 +32,15 @@ def collate_fn_single_pos(
     """
 
     assert len(batch) == 1 # Only one positive pair
-    assert len(batch[0]) == 4
 
-    pdb_id_1, pdb_id_2, embedding_1, embedding_2 = batch[0]
+    pdb_id_1, pdb_id_2, embedding_1, embedding_2, coord_1, coord_2, target = batch[0]
 
+    include_coords = coord_1 is not None
 
     negative_keys = random.sample(pdb_ids, num_negatives)
     negative_embeddings = [pdb_id_to_embeddings[key] for key in negative_keys]
+    if include_coords:
+        negative_coords = [pdb_id_to_coordinates[key] for key in negative_keys]
 
     pdb_ids = [
         pdb_id_1,
@@ -51,28 +54,40 @@ def collate_fn_single_pos(
         *negative_embeddings,
     ]
 
+    if include_coords:
+        coords = [
+            coord_1,
+            coord_2,
+            *negative_coords,
+        ]
+
     lengths = [embedding.shape[0] for embedding in embeddings]
     max_seq_len = max(lengths)
     valid_positions = torch.tensor([[1] * length + [0] * (max_seq_len - length) for length in lengths])
     padding_mask = ~valid_positions.bool() # True where padding token
     embeddings = torch.nn.utils.rnn.pad_sequence(embeddings, batch_first=True)
+    if include_coords:
+        coords = torch.nn.utils.rnn.pad_sequence(coords, batch_first=True)
 
-    return pdb_ids, embeddings, padding_mask
+    return {
+        'pdb_ids': pdb_ids, 
+        'embeddings': embeddings,
+        'coords': coords,
+        'padding_mask': padding_mask,
+        'targets': None,
+    }
 
 
 
-def collate_fn_paired_pos(
-    batch: list[tuple[str, str, torch.Tensor, torch.Tensor]],
+def collate_fn_pairs(
+    batch: list[tuple[str, str, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]],
 ):
     """
-    :param batch: A batch of items, where each item contains
-        - pdb_ids_1 first protein of paired pdb_ids
-        - pdb_ids_2 second protein of paired pdb_ids
-        - embedding_1 (num_residues_1, embedding_dim) of first protein
-        - embedding_2 (num_residues_2, embedding_dim) of second protein
     """
 
-    pdb_ids_1, pdb_ids_2, embeddings_1, embeddings_2 = zip(*batch)
+    pdb_ids_1, pdb_ids_2, embeddings_1, embeddings_2, coords_1, coords_2, targets = zip(*batch)
+
+    include_coords = coords_1[0] is not None
 
     pdb_ids = [
         *pdb_ids_1,
@@ -84,43 +99,32 @@ def collate_fn_paired_pos(
         *embeddings_2,
     ]
 
-    lengths = [embedding.shape[0] for embedding in embeddings]
-    max_seq_len = max(lengths)
-    valid_positions = torch.tensor([[1] * length + [0] * (max_seq_len - length) for length in lengths])
-    padding_mask = ~valid_positions.bool() # True where padding token
-    embeddings = torch.nn.utils.rnn.pad_sequence(embeddings, batch_first=True)
+    if include_coords:
+        coords = [
+            *coords_1,
+            *coords_2,
+        ]
 
-    return pdb_ids, embeddings, padding_mask
-
-
-
-def collate_fn_supervised_pairs(
-    batch: list[tuple[str, str, torch.Tensor, torch.Tensor]],
-):
-    """
-    """
-
-    pdb_ids_1, pdb_ids_2, embeddings_1, embeddings_2, targets = zip(*batch)
-
-    pdb_ids = [
-        *pdb_ids_1,
-        *pdb_ids_2,
-    ]
-    
-    embeddings = [
-        *embeddings_1,
-        *embeddings_2,
-    ]
-
-    targets = torch.tensor(targets, dtype=torch.float32)
+    if targets[0] is not None:
+        targets = torch.tensor(targets, dtype=torch.float32)
+    else:
+        targets = None
 
     lengths = [embedding.shape[0] for embedding in embeddings]
     max_seq_len = max(lengths)
     valid_positions = torch.tensor([[1] * length + [0] * (max_seq_len - length) for length in lengths])
     padding_mask = ~valid_positions.bool() # True where padding token
     embeddings = torch.nn.utils.rnn.pad_sequence(embeddings, batch_first=True)
+    if include_coords:
+        coords = torch.nn.utils.rnn.pad_sequence(coords, batch_first=True)
 
-    return pdb_ids, embeddings, padding_mask, targets
+    return {
+        'pdb_ids': pdb_ids, 
+        'embeddings': embeddings,
+        'coords': coords,
+        'padding_mask': padding_mask,
+        'targets': targets,
+    }
 
 
 
@@ -133,6 +137,7 @@ class ProteinPairDataset(Dataset):
             pdb_ids_2: list[str],
             targets: list[float],
             pdb_id_to_embeddings: dict[str, torch.Tensor],
+            pdb_id_to_coordinates: dict[str, torch.Tensor],
     ) -> None:
 
         assert len(pdb_ids_1) == len(pdb_ids_2)
@@ -141,6 +146,7 @@ class ProteinPairDataset(Dataset):
         self.pdb_ids_2 = pdb_ids_2
         self.targets = targets
         self.pdb_id_to_embeddings = pdb_id_to_embeddings
+        self.pdb_id_to_coordinates = pdb_id_to_coordinates
 
         self.rng = np.random.default_rng(seed=0)
 
@@ -165,16 +171,22 @@ class ProteinPairDataset(Dataset):
 
         pdb_id_1 = self.pdb_ids_1[index]
         pdb_id_2 = self.pdb_ids_2[index]
+
         if self.targets is not None:
             target = self.targets[index]
+        else:
+            target = None
 
         embedding_1 = self.pdb_id_to_embeddings[pdb_id_1]
         embedding_2 = self.pdb_id_to_embeddings[pdb_id_2]
 
-        if self.targets is None:
-            return pdb_id_1, pdb_id_2, embedding_1, embedding_2
+        if self.pdb_id_to_coordinates is not None:
+            coord_1 = self.pdb_id_to_coordinates[pdb_id_1]
+            coord_2 = self.pdb_id_to_coordinates[pdb_id_2]
         else:
-            return pdb_id_1, pdb_id_2, embedding_1, embedding_2, target
+            coord_1, coord_2 = None, None
+
+        return pdb_id_1, pdb_id_2, embedding_1, embedding_2, coord_1, coord_2, target
 
 
 class ProteinPairDataModule(pl.LightningDataModule):
@@ -182,6 +194,7 @@ class ProteinPairDataModule(pl.LightningDataModule):
     def __init__(
         self,
         embeddings_path: Path,
+        proteins_path: Path,
         pdb_ids_train_path: Path,
         pdb_ids_val_path: Path,
         pairfile_train_path: Path,
@@ -190,12 +203,17 @@ class ProteinPairDataModule(pl.LightningDataModule):
         batch_size: int,
         num_workers: int = 4,
     ) -> None:
+        """
+        specify proteins_path if require coordinates for pre-encoding with an EGNN. 
+        set to None to omit this field from datasets.
+        """
 
         super().__init__()
 
         assert batch_size > 2, "batch size must be greater than 2 to include one positive pair"
 
         self.embeddings_path = embeddings_path
+        self.proteins_path = proteins_path
         self.pdb_ids_train_path = pdb_ids_train_path
         self.pdb_ids_val_path = pdb_ids_val_path
         self.pairfile_train_path = pairfile_train_path
@@ -203,6 +221,8 @@ class ProteinPairDataModule(pl.LightningDataModule):
         self.is_supervised = is_supervised
         self.batch_size = batch_size
         self.num_workers = num_workers
+        
+        self.batch_of_pairs = True
 
         self.train_dataset: ProteinPairDataset | None = None
         self.val_dataset: ProteinPairDataset | None = None
@@ -212,6 +232,9 @@ class ProteinPairDataModule(pl.LightningDataModule):
 
 
         self.pdb_id_to_embeddings = torch.load(self.embeddings_path)
+        if self.proteins_path is not None:
+            pdb_id_to_proteins = torch.load(self.proteins_path)
+            self.pdb_id_to_coordinates = {k: v["structure"] for k, v in pdb_id_to_proteins.items()}
         self.pdb_ids_train = pd.read_csv(self.pdb_ids_train_path, header=None)[0].tolist()
         self.pdb_ids_val = pd.read_csv(self.pdb_ids_val_path, header=None)[0].tolist()
         assert set(self.pdb_ids_train + self.pdb_ids_val) == set(self.pdb_id_to_embeddings)
@@ -228,6 +251,7 @@ class ProteinPairDataModule(pl.LightningDataModule):
             pdb_ids_2=pairfile_train[1].tolist(),
             targets=pairfile_train[2].tolist() if self.is_supervised else None,
             pdb_id_to_embeddings=self.pdb_id_to_embeddings,
+            pdb_id_to_coordinates=self.pdb_id_to_coordinates if self.proteins_path is not None else None
         )
         print(f'Train dataset size: {len(self.train_dataset):,}')
 
@@ -238,6 +262,7 @@ class ProteinPairDataModule(pl.LightningDataModule):
             pdb_ids_2=pairfile_val[1].tolist(),
             targets=pairfile_val[2].tolist() if self.is_supervised else None,
             pdb_id_to_embeddings=self.pdb_id_to_embeddings,
+            pdb_id_to_coordinates=self.pdb_id_to_coordinates if self.proteins_path is not None else None
         )
         print(f'Val dataset size: {len(self.val_dataset):,}')
 
@@ -246,13 +271,13 @@ class ProteinPairDataModule(pl.LightningDataModule):
 
     def train_dataloader(self) -> DataLoader:
         """Get the train data loader."""
-        if self.is_supervised:
+        if self.is_supervised or self.batch_of_pairs:
             return DataLoader(
                 dataset=self.train_dataset,
                 batch_size=self.batch_size,
                 shuffle=True,
                 num_workers=self.num_workers,
-                collate_fn=collate_fn_supervised_pairs,
+                collate_fn=collate_fn_pairs,
             )
         else:
             return DataLoader(
@@ -265,18 +290,19 @@ class ProteinPairDataModule(pl.LightningDataModule):
                     num_negatives=self.batch_size-2, 
                     pdb_ids=self.pdb_ids_train, 
                     pdb_id_to_embeddings=self.pdb_id_to_embeddings,
+                    pdb_id_to_coordinates=self.pdb_id_to_coordinates,
                 ),
             )
 
     def val_dataloader(self) -> DataLoader:
         """Get the validation data loader."""
-        if self.is_supervised:
+        if self.is_supervised or self.batch_of_pairs:
             return DataLoader(
                 dataset=self.val_dataset,
                 batch_size=self.batch_size,
-                shuffle=False,
+                shuffle=True,
                 num_workers=self.num_workers,
-                collate_fn=collate_fn_supervised_pairs,
+                collate_fn=collate_fn_pairs,
             )
         else:
             return DataLoader(
@@ -289,6 +315,7 @@ class ProteinPairDataModule(pl.LightningDataModule):
                     num_negatives=self.batch_size-2, 
                     pdb_ids=self.pdb_ids_val, 
                     pdb_id_to_embeddings=self.pdb_id_to_embeddings,
+                    pdb_id_to_coordinates=self.pdb_id_to_coordinates,
                 ),
             )
 
