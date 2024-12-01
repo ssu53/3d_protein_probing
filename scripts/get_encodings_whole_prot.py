@@ -3,11 +3,12 @@
 from pathlib import Path
 from tqdm import tqdm
 
+import pandas as pd
 import einops
 import torch
 from torch.utils.data import Dataset, DataLoader
 from pp3.models_prot.model import ModelProt
-
+from pp3.models_prot import default_paths
 
 
 def compute_encodings(model, dataloader, save_path):
@@ -20,12 +21,17 @@ def compute_encodings(model, dataloader, save_path):
     # Forward pass on each batch
     for i,batch in enumerate(dataloader):
 
-        pdb_ids, embeddings, padding_mask = batch
+        pdb_ids = batch['pdb_ids']
+        embeddings = batch['embeddings']
+        coords = batch['coords']
+        padding_mask = batch['padding_mask']
+
         embeddings = embeddings.to(model.device)
+        coords = coords.to(model.device)
         padding_mask = padding_mask.to(model.device)
 
         with torch.no_grad():
-            batch_encodings = model.encoder(x=embeddings, pad_mask=padding_mask)
+            batch_encodings = model.forward(embeddings, coords, padding_mask, mode='val')
         
         # Extract the encodings per protein
         for j in range(len(batch_encodings)):
@@ -65,11 +71,14 @@ class ProteinEncodingDataset(Dataset):
 
     def __init__(
         self,
+        pdb_ids,
         pdb_id_to_embeddings: dict[str, torch.Tensor],
+        pdb_id_to_coordinates: dict[str, torch.Tensor],
     ) -> None:
 
+        self.pdb_ids = pdb_ids
         self.pdb_id_to_embeddings = pdb_id_to_embeddings
-        self.pdb_ids = list(pdb_id_to_embeddings.keys())
+        self.pdb_id_to_coordinates = pdb_id_to_coordinates
 
     @property
     def embedding_dim(self) -> int:
@@ -92,21 +101,32 @@ class ProteinEncodingDataset(Dataset):
 
         pdb_id = self.pdb_ids[index]
         embedding = self.pdb_id_to_embeddings[pdb_id]
+        if self.pdb_id_to_coordinates is not None:
+            coord = self.pdb_id_to_coordinates[pdb_id]
+        else:
+            coord = None
 
-        return pdb_id, embedding
+        return pdb_id, embedding, coord
 
 
 def collate_fn(batch):
     
-    pdb_ids, embeddings = zip(*batch)
+    pdb_ids, embeddings, coords = zip(*batch)
 
     lengths = [embedding.shape[0] for embedding in embeddings]
     max_seq_len = max(lengths)
     valid_positions = torch.tensor([[1] * length + [0] * (max_seq_len - length) for length in lengths])
     padding_mask = ~valid_positions.bool() # True where padding token
     embeddings = torch.nn.utils.rnn.pad_sequence(embeddings, batch_first=True)
+    if coords[0] is not None:
+        coords = torch.nn.utils.rnn.pad_sequence(coords, batch_first=True)
 
-    return pdb_ids, embeddings, padding_mask
+    return {
+        'pdb_ids': pdb_ids, 
+        'embeddings': embeddings,
+        'coords': coords,
+        'padding_mask': padding_mask,
+    }
 
 
 
@@ -116,28 +136,40 @@ def main():
 
     root_dir = Path(__file__).parent / '..'
 
-    encoding_name = 'encodings_aa_onehot_v6'
+    encoding_name = 'encodings_foldseek_sinusoid'
     # checkpoint_path = root_dir / f'results/embed_for_retrieval/{encoding_name}_3L_0.0001lr_32bs_0.1temp/epoch=8-step=185481.ckpt'
     # checkpoint_path = root_dir / f'results/embed_for_retrieval/{encoding_name}_3L_0.0001lr_32bs_0.01temp/epoch=8-step=185481.ckpt'
     # checkpoint_path = root_dir / f'results/embed_for_retrieval/{encoding_name}_l1_3L_0.0001lr_32bs/epoch=25-step=32994.ckpt'
-    checkpoint_path = root_dir / f'results/embed_for_retrieval/{encoding_name}_l1_3L_0.0001lr_32bs/epoch=49-step=32250.ckpt'
+    # checkpoint_path = root_dir / f'results/embed_for_retrieval/{encoding_name}_l1_3L_0.0001lr_32bs/epoch=49-step=32250.ckpt'
+    # checkpoint_path = root_dir / f'results/embed_for_retrieval_egnn/{encoding_name}_l1_2L_0.0001lr_32bs_egnn/epoch=49-step=63450.ckpt'
+    checkpoint_path = root_dir / f'results/embed_for_retrieval_egnn/{encoding_name}_l1_4L_0.0001lr_16bs_egnn_large/epoch=44-step=114210.ckpt'
     load_path = root_dir / f'data/embed_for_retrieval/encodings/{encoding_name}.pt'
-    save_path = root_dir / f'data/embed_for_retrieval/encodings_whole_prot/{encoding_name}_v5.pt'
+    save_path = root_dir / f'data/embed_for_retrieval/encodings_whole_prot/{encoding_name}_v2.pt'
 
     print(f"{checkpoint_path=}")
     print(f"{load_path=}")
     print(f"{save_path=}")
 
     # Load residue-level encodings
-    pdb_id_to_encodings = torch.load(load_path)
+    pdb_id_to_embeddings = torch.load(load_path)
 
-    # %%
 
-    dataset = ProteinEncodingDataset(pdb_id_to_encodings)
+    proteins_path = default_paths.get_proteins_path()
+    valid_pdb_ids_train_path = default_paths.get_valid_pdb_ids_train_path()
+    valid_pdb_ids_val_path = default_paths.get_valid_pdb_ids_val_path()
+
+    pdb_id_to_proteins = torch.load(proteins_path)
+    pdb_id_to_coordinates = {k: v["structure"] for k, v in pdb_id_to_proteins.items()}
+    pdb_ids_train = pd.read_csv(valid_pdb_ids_train_path, header=None)[0].tolist()
+    pdb_ids_val = pd.read_csv(valid_pdb_ids_val_path, header=None)[0].tolist()
+    pdb_ids = pdb_ids_train + pdb_ids_val
+    print(f"{len(pdb_id_to_embeddings)} {len(pdb_id_to_coordinates)} {len(pdb_ids)}")
+
+    dataset = ProteinEncodingDataset(pdb_ids, pdb_id_to_embeddings, pdb_id_to_coordinates)
 
     dataloader = DataLoader(
         dataset=dataset,
-        batch_size=64,
+        batch_size=32,
         shuffle=False,
         num_workers=0,
         collate_fn=collate_fn,

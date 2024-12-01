@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import torch
 
-encoding_name = 'encodings_aa_onehot_v6_v1'
+encoding_name = 'encodings_foldseek_sinusoid_v2'
 load_path = f'/home/groups/jamesz/shiye/3d_protein_probing/data/embed_for_retrieval/encodings_whole_prot/{encoding_name}.pt'
 save_dir = f'/home/groups/jamesz/shiye/protein_vector_retrieve/{encoding_name}_train'
 

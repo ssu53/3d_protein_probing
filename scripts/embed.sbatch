@@ -7,12 +7,12 @@
 #SBATCH --gpus=1
 #SBATCH --constraint=GPU_SKU:RTX_2080Ti|GPU_SKU:TITAN_V|GPU_SKU:TITAN_Xp
 #SBATCH --cpus-per-task=4
-#SBATCH --mem=4G
+#SBATCH --mem=32G
 #SBATCH --array=0-0%1
 #SBATCH --partition=jamesz
 #SBATCH --output=/home/groups/jamesz/shiye/3d_protein_probing/slurm_output/embed/%x.%j.%a.out
 #SBATCH --error=/home/groups/jamesz/shiye/3d_protein_probing/slurm_error/embed/%x.%j.%a.err
-#SBATCH --time=3:00:00
+#SBATCH --time=6:00:00
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=shiye@stanford.edu
 
@@ -37,7 +37,7 @@ experiments=()
 for LR in 1e-4 # 1e-4 1e-3 1e-2
 do
 
-    for BATCH_SIZE in 32
+    for BATCH_SIZE in 16
     do
 
         for TEMPERATURE in 1e-1 # 1e-0 1e-1 1e-2
@@ -49,18 +49,18 @@ do
                 --embeddings_path /home/groups/jamesz/shiye/3d_protein_probing/data/embed_for_retrieval/encodings/encodings_foldseek_sinusoid.pt \
                 --proteins_path data/scope40_foldseek_compatible/proteins.pt \
                 --preencoder_num_layers 3 \
-                --preencoder_hidden_dim 16 \
+                --preencoder_hidden_dim 64 \
                 --preencoder_max_neighbors 24 \
-                --preencoder_noise_std 2.0 \
-                --embedding_dim 32 \
-                --num_layers 2 \
-                --num_heads 2 \
+                --preencoder_noise_std 0.0 \
+                --embedding_dim 128 \
+                --num_layers 4 \
+                --num_heads 4 \
                 --learning_rate $LR \
                 --temperature $TEMPERATURE \
                 --batch_size $BATCH_SIZE \
                 --max_epochs 50 \
                 --loss_func l1 \
-                --run_name_suffix egnn_2.0noise \
+                --run_name_suffix egnn_large \
                 --run_id_number $SLURM_ARRAY_TASK_ID \
                 --entity ssu53"
             interaction="${no_interaction} --interaction_model transformer"
