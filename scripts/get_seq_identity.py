@@ -87,8 +87,9 @@ def get_seq_ident():
 def get_seq_ident_for_hits():
 
     # hits = pd.read_csv('/home/groups/jamesz/shiye/tm-vec/tabular_scope40_val_128.txt', sep='\t')
-    hits = pd.read_csv('/home/groups/jamesz/shiye/tm-vec/tabular_scope40_val.txt', sep='\t')
-    lookup = pd.read_csv('/home/groups/jamesz/shiye/3d_protein_probing/hits_.csv', sep=' ') # already computed some sequence identities
+    # hits = pd.read_csv('/home/groups/jamesz/shiye/tm-vec/tabular_scope40_val.txt', sep='\t')
+    hits = pd.read_csv('/home/groups/jamesz/shiye/protein_vector_retrieve/encodings_foldseek_sinusoid/tabular_scope40_val.txt', sep='\t')
+    lookup = pd.read_csv('/home/groups/jamesz/shiye/3d_protein_probing/data/hits1.csv', sep=' ') # already computed some sequence identities
 
     lookup_dict = {f"{x.query_id} {x.database_id}": x.seq_ident for i,x in lookup.iterrows()}
 
@@ -107,11 +108,11 @@ def get_seq_ident_for_hits():
             hits.loc[i,'seq_ident'], _ = pairwise_sequence_align_util(seq1, seq2)
 
         if i % 10000 == 0:
-            hits.to_csv('hits.csv', index=False, sep=' ')
+            hits.to_csv('data/hits2.csv', index=False, sep=' ')
 
     print(f"{num_new_pairs_computed=}")
 
-    hits.to_csv('hits.csv', index=False, sep=' ')
+    hits.to_csv('data/hits2.csv', index=False, sep=' ')
 
 
 # %%
@@ -122,7 +123,10 @@ exit
 
 # %%
 
-hits = pd.read_csv('/home/groups/jamesz/shiye/3d_protein_probing/hits.csv', sep=' ')
+# hits1 is top-256 from tm-vec
+# hits2 is top-256 from encodings_foldseek_sinusoid
+# hits = pd.read_csv('/home/groups/jamesz/shiye/3d_protein_probing/data/hits1.csv', sep=' ')
+hits = pd.read_csv('/home/groups/jamesz/shiye/3d_protein_probing/data/hits2.csv', sep=' ')
 hits = hits.dropna()
 # hits = hits[hits.query_id != hits.database_id]
 hits
@@ -142,16 +146,25 @@ within_fold_pairs.columns = ['pdb_id_1', 'pdb_id_2', 'seq_ident']
 
 # add fam, sfam, fold annotations for the database hits
 within_fold_pairs['fam_2'] = within_fold_pairs.apply(lambda x: scop_lookup.family[x.pdb_id_2], axis=1)
-within_fold_pairs['sfam_2'] = within_fold_pairs.apply(lambda x: scop_lookup.superfamily[x.pdb_id_2], axis=1)
-within_fold_pairs['fold_2'] = within_fold_pairs.apply(lambda x: scop_lookup.fold[x.pdb_id_2], axis=1)
+within_fold_pairs['sfam_2'] = within_fold_pairs['fam_2'].apply(lambda x: x[:x.rfind('.')])
+within_fold_pairs['fold_2'] = within_fold_pairs['sfam_2'].apply(lambda x: x[:x.rfind('.')])
 within_fold_pairs
 # %%
 
+# add fam, sfam, fold annotations for the database hits
+hits['fam_database'] = hits.apply(lambda x: scop_lookup.family[x.database_id], axis=1)
+hits['sfam_database'] = hits['fam_database'].apply(lambda x: x[:x.rfind('.')])
+hits['fold_database'] = hits['sfam_database'].apply(lambda x: x[:x.rfind('.')])
+hits
+# %%
 
-for thresh in [0.3, 0.4, 0.5]:
 
-    within_fold_pairs_thresh = within_fold_pairs[within_fold_pairs.seq_ident < thresh]
-    hits_thresh = hits[hits.seq_ident < thresh]
+# result = {}
+
+for thresh in [0.99]:
+
+    within_fold_pairs_thresh = within_fold_pairs[within_fold_pairs.seq_ident <= thresh]
+    hits_thresh = hits[hits.seq_ident <= thresh]
 
     print(f"{thresh=}")
     print(f"{len(within_fold_pairs_thresh)}/{len(within_fold_pairs)}")
@@ -169,13 +182,23 @@ for thresh in [0.3, 0.4, 0.5]:
 
         within_fold_pairs_ = within_fold_pairs_thresh[(within_fold_pairs_thresh.pdb_id_1 == pdb_id)]
 
-        if len(within_fold_pairs_) == 0:
-            fam_counts.append(0)
-            sfam_counts.append(0)
-            fold_counts.append(0)
-            fam_hits.append(0)
-            sfam_hits.append(0)
-            fold_hits.append(0)
+        if len(within_fold_pairs_) == 0: 
+            # only self in same fam/sfam/fold, hits trivially
+            # ignore row because (num_fam == num_sfam) or (num_sfam == num_fold)
+            if thresh >= 1.0:
+                fam_counts.append(1)
+                sfam_counts.append(1)
+                fold_counts.append(1)
+                fam_hits.append(1)
+                sfam_hits.append(0)
+                fold_hits.append(0)
+            else:
+                fam_counts.append(0)
+                sfam_counts.append(0)
+                fold_counts.append(0)
+                fam_hits.append(0)
+                sfam_hits.append(0)
+                fold_hits.append(0)
             continue
 
         # count the number of fam, sfam, fold
@@ -185,6 +208,15 @@ for thresh in [0.3, 0.4, 0.5]:
         num_fam = sum(within_fold_pairs_.fam_2 == query_scop_fam)
         num_sfam = sum(within_fold_pairs_.sfam_2 == query_scop_sfam) 
         num_fold = sum(within_fold_pairs_.fold_2 == query_scop_fold)
+        
+        if thresh >= 1.0: # since within_fold_pairs does not include self
+            num_fam += 1
+            num_sfam += 1
+            num_fold += 1
+
+        # if (num_fam == 0) or (num_fam == num_sfam) or (num_sfam == num_fold):
+        #     continue
+        
         fam_counts.append(num_fam)
         sfam_counts.append(num_sfam)
         fold_counts.append(num_fold)
@@ -198,11 +230,11 @@ for thresh in [0.3, 0.4, 0.5]:
         fold_hit = 0
         reached_end = True
         for _,row in hits_.iterrows():
-            if query_scop_fam == scop_lookup.family[row.database_id]:
+            if query_scop_fam == row.fam_database:
                 fam_hit += 1
-            elif query_scop_sfam == scop_lookup.superfamily[row.database_id]:
+            elif query_scop_sfam == row.sfam_database:
                 sfam_hit += 1
-            elif query_scop_fold == scop_lookup.fold[row.database_id]:
+            elif query_scop_fold == row.fold_database:
                 fold_hit += 1
             else:
                 reached_end = False
@@ -213,6 +245,16 @@ for thresh in [0.3, 0.4, 0.5]:
         sfam_hits.append(sfam_hit)
         fold_hits.append(fold_hit)
 
+        # result[pdb_id] = [
+        #     query_scop_fam,
+        #     fam_hit / num_fam,
+        #     sfam_hit / (num_sfam - num_fam),
+        #     fold_hit / (num_fold - num_sfam),
+        #     0 if reached_end else 1,
+        #     num_fam,
+        #     num_sfam,
+        #     num_fold
+        # ] 
 
     print(fam_counts)
     print(sfam_counts)
@@ -238,6 +280,11 @@ for thresh in [0.3, 0.4, 0.5]:
     print(np.nanmean(sfam_hits / sfam_denom))
     print(np.nanmean(fold_hits / fold_denom))
 
+    mask = (fam_counts != 0) & (sfam_counts != fam_counts) & (fold_counts != sfam_counts)
+    print(np.nanmean(fam_hits[mask] / fam_denom[mask]))
+    print(np.nanmean(sfam_hits[mask] / sfam_denom[mask]))
+    print(np.nanmean(fold_hits[mask] / fold_denom[mask]))
+
 
     # plt.figure()
     # plt.hist(hits_.seq_ident, bins=20)
@@ -251,14 +298,39 @@ for thresh in [0.3, 0.4, 0.5]:
     np.save(
         f'thresh{thresh}',
         np.stack((fam_counts, sfam_counts, fold_counts, fam_hits, sfam_hits, fold_hits)))
+
+
 # %%
+# # from file
+# result_awk = pd.read_csv('/home/groups/jamesz/shiye/protein_vector_retrieve/encodings_foldseek_sinusoid/result.rocx', sep='\t')
+# result_awk = result_awk.sort_values('NAME').set_index('NAME')
+# result_awk
+
+
+# # reproduced
+# result_here = pd.DataFrame(result).T
+# result_here.columns = result_awk.columns
+# result_here = result_here.sort_index()
+# result_here
+
+# # %%
 
 results = pd.DataFrame()
 
-for thresh in [0.5, 0.4, 0.3, 0.25, 0.24, 0.23, 0.22, 0.21, 0.20, 0.19, 0.18, 0.17]:
+# for thresh in [1.0, 0.5, 0.4, 0.3, 0.25, 0.24, 0.23, 0.22, 0.21, 0.20, 0.19, 0.18, 0.17]:
+for thresh in [1.0, 0.99, 0.5, 0.4, 0.3, 0.25, 0.22, 0.20, 0.19, 0.18, 0.17]:
 
-    fam_counts, sfam_counts, fold_counts, fam_hits, sfam_hits, fold_hits = np.array_split(np.load(f'thresh{thresh}.npy'), 6, axis=0)
+    fam_counts, sfam_counts, fold_counts, fam_hits, sfam_hits, fold_hits = \
+        np.array_split(np.load(f'thresh{thresh}.npy'), 6, axis=0)
     
+    # mask = (fam_counts != 0) & (sfam_counts != fam_counts) & (fold_counts != sfam_counts)
+    # fam_counts = fam_counts[mask]
+    # sfam_counts = sfam_counts[mask]
+    # fold_counts = fold_counts[mask]
+    # fam_hits = fam_hits[mask]
+    # sfam_hits = sfam_hits[mask]
+    # fold_hits = fold_hits[mask]
+
     fam_denom = fam_counts
     sfam_denom = sfam_counts - fam_counts
     fold_denom = fold_counts - sfam_counts
@@ -291,8 +363,43 @@ for col in [
     plt.plot(results.index, results[col], '-o', label=col, markersize=5)
 plt.legend()
 plt.grid()
-plt.title('tm-vec (macro-averaged)')
+plt.title('ours (macro-averaged)')
 plt.xlabel('sequence identity thresh')
 plt.ylabel('sensitivity up to the 1st FP')
 plt.show()
 # %%
+
+# Scratch
+# foldseek-analysis awk script ignores any protein for which the fam, sfam, or fold denominator is 0
+# also it has an off-by-one error (due to length of the file including header)
+
+fam_counts, sfam_counts, fold_counts, fam_hits, sfam_hits, fold_hits = np.array_split(np.load(f'../data/tmvec_top256_scope40_val/thresh{thresh}.npy'), 6, axis=0)
+
+fam_counts_awk, sfam_counts_awk, fold_counts_awk, fam_hits_awk, sfam_hits_awk, fold_hits_awk = np.array_split(np.load(f'../data/tmvec_top256_scope40_val_awkconsistent/thresh{thresh}.npy'), 6, axis=0)
+
+# %%
+
+print(fold_counts.shape)
+print(fold_counts_awk.shape)
+# %%
+
+fold_counts
+# %%
+fold_counts_awk
+# %%
+
+fold_hits
+
+# %%
+
+print(np.nanmean(fold_hits / (fold_counts - sfam_counts)))
+
+mask = (fam_counts != 0) & (sfam_counts != fam_counts) & (fold_counts != sfam_counts)
+
+print(np.mean(fold_hits[mask] / (fold_counts[mask] - sfam_counts[mask])))
+print(np.mean(fold_hits_awk / (fold_counts_awk - sfam_counts_awk)))
+
+# %%
+
+mask = (fam_counts != 0) & (sfam_counts != fam_counts) & (fold_counts != sfam_counts)
+fold_counts[mask]
