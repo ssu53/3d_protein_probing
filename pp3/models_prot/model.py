@@ -287,16 +287,22 @@ class ModelProt(pl.LightningModule):
         self.log(f'{mode}_spearman', spearmanr(y, y_hat).statistic)
 
     def on_train_epoch_end(self) -> None:
-        self.evaluate(
-            y=self.train_y,
-            y_hat=self.train_y_hat,
-            mode='train',
-        )
-
-        self.train_y = []
-        self.train_y_hat = []
+        pass
     
     def on_validation_epoch_end(self) -> None:
+
+        if len(self.train_y) > 0 and len(self.train_y_hat) > 0:
+            # train
+            self.evaluate(
+                y=self.train_y,
+                y_hat=self.train_y_hat,
+                mode='train',
+            )
+
+            self.train_y = []
+            self.train_y_hat = []
+
+        # val
         self.evaluate(
             y=self.val_y,
             y_hat=self.val_y_hat,

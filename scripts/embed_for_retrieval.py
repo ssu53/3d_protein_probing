@@ -36,7 +36,9 @@ def embed_for_retrieval(
     max_epochs: int = 500,
     patience: int = 25,
     ckpt_every_k_epochs: int = 1,
+    # ckpt_every_n_train_steps: int | None = 2500,
     num_sanity_val_steps: int = 2,
+    val_check_interval: float = 1.0,
     run_id_number: int | None = None,
     run_name_suffix: str = '',
     entity: str = 'ssu53',
@@ -164,8 +166,11 @@ def embed_for_retrieval(
     ckpt_callback = ModelCheckpoint(
         dirpath=save_dir,
         save_top_k=2,
+        save_last=True,
         monitor='val_loss',
-        every_n_epochs=ckpt_every_k_epochs
+        every_n_epochs=ckpt_every_k_epochs,
+        # every_n_train_steps=ckpt_every_n_train_steps,
+        save_on_train_epoch_end=False, # ckpt after each validation
     )
 
     # Build early stopping callback
@@ -187,6 +192,7 @@ def embed_for_retrieval(
         deterministic=True,
         max_epochs=max_epochs,
         log_every_n_steps=25,
+        val_check_interval=val_check_interval,
         callbacks=[ckpt_callback, early_stopping, lr_monitor],
         num_sanity_val_steps=num_sanity_val_steps
     )
