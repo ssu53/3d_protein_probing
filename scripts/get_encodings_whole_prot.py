@@ -136,15 +136,38 @@ def main():
 
     root_dir = Path(__file__).parent / '..'
 
-    encoding_name = 'encodings_foldseek_sinusoid'
+    # encoding_name = 'encodings_foldseek_sinusoid'
     # checkpoint_path = root_dir / f'results/embed_for_retrieval/{encoding_name}_3L_0.0001lr_32bs_0.1temp/epoch=8-step=185481.ckpt'
     # checkpoint_path = root_dir / f'results/embed_for_retrieval/{encoding_name}_3L_0.0001lr_32bs_0.01temp/epoch=8-step=185481.ckpt'
     # checkpoint_path = root_dir / f'results/embed_for_retrieval/{encoding_name}_l1_3L_0.0001lr_32bs/epoch=25-step=32994.ckpt'
     # checkpoint_path = root_dir / f'results/embed_for_retrieval/{encoding_name}_l1_3L_0.0001lr_32bs/epoch=49-step=32250.ckpt'
     # checkpoint_path = root_dir / f'results/embed_for_retrieval_egnn/{encoding_name}_l1_2L_0.0001lr_32bs_egnn/epoch=49-step=63450.ckpt'
-    checkpoint_path = root_dir / f'results/embed_for_retrieval_egnn/{encoding_name}_l1_4L_0.0001lr_16bs_egnn_large/epoch=44-step=114210.ckpt'
-    load_path = root_dir / f'data/embed_for_retrieval/encodings/{encoding_name}.pt'
-    save_path = root_dir / f'data/embed_for_retrieval/encodings_whole_prot/{encoding_name}_v2.pt'
+    # checkpoint_path = root_dir / f'results/embed_for_retrieval_egnn/{encoding_name}_l1_4L_0.0001lr_16bs_egnn_large/epoch=44-step=114210.ckpt'
+
+    # checkpoint_path = root_dir / f'results/embed_for_retrieval_1/encodings_foldseek_sinusoid_l1_128d_3pL_4L_7/epoch=34-step=88792.ckpt'
+    # load_path = root_dir / f'data/embed_for_retrieval/encodings/encodings_foldseek_sinusoid.pt'
+    # save_path = root_dir / f'data/embed_for_retrieval/encodings_whole_prot/v7.pt'
+
+    # checkpoint_path = root_dir / f'results/embed_for_retrieval_1/encodings_foldseek_sinusoid_mse_128d_3pL_4L_9/epoch=46-step=119248.ckpt'
+    # load_path = root_dir / f'data/embed_for_retrieval/encodings/encodings_foldseek_sinusoid.pt'
+    # save_path = root_dir / f'data/embed_for_retrieval/encodings_whole_prot/v9.pt'
+
+    # checkpoint_path = root_dir / f'results/embed_for_retrieval_1/encodings_foldseek_sinusoid_l1weighted_128d_3pL_4L_10/epoch=46-step=119248.ckpt'
+    # load_path = root_dir / f'data/embed_for_retrieval/encodings/encodings_foldseek_sinusoid.pt'
+    # save_path = root_dir / f'data/embed_for_retrieval/encodings_whole_prot/v10.pt'
+
+    # checkpoint_path = root_dir / f'results/embed_for_retrieval_1/encodings_foldseek_sinusoid_mse_128d_3pL_4L_12/epoch=46-step=119248.ckpt'
+    # load_path = root_dir / f'data/embed_for_retrieval/encodings/encodings_foldseek_sinusoid.pt'
+    # save_path = root_dir / f'data/embed_for_retrieval/encodings_whole_prot/v12.pt'
+
+    # checkpoint_path = root_dir / f'results/embed_for_retrieval_1/encodings_foldseek_sinusoid_mse_128d_3pL_4L_18/epoch=36-step=138868.ckpt'
+    # load_path = root_dir / f'data/embed_for_retrieval/encodings/encodings_foldseek_sinusoid.pt'
+    # save_path = root_dir / f'data/embed_for_retrieval/encodings_whole_prot/v18.pt'
+
+    checkpoint_path = root_dir / f'results/embed_for_retrieval_1/encodings_foldseek_sinusoid_mseweighted_128d_3pL_4L_19/epoch=21-step=82048.ckpt'
+    load_path = root_dir / f'data/embed_for_retrieval/encodings/encodings_foldseek_sinusoid.pt'
+    save_path = root_dir / f'data/embed_for_retrieval/encodings_whole_prot/v19.pt'
+    
 
     print(f"{checkpoint_path=}")
     print(f"{load_path=}")
@@ -176,7 +199,11 @@ def main():
     )
 
     # Load model
-    model = ModelProt.load_from_checkpoint(checkpoint_path)
+    try:
+        model = ModelProt.load_from_checkpoint(checkpoint_path)
+    except TypeError:
+        print("Inferring missing preencoder type as egnn!")
+        model = ModelProt.load_from_checkpoint(checkpoint_path, preencoder_type='egnn')
     model.freeze()
     model.eval()
 
