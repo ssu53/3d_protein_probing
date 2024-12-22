@@ -30,7 +30,10 @@ def get_tmaln_data_train_path():
     # return path_local / '../../data/embed_for_retrieval/train_data/tmaln_data_train.csv'
 
     # 400k all within-fold pairs and 600k random samples outside-fold (1mil pairs)
-    return path_local / '../../data/embed_for_retrieval/train_data/tmaln_data_train_1.csv'
+    # return path_local / '../../data/embed_for_retrieval/train_data/tmaln_data_train_1.csv'
+
+    # 20k tm-score > 0.6, 20k random samples, 20k within-fold samples (60k pairs)
+    return path_local / '../../data/embed_for_retrieval/train_data/tmaln_data_train_3.csv'
 
 def get_tmaln_data_val_path():
 
@@ -38,4 +41,7 @@ def get_tmaln_data_val_path():
     # return path_local / '../../data/embed_for_retrieval/train_data/tmaln-06_data_val.csv'
 
     # the above, supplemented with another 2k random samples (4k pairs)
-    return path_local / '../../data/embed_for_retrieval/train_data/tmaln_data_val.csv'
+    # return path_local / '../../data/embed_for_retrieval/train_data/tmaln_data_val.csv'
+
+    # the above, supplemented with another 2k within-fold samples (6k pairs)
+    return path_local / '../../data/embed_for_retrieval/train_data/tmaln_data_val_3.csv'

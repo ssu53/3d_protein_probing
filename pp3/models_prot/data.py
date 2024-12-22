@@ -1,5 +1,6 @@
 # %%
 
+from typing import List
 from pathlib import Path
 from functools import partial
 import random
@@ -209,8 +210,9 @@ class ProteinPairDataModule(pl.LightningDataModule):
         """
 
         super().__init__()
-
-        assert batch_size > 2, "batch size must be greater than 2 to include one positive pair"
+        print(f"{is_supervised=}")
+        if not is_supervised:
+            assert batch_size > 2, "batch size must be greater than 2 to include one positive pair"
 
         self.embeddings_path = embeddings_path
         self.proteins_path = proteins_path
@@ -226,6 +228,9 @@ class ProteinPairDataModule(pl.LightningDataModule):
 
         self.train_dataset: ProteinPairDataset | None = None
         self.val_dataset: ProteinPairDataset | None = None
+        self.val_dataset_1: ProteinPairDataset | None = None
+        self.val_dataset_2: ProteinPairDataset | None = None
+        self.val_dataset_3: ProteinPairDataset | None = None
 
 
     def setup(self, stage: str | None = None) -> None:
@@ -243,6 +248,11 @@ class ProteinPairDataModule(pl.LightningDataModule):
         
         pairfile_train = pd.read_csv(self.pairfile_train_path, header=None, sep=' ')
         pairfile_val = pd.read_csv(self.pairfile_val_path, header=None, sep=' ')
+
+        path_local = Path(__file__).parent
+        pairfile_val_1 = pd.read_csv(path_local / '../../data/embed_for_retrieval/train_data/tmaln-06_data_val.csv', header=None, sep=' ')
+        pairfile_val_2 = pd.read_csv(path_local / '../../data/embed_for_retrieval/train_data/tmaln_data_val_within_fold.csv', header=None, sep=' ')
+        pairfile_val_3 = pd.read_csv(path_local / '../../data/embed_for_retrieval/train_data/tmaln_data_val_random_pairs.csv', header=None, sep=' ')
 
 
         # Create train dataset
@@ -265,6 +275,33 @@ class ProteinPairDataModule(pl.LightningDataModule):
             pdb_id_to_coordinates=self.pdb_id_to_coordinates if self.proteins_path is not None else None
         )
         print(f'Val dataset size: {len(self.val_dataset):,}')
+
+        self.val_dataset_1 = ProteinPairDataset(
+            pdb_ids_1=pairfile_val_1[0].tolist(),
+            pdb_ids_2=pairfile_val_1[1].tolist(),
+            targets=pairfile_val_1[2].tolist() if self.is_supervised else None,
+            pdb_id_to_embeddings=self.pdb_id_to_embeddings,
+            pdb_id_to_coordinates=self.pdb_id_to_coordinates if self.proteins_path is not None else None
+        )
+        print(f'Val 1 dataset size: {len(self.val_dataset_1):,}')
+
+        self.val_dataset_2 = ProteinPairDataset(
+            pdb_ids_1=pairfile_val_2[0].tolist(),
+            pdb_ids_2=pairfile_val_2[1].tolist(),
+            targets=pairfile_val_2[2].tolist() if self.is_supervised else None,
+            pdb_id_to_embeddings=self.pdb_id_to_embeddings,
+            pdb_id_to_coordinates=self.pdb_id_to_coordinates if self.proteins_path is not None else None
+        )
+        print(f'Val 2 dataset size: {len(self.val_dataset_2):,}')
+
+        self.val_dataset_3 = ProteinPairDataset(
+            pdb_ids_1=pairfile_val_3[0].tolist(),
+            pdb_ids_2=pairfile_val_3[1].tolist(),
+            targets=pairfile_val_3[2].tolist() if self.is_supervised else None,
+            pdb_id_to_embeddings=self.pdb_id_to_embeddings,
+            pdb_id_to_coordinates=self.pdb_id_to_coordinates if self.proteins_path is not None else None
+        )
+        print(f'Val 3 dataset size: {len(self.val_dataset_3):,}')
 
         self.is_setup = True
     
@@ -294,7 +331,7 @@ class ProteinPairDataModule(pl.LightningDataModule):
                 ),
             )
 
-    def val_dataloader(self) -> DataLoader:
+    def val_dataloader_(self) -> DataLoader:
         """Get the validation data loader."""
         if self.is_supervised or self.batch_of_pairs:
             return DataLoader(
@@ -318,6 +355,39 @@ class ProteinPairDataModule(pl.LightningDataModule):
                     pdb_id_to_coordinates=self.pdb_id_to_coordinates,
                 ),
             )
+    
+    def val_dataloader(self) -> List[DataLoader]:
+        """Get the validation data loaders."""
+        assert self.is_supervised and self.batch_of_pairs 
+        dl0 = DataLoader(
+                dataset=self.val_dataset,
+                batch_size=self.batch_size,
+                shuffle=True,
+                num_workers=self.num_workers,
+                collate_fn=collate_fn_pairs,
+            )
+        dl1 = DataLoader(
+                dataset=self.val_dataset_1,
+                batch_size=self.batch_size,
+                shuffle=True,
+                num_workers=self.num_workers,
+                collate_fn=collate_fn_pairs,
+            )
+        dl2 = DataLoader(
+                dataset=self.val_dataset_2,
+                batch_size=self.batch_size,
+                shuffle=True,
+                num_workers=self.num_workers,
+                collate_fn=collate_fn_pairs,
+            )
+        dl3 = DataLoader(
+                dataset=self.val_dataset_3,
+                batch_size=self.batch_size,
+                shuffle=True,
+                num_workers=self.num_workers,
+                collate_fn=collate_fn_pairs,
+            )
+        return [dl0, dl1, dl2, dl3]
 
 
     @property
