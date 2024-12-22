@@ -10,6 +10,7 @@ import pytorch_lightning as pl
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 from pp3.models.egnn import EGNN
+from pp3.models.tfn import TFN
 from pp3.models.mlp import MLP
 from pp3.models_prot.modules import MeanAggSelfAttentionBlock 
 from pp3.models_prot.data import get_train_dataloader
@@ -24,6 +25,7 @@ class ModelProt(pl.LightningModule):
 
     def __init__(
         self,
+        preencoder_type: Literal['egnn','tfn'],
         preencoder_num_layers: int, # 0 to turn off the EGNN layers
         preencoder_hidden_dim: int,
         preencoder_max_neighbors: int,
@@ -49,6 +51,7 @@ class ModelProt(pl.LightningModule):
         weight_decay: float = 0.0,
         similarity_func: Literal['cosine','euclidean'] = 'cosine',
         loss_func: Literal['l1','infonce'] = 'l1',
+        loss_thresh: float | None = None,
     ):
         """
         :param num_channels: number of dimensions of the residue-level embedding
@@ -61,16 +64,35 @@ class ModelProt(pl.LightningModule):
         assert temperature > 0.0, "The temperature must be a positive float!"
         assert similarity_func in {'cosine', 'euclidean'}, "Unknown similarity function."
 
+        # self.proj_in = MLP(
+        #     input_dim = input_dim,
+        #     hidden_dim = 0, # not used, 1-layer model
+        #     output_dim = embedding_dim,
+        #     num_layers = 1,
+        #     last_layer_activation = False,
+        #     dropout = dropout,
+        # )
         if preencoder_num_layers > 0:
             self.preencoder_noise_std = preencoder_noise_std
-            self.preencoder = EGNN(
-                node_dim = input_dim,
-                hidden_dim = preencoder_hidden_dim,
-                num_layers = preencoder_num_layers,
-                max_neighbors = preencoder_max_neighbors,
-                dropout = dropout,
-            )
-            # last hidden layer has dim = node_dim = input_dim
+            if preencoder_type == 'egnn':
+                self.preencoder = EGNN(
+                    node_dim = input_dim,
+                    hidden_dim = preencoder_hidden_dim,
+                    num_layers = preencoder_num_layers,
+                    max_neighbors = preencoder_max_neighbors,
+                    dropout = dropout,
+                )
+                # last hidden layer has dim = node_dim = input_dim
+            elif preencoder_type == 'tfn':
+                self.preencoder = TFN(
+                    node_dim = input_dim,
+                    fc_dim = preencoder_hidden_dim,
+                    num_layers = preencoder_num_layers,
+                    max_neighbors = preencoder_max_neighbors,
+                    dropout = dropout,
+                )
+            else:
+                raise NotImplementedError
         self.proj = MLP(
             input_dim = input_dim,
             hidden_dim = 0, # not used, 1-layer model
@@ -96,24 +118,43 @@ class ModelProt(pl.LightningModule):
             mlp_bias = mlp_bias,
             init_scale = init_scale,
         )
+        # self.proj_out = MLP(
+        #     input_dim = embedding_dim,
+        #     hidden_dim = 0, # not used, 1-layer model
+        #     output_dim = embedding_dim,
+        #     num_layers = 1,
+        #     last_layer_activation = False,
+        #     dropout = dropout,
+        # )
         self.learning_rate = learning_rate
         self.temperature = temperature
         self.weight_decay = weight_decay
         self.similarity_func = similarity_func
         self.loss_func = loss_func
+        self.loss_thresh = loss_thresh
 
         if loss_func == 'infonce': 
             self.loss_function = self.info_nce_loss_pairs
-        elif loss_func == 'l1' or loss_func == 'l2':
+        elif loss_func == 'l1' or loss_func == 'mse' or loss_func == 'l1weighted' or loss_func == 'mseweighted':
             assert similarity_func == 'cosine'
             self.loss_function = self.supervised_loss
         else:
             raise NotImplementedError
 
-        self.train_y = []
-        self.train_y_hat = []
-        self.val_y = []
-        self.val_y_hat = []
+        self.y = {
+            'train': [],
+            'val': [],
+            'val_tms-06': [],
+            'val_within_fold': [],
+            'val_random': [],
+        }
+        self.y_hat = {
+            'train': [],
+            'val': [],
+            'val_tms-06': [],
+            'val_within_fold': [],
+            'val_random': [],
+        }
 
 
     def configure_optimizers(self) -> dict[str, torch.optim.Optimizer | ReduceLROnPlateau | str]:
@@ -130,6 +171,7 @@ class ModelProt(pl.LightningModule):
         }
 
     def forward(self, embeddings, coords, padding_mask, mode):
+        # embeddings = self.proj_in(embeddings)
         if self.preencoder is not None:
             if mode == 'train' and self.preencoder_noise_std > 0.:
                 coords = coords + \
@@ -137,6 +179,7 @@ class ModelProt(pl.LightningModule):
             embeddings = self.preencoder(embeddings, coords, padding_mask)
         embeddings = self.proj(embeddings)
         feats = self.encoder(x=embeddings, pad_mask=padding_mask,)
+        # feats = self.proj_out(feats)
         return feats
     
 
@@ -241,26 +284,32 @@ class ModelProt(pl.LightningModule):
         num_pairs = len(targets)
 
         # Encode each protein
-        feats = self.forward(embeddings, coords, padding_mask, mode)
+        feats = self.forward(embeddings, coords, padding_mask, 'train' if mode == 'train' else 'val')
         assert len(feats) % 2 == 0
         assert len(feats) // 2 == num_pairs
         
         similarity = nn.functional.cosine_similarity(feats[:num_pairs], feats[num_pairs:], dim=-1)
-        loss_l1 = nn.functional.l1_loss(similarity, targets)
-        loss_l2 = nn.functional.mse_loss(similarity, targets)
+        # similarity = (similarity + 1) * 0.5
+        if self.loss_thresh is not None:
+            mask = (similarity >= self.loss_thresh) | (targets >= self.loss_thresh)
+            similarity = similarity[mask]
+            targets = targets[mask]
 
-        self.log(f'{mode}_l1', loss_l1)
-        self.log(f'{mode}_l2', loss_l2)
+        if self.loss_func == 'l1':
+            loss = nn.functional.l1_loss(similarity, targets)
+        elif self.loss_func == 'mse':
+            loss = nn.functional.mse_loss(similarity, targets)
+        elif self.loss_func == 'l1weighted':
+            weighted = 3. * targets + 1. # high tm-scores pairs are more important
+            loss = (weighted * torch.abs(similarity - targets)).mean()
+        elif self.loss_func == 'mseweighted':
+            weighted = 3. * targets + 1. # high tm-scores pairs are more important
+            loss = (weighted * torch.square(similarity - targets)).mean()
+        else:
+            raise NotImplementedError
         
-        if mode == 'train':
-            self.train_y += targets.detach().cpu().tolist()
-            self.train_y_hat += similarity.detach().cpu().tolist()
-        if mode == 'val':
-            self.val_y += targets.detach().cpu().tolist()
-            self.val_y_hat += similarity.detach().cpu().tolist()
-        
-        loss = loss_l1 if self.loss_func == 'l1' \
-                else loss_l2 if self.loss_func == 'l2' else None
+        self.y[mode] += targets.detach().cpu().tolist()
+        self.y_hat[mode] += similarity.detach().cpu().tolist()
 
         return loss
 
@@ -272,9 +321,18 @@ class ModelProt(pl.LightningModule):
         self.log('train_loss', loss)
         return loss
     
-    def validation_step(self, batch, batch_idx):
-        loss = self.loss_function(batch, mode='val')
-        self.log('val_loss', loss)
+    def validation_step(self, batch, batch_idx, dataloader_idx):
+        if dataloader_idx == 0:
+            loss = self.loss_function(batch, mode='val')
+            self.log('val_loss', loss)
+        elif dataloader_idx == 1:
+            loss = self.loss_function(batch, mode='val_tms-06')
+        elif dataloader_idx == 2:
+            loss = self.loss_function(batch, mode='val_within_fold')
+        elif dataloader_idx == 3:
+            loss = self.loss_function(batch, mode='val_random')
+        else:
+            raise Exception
         return loss
 
     def evaluate(self, y, y_hat, mode):
@@ -285,31 +343,78 @@ class ModelProt(pl.LightningModule):
         self.log(f'{mode}_r2', r2_score(y, y_hat))
         self.log(f'{mode}_pearson', pearsonr(y, y_hat).statistic)
         self.log(f'{mode}_spearman', spearmanr(y, y_hat).statistic)
+        self.log(f'{mode}_l1', nn.functional.l1_loss(torch.tensor(y), torch.tensor(y_hat)))
+        self.log(f'{mode}_mse', nn.functional.mse_loss(torch.tensor(y), torch.tensor(y_hat)))
+        
+        if self.loss_thresh is not None:
+            pass
+            
+            y = np.array(y)
+            y_hat = np.array(y_hat)
+            mask = (y >= self.loss_thresh)
+            # print(f"{mode} {len(y)=} {len(y_hat)=} {mask.sum()=}")
+            # print(y)
+            
+            if mask.sum() > 0:
+                y_upper = y[mask]
+                y_hat_upper = y_hat[mask]
+                self.log(f'{mode}_upper_y_mean', np.mean(y_upper))
+                self.log(f'{mode}_upper_y_hat_mean', np.mean(y_hat_upper))
+                self.log(f'{mode}_upper_y_std', np.std(y_upper))
+                self.log(f'{mode}_upper_y_hat_std', np.std(y_hat_upper))
+                self.log(f'{mode}_upper_r2', r2_score(y_upper, y_hat_upper))
+                self.log(f'{mode}_upper_pearson', pearsonr(y_upper, y_hat_upper).statistic)
+                self.log(f'{mode}_upper_spearman', spearmanr(y_upper, y_hat_upper).statistic)
+                self.log(f'{mode}_upper_l1', nn.functional.l1_loss(torch.tensor(y), torch.tensor(y_hat)))
+
+            
+            if (~mask).sum() > 0:
+                y_lower = y[~mask]
+                y_hat_lower = y_hat[~mask]
+                self.log(f'{mode}_lower_y_mean', np.mean(y_lower))
+                self.log(f'{mode}_lower_y_hat_mean', np.mean(y_hat_lower))
+                self.log(f'{mode}_lower_y_std', np.std(y_lower))
+                self.log(f'{mode}_lower_y_hat_std', np.std(y_hat_lower))
+                self.log(f'{mode}_lower_r2', r2_score(y_lower, y_hat_lower))
+                self.log(f'{mode}_lower_pearson', pearsonr(y_lower, y_hat_lower).statistic)
+                self.log(f'{mode}_lower_spearman', spearmanr(y_lower, y_hat_lower).statistic)
+                self.log(f'{mode}_lower_l1', nn.functional.l1_loss(torch.tensor(y), torch.tensor(y_hat)))
+
 
     def on_train_epoch_end(self) -> None:
         pass
     
     def on_validation_epoch_end(self) -> None:
 
-        if len(self.train_y) > 0 and len(self.train_y_hat) > 0:
-            # train
+        for mode in self.y:
+            if len(self.y[mode]) == 0: continue
             self.evaluate(
-                y=self.train_y,
-                y_hat=self.train_y_hat,
-                mode='train',
+                y=self.y[mode],
+                y_hat=self.y_hat[mode],
+                mode=mode,
             )
+            self.y[mode] = []
+            self.y_hat[mode] = []
 
-            self.train_y = []
-            self.train_y_hat = []
+        # if len(self.train_y) > 0 and len(self.train_y_hat) > 0:
+        #     # train
+        #     self.evaluate(
+        #         y=self.train_y,
+        #         y_hat=self.train_y_hat,
+        #         mode='train',
+        #     )
 
-        # val
-        self.evaluate(
-            y=self.val_y,
-            y_hat=self.val_y_hat,
-            mode='val',
-        )
+        #     self.train_y = []
+        #     self.train_y_hat = []
 
-        self.val_y = []
-        self.val_y_hat = []
+        # # val
+        # self.evaluate(
+        #     y=self.val_y,
+        #     y_hat=self.val_y_hat,
+        #     mode='val',
+        # )
+
+        # self.val_y = []
+        # self.val_y_hat = []
 
 

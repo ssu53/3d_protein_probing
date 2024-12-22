@@ -12,6 +12,7 @@ from pp3.models_prot.model import ModelProt
 def embed_for_retrieval(
     project_name: str,
     save_dir: Path,
+    preencoder_type,
     preencoder_num_layers: int,
     preencoder_hidden_dim: int,
     preencoder_max_neighbors: int,
@@ -28,6 +29,7 @@ def embed_for_retrieval(
     temperature: float = 1e-1,
     similarity_func: str = 'cosine',
     loss_func: str = 'infonce',
+    loss_thresh: float | None = None,
     learning_rate: float = 1e-4,
     dropout: float = 0.0,
     weight_decay: float = 0.0,
@@ -35,8 +37,10 @@ def embed_for_retrieval(
     num_workers: int = 4,
     max_epochs: int = 500,
     patience: int = 25,
+    accumulate_grad_batches: int = 1,
     ckpt_every_k_epochs: int = 1,
     # ckpt_every_n_train_steps: int | None = 2500,
+    model_ckpt_path: Path | None = None,
     num_sanity_val_steps: int = 2,
     val_check_interval: float = 1.0,
     run_id_number: int | None = None,
@@ -52,7 +56,7 @@ def embed_for_retrieval(
     embeddings_name = str(embeddings_path).split('/')[-1].replace('.pt','')
     if loss_func != 'infonce':
         print("Ignoring temperature!")
-        run_name = f'{embeddings_name}_{loss_func}_{num_layers}L_{learning_rate}lr_{batch_size}bs'
+        run_name = f'{embeddings_name}_{loss_func}_{embedding_dim}d_{preencoder_num_layers}pL_{num_layers}L'
     else:
         run_name = f'{embeddings_name}_{loss_func}_{num_layers}L_{learning_rate}lr_{batch_size}bs_{temperature}temp'
     if run_name_suffix:
@@ -100,22 +104,36 @@ def embed_for_retrieval(
 
 
     # Build model
-    model = ModelProt(
-        preencoder_num_layers=preencoder_num_layers,
-        preencoder_hidden_dim=preencoder_hidden_dim,
-        preencoder_max_neighbors=preencoder_max_neighbors,
-        preencoder_noise_std=preencoder_noise_std,
-        num_layers=num_layers,
-        num_heads=num_heads,
-        input_dim=data_module.embedding_dim,
-        embedding_dim=embedding_dim,
-        dropout=dropout,
-        learning_rate=learning_rate,
-        temperature=temperature,
-        weight_decay=weight_decay,
-        similarity_func=similarity_func,
-        loss_func=loss_func,
-    )
+    if model_ckpt_path is None:
+        model = ModelProt(
+            preencoder_type=preencoder_type,
+            preencoder_num_layers=preencoder_num_layers,
+            preencoder_hidden_dim=preencoder_hidden_dim,
+            preencoder_max_neighbors=preencoder_max_neighbors,
+            preencoder_noise_std=preencoder_noise_std,
+            num_layers=num_layers,
+            num_heads=num_heads,
+            input_dim=data_module.embedding_dim,
+            embedding_dim=embedding_dim,
+            dropout=dropout,
+            learning_rate=learning_rate,
+            temperature=temperature,
+            weight_decay=weight_decay,
+            similarity_func=similarity_func,
+            loss_func=loss_func,
+            loss_thresh=loss_thresh,
+        )
+    else:
+        model = ModelProt.load_from_checkpoint(model_ckpt_path)
+        print('Loaded from checkpoint; ignoring many model hyperparameters!')
+
+        assert model.similarity_func == similarity_func
+        assert model.loss_func == loss_func
+
+        model.preencoder_noise_std = preencoder_noise_std
+        model.learning_rate = learning_rate
+        model.temperature = temperature
+        model.weight_decay = weight_decay
 
     print(model)
 
@@ -139,6 +157,7 @@ def embed_for_retrieval(
         'pairfile_val_path': str(pairfile_val_path),
         'save_dir': str(save_dir),
         'embedding_dim': embedding_dim,
+        'preencoder_type': preencoder_type,
         'preencoder_num_layers': preencoder_num_layers,
         'preencoder_hidden_dim': preencoder_hidden_dim,
         'preencoder_max_neighbors': preencoder_max_neighbors,
@@ -151,23 +170,27 @@ def embed_for_retrieval(
         'learning_rate': learning_rate,
         'temperature': temperature,
         'loss_func': loss_func,
+        'loss_thresh': loss_thresh,
         'similarity_func': similarity_func,
         'weight_decay': weight_decay,
         'dropout': dropout,
         'max_epochs': max_epochs,
+        'accumulate_grad_batches': accumulate_grad_batches,
         'ckpt_every_k_epochs': ckpt_every_k_epochs,
         'num_workers': num_workers,
         'patience': patience,
         'run_id_number': run_id_number,
         'num_sanity_val_steps': num_sanity_val_steps,
+        'model_ckpt_path': model_ckpt_path,
     })
+    print(logger.experiment.config)
 
     # Build model checkpoint callback
     ckpt_callback = ModelCheckpoint(
         dirpath=save_dir,
         save_top_k=2,
         save_last=True,
-        monitor='val_loss',
+        monitor='val_loss/dataloader_idx_0',
         every_n_epochs=ckpt_every_k_epochs,
         # every_n_train_steps=ckpt_every_n_train_steps,
         save_on_train_epoch_end=False, # ckpt after each validation
@@ -175,7 +198,7 @@ def embed_for_retrieval(
 
     # Build early stopping callback
     early_stopping = EarlyStopping(
-        monitor='val_loss',
+        monitor='val_loss/dataloader_idx_0',
         patience=patience,
         mode='min'
     )
@@ -190,6 +213,7 @@ def embed_for_retrieval(
         accelerator='gpu',
         devices=1,
         deterministic=True,
+        accumulate_grad_batches=accumulate_grad_batches,
         max_epochs=max_epochs,
         log_every_n_steps=25,
         val_check_interval=val_check_interval,
@@ -197,9 +221,17 @@ def embed_for_retrieval(
         num_sanity_val_steps=num_sanity_val_steps
     )
 
+    # trainer.validate(
+    #     model=model,
+    #     ckpt_path='last',
+    #     datamodule=data_module,
+    # )
+
+    # return
 
     # Train model
     trainer.fit(
+        # ckpt_path=model_ckpt_path,
         model=model,
         datamodule=data_module
     )
